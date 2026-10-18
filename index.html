@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PT. Fath Indah Travel Service - Portal Sistem Manajemen</title>
+  
+  <!-- Modern Typography: Plus Jakarta Sans & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome 6 Free Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Custom Styling -->
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" type="image/png" href="assets/logo.png">
+</head>
+<body>
+
+  <!-- ======================================================================
+       1. LOGIN SCREEN
+       ====================================================================== -->
+  <div class="login-wrapper" id="loginWrapper">
+    <div class="login-card">
+      
+      <!-- Brand Header -->
+      <div class="brand-badge-container">
+        <img src="assets/logo.png" alt="Logo PT. Fath Indah Travel Service" class="brand-logo-img">
+        <h1 class="brand-company-title">PT. Fath Indah Travel Service</h1>
+        <div class="brand-company-subtitle">Umrah & Hajj Management Portal</div>
+        <p class="brand-tagline">Silakan masuk untuk mengakses modul operasional</p>
+        
+        <div class="db-pill" id="loginDbSourcePill">
+          <span class="status-dot"></span>
+          <span>Database: Google Sheets (Tabel Users)</span>
+        </div>
+      </div>
+
+      <!-- Alert Box -->
+      <div class="alert-box" id="loginAlert"></div>
+
+      <!-- Login Form -->
+      <form id="loginForm" autocomplete="off">
+        <div class="form-group">
+          <label class="form-label" for="usernameInput">Username</label>
+          <div class="input-container">
+            <i class="fa-regular fa-user input-icon"></i>
+            <input type="text" id="usernameInput" class="form-input" placeholder="Masukkan username Anda" required autofocus>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="passwordInput">Password</label>
+          <div class="input-container">
+            <i class="fa-solid fa-lock input-icon"></i>
+            <input type="password" id="passwordInput" class="form-input" placeholder="Masukkan password Anda" required>
+            <button type="button" class="toggle-password-btn" id="togglePasswordBtn" aria-label="Lihat Password">
+              <i class="fa-regular fa-eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Automatic Geolocation & Google Maps Tracker Indicator -->
+        <div class="geo-info-banner">
+          <i class="fa-solid fa-map-location-dot geo-icon"></i>
+          <span id="geoStatusText">Mendeteksi lokasi Google Maps secara otomatis...</span>
+        </div>
+
+        <button type="submit" class="submit-btn" id="loginBtn">
+          <span>Masuk ke Sistem</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </form>
+
+      <!-- Quick Demo Accounts (Based on Google Sheets data) -->
+      <div class="demo-users-card">
+        <div class="demo-title">
+          <span>Pilih Akun Demo Cepat (Tabel Users)</span>
+          <i class="fa-solid fa-bolt" style="color:var(--gold-light);"></i>
+        </div>
+        <div class="demo-chips">
+          <button type="button" class="demo-chip" data-user="admin" data-pass="a">
+            <i class="fa-solid fa-user-shield"></i> admin (Pusat)
+          </button>
+          <button type="button" class="demo-chip" data-user="Miftah" data-pass="a">
+            <i class="fa-solid fa-user-tie"></i> Miftah (StaffHaji)
+          </button>
+          <button type="button" class="demo-chip" data-user="Andini" data-pass="085717681184">
+            <i class="fa-solid fa-user"></i> Andini (Staff)
+          </button>
+          <button type="button" class="demo-chip" data-user="Kadari" data-pass="0811145185">
+            <i class="fa-solid fa-user"></i> Kadari (Staff)
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       2. AUTHENTICATED WORKSPACE APP LAYOUT
+       ====================================================================== -->
+  <div class="app-container" id="appContainer">
+    
+    <!-- Mobile Sidebar Backdrop -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <!-- LEFT SIDEBAR (COLLAPSIBLE / BISA DISEMBUNYIKAN) -->
+    <aside class="sidebar" id="sidebar">
+      
+      <!-- Sidebar Header with Brand -->
+      <div class="sidebar-header">
+        <a href="#" class="sidebar-brand" onclick="switchModule('dashboard'); return false;">
+          <img src="assets/logo.png" alt="Logo" class="sidebar-logo">
+          <div class="sidebar-brand-text">
+            <div class="sidebar-title">PT. FATH INDAH</div>
+            <div class="sidebar-sub">Travel Service</div>
+          </div>
+        </a>
+        <button type="button" class="close-mobile-sidebar-btn" id="closeMobileSidebarBtn" aria-label="Tutup Menu">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Navigation Menu -->
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Menu Utama</div>
+
+        <a href="#dashboard" class="nav-item active" data-module="dashboard" data-tooltip="Dashboard">
+          <i class="fa-solid fa-chart-pie nav-icon"></i>
+          <span class="nav-label">Dashboard</span>
+        </a>
+
+        <a href="#jamaah" class="nav-item" data-module="jamaah" data-tooltip="Data Jamaah">
+          <i class="fa-solid fa-users nav-icon"></i>
+          <span class="nav-label">Data Jamaah</span>
+        </a>
+
+        <a href="#logs" class="nav-item" data-module="logs" data-tooltip="Log Aktivitas">
+          <i class="fa-solid fa-list-check nav-icon"></i>
+          <span class="nav-label">Log Aktivitas</span>
+        </a>
+
+        <div class="nav-section-title">Manajemen & SDM</div>
+
+        <a href="#users" class="nav-item" data-module="users" data-tooltip="Manajemen Users">
+          <i class="fa-solid fa-user-gear nav-icon"></i>
+          <span class="nav-label">Manajemen Users</span>
+        </a>
+
+        <a href="#cuti_absensi" class="nav-item" data-module="cuti_absensi" data-tooltip="Cuti & Presensi">
+          <i class="fa-regular fa-calendar-check nav-icon"></i>
+          <span class="nav-label">Cuti & Presensi</span>
+        </a>
+
+        <div class="nav-section-title">Sistem</div>
+
+        <a href="#settings" class="nav-item" data-module="settings" data-tooltip="Konfigurasi Database">
+          <i class="fa-solid fa-database nav-icon"></i>
+          <span class="nav-label">Konfigurasi DB</span>
+        </a>
+      </nav>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <div class="user-quick-profile">
+          <div class="avatar-badge" id="userAvatarLetter">A</div>
+          <div class="user-quick-info">
+            <div class="user-quick-name" id="userDisplayName">Administrator</div>
+            <div class="user-quick-role" id="userDisplayRole">Admin • Pusat</div>
+          </div>
+        </div>
+
+        <button type="button" class="sidebar-collapse-btn" id="sidebarToggleBtn" title="Sembunyikan/Buka Menu">
+          <i class="fa-solid fa-angles-left"></i>
+          <span>Minimize Menu</span>
+        </button>
+      </div>
+
+    </aside>
+
+    <!-- MAIN WRAPPER (HEADER + DYNAMIC WORKSPACE) -->
+    <div class="main-wrapper">
+      
+      <!-- TOP HEADER BAR -->
+      <header class="top-header">
+        <div class="header-left">
+          <button type="button" class="hamburger-btn" id="mobileHamburgerBtn" aria-label="Buka Menu">
+            <i class="fa-solid fa-bars"></i>
+          </button>
+          
+          <div class="module-title-box">
+            <h2 class="module-title" id="moduleTitle">Dashboard Utama</h2>
+            <div class="module-breadcrumb" id="moduleBreadcrumb">Portal Eksekutif / Ikhtisar Sistem</div>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <!-- Real-time Clock (WIB) -->
+          <div class="live-clock-pill" id="liveClock">
+            <i class="fa-regular fa-clock"></i> Memuat waktu...
+          </div>
+
+          <!-- Active Database Mode Indicator -->
+          <div class="db-pill" id="headerDbBadge">
+            <span class="status-dot"></span>
+            <span>Database: Google Sheets</span>
+          </div>
+
+          <!-- Logout Button -->
+          <button type="button" class="logout-btn" id="logoutBtn" title="Keluar dari sesi">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            <span>Keluar</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- WORKSPACE AREA (SISA LAYAR UNTUK KERJA) -->
+      <main class="workspace" id="workspace">
+
+        <!-- ================================================================
+             MODULE 1: DASHBOARD OVERVIEW
+             ================================================================ -->
+        <div class="module-view active" id="view-dashboard">
+          
+          <!-- Key Metrics -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-header">
+                <span class="stat-label">Total Data Jamaah</span>
+                <div class="stat-icon emerald"><i class="fa-solid fa-kaaba"></i></div>
+              </div>
+              <div class="stat-value" id="statJamaahCount">154+</div>
+              <div class="stat-subtext"><i class="fa-solid fa-circle-check"></i> Sumber: Sheet Metadata</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-header">
+                <span class="stat-label">Pengguna Terdaftar</span>
+                <div class="stat-icon gold"><i class="fa-solid fa-user-shield"></i></div>
+              </div>
+              <div class="stat-value" id="statUsersCount">42</div>
+              <div class="stat-subtext"><i class="fa-solid fa-database"></i> Sumber: Sheet Users</div>
+            </div>
+
+            <div class="stat-card emerald">
+              <div class="stat-header">
+                <span class="stat-label">Total Log Aktivitas</span>
+                <div class="stat-icon blue"><i class="fa-solid fa-clock-rotate-left"></i></div>
+              </div>
+              <div class="stat-value" id="statLogsCount">325+</div>
+              <div class="stat-subtext"><i class="fa-solid fa-location-dot"></i> Termasuk Maps URL</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-header">
+                <span class="stat-label">Status Database</span>
+                <div class="stat-icon purple"><i class="fa-solid fa-server"></i></div>
+              </div>
+              <div class="stat-value" style="font-size:1.35rem; color:#34d399;">TERHUBUNG</div>
+              <div class="stat-subtext"><i class="fa-solid fa-shield-halved"></i> Google Sheets & Supabase Ready</div>
+            </div>
+          </div>
+
+          <!-- Quick Actions & Recent Logins -->
+          <div class="content-card">
+            <div class="card-header-actions">
+              <div class="card-title">
+                <i class="fa-solid fa-history" style="color:var(--gold-light);"></i>
+                <span>Aktivitas Login Terkini (Tabel ActivityLogs)</span>
+              </div>
+              <div class="card-actions">
+                <button type="button" class="btn-secondary" onclick="switchModule('logs')">
+                  <i class="fa-solid fa-arrow-up-right-from-square"></i> Lihat Semua Log
+                </button>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Log ID</th>
+                    <th>Waktu (WIB)</th>
+                    <th>User</th>
+                    <th>Status</th>
+                    <th>Lokasi</th>
+                    <th>Peta Lokasi</th>
+                  </tr>
+                </thead>
+                <tbody id="recentLogsTableBody">
+                  <tr><td colspan="6" style="text-align:center; padding:20px;">Memuat data...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Information Notice Card -->
+          <div class="content-card" style="border-left: 4px solid var(--gold-primary);">
+            <div style="display:flex; gap:16px; align-items:flex-start;">
+              <i class="fa-solid fa-circle-info" style="color:var(--gold-light); font-size:1.5rem; margin-top:2px;"></i>
+              <div>
+                <h4 style="color:#ffffff; margin-bottom:4px; font-weight:700;">Informasi Sistem & Otorisasi</h4>
+                <p style="color:var(--text-muted); font-size:0.88rem; line-height:1.6;">
+                  Sistem ini terintegrasi langsung dengan database Google Sheets PT. Fath Indah Travel Service tanpa menggunakan Google Apps Script. 
+                  Setiap kali login berhasil, koordinat GPS dan tautan Google Maps secara otomatis dicatat ke dalam tabel <code>ActivityLogs</code>. 
+                  Sistem juga dapat dialihkan sewaktu-waktu ke <strong>Supabase</strong> melalui menu <em>Konfigurasi DB</em>.
+                </p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ================================================================
+             MODULE 2: DATA JAMAAH (Metadata)
+             ================================================================ -->
+        <div class="module-view" id="view-jamaah">
+          <div class="content-card">
+            <div class="card-header-actions">
+              <div class="card-title">
+                <i class="fa-solid fa-kaaba" style="color:var(--gold-light);"></i>
+                <span>Daftar Jamaah Umrah & Haji</span>
+                <span class="badge badge-gold" id="totalJamaahBadge">154 Jamaah</span>
+              </div>
+
+              <div class="card-actions">
+                <div class="search-box">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" id="searchJamaahInput" placeholder="Cari nama, ID, referensi..." oninput="renderJamaahTable()">
+                </div>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID Jamaah</th>
+                    <th>Nama Lengkap</th>
+                    <th>Paket Umrah</th>
+                    <th>Kanwil / Asal</th>
+                    <th>Kontak HP</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="jamaahTableBody">
+                  <tr><td colspan="6" style="text-align:center; padding:24px;">Memuat data jamaah...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 3: LOG AKTIVITAS (ActivityLogs)
+             ================================================================ -->
+        <div class="module-view" id="view-logs">
+          <div class="content-card">
+            <div class="card-header-actions">
+              <div class="card-title">
+                <i class="fa-solid fa-clipboard-list" style="color:var(--emerald-primary);"></i>
+                <span>Audit Trail & Activity Logs</span>
+                <span class="badge badge-success" id="totalLogsCountBadge">325+ Entri</span>
+              </div>
+
+              <div class="card-actions">
+                <div class="search-box">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" id="searchLogsInput" placeholder="Cari ID, user, aktivitas..." oninput="renderLogsTable()">
+                </div>
+
+                <select id="filterLogsModule" class="form-input" style="width:auto; padding:9px 16px;" onchange="renderLogsTable()">
+                  <option value="all">Semua Modul</option>
+                  <option value="Auth">Modul Auth</option>
+                  <option value="Cuti Karyawan">Cuti Karyawan</option>
+                  <option value="Jamaah">Jamaah</option>
+                </select>
+
+                <button type="button" class="btn-gold" onclick="exportLogsToCSV()">
+                  <i class="fa-solid fa-file-csv"></i> Ekspor CSV
+                </button>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Log ID</th>
+                    <th>Waktu (WIB)</th>
+                    <th>User & IP</th>
+                    <th>Modul</th>
+                    <th>Aksi & Detail</th>
+                    <th>Lokasi Geografis</th>
+                    <th>Google Maps</th>
+                  </tr>
+                </thead>
+                <tbody id="logsTableBody">
+                  <tr><td colspan="7" style="text-align:center; padding:24px;">Memuat riwayat log...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 4: MANAJEMEN USERS (Users Sheet)
+             ================================================================ -->
+        <div class="module-view" id="view-users">
+          <div class="content-card">
+            <div class="card-header-actions">
+              <div class="card-title">
+                <i class="fa-solid fa-users-gear" style="color:var(--gold-light);"></i>
+                <span>Data Pengguna (Tabel Users)</span>
+                <span class="badge badge-gold" id="totalUsersBadge">42 Pengguna</span>
+              </div>
+
+              <div class="card-actions">
+                <div class="search-box">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" id="searchUsersInput" placeholder="Cari nama, username, role..." oninput="renderUsersTable()">
+                </div>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>User ID</th>
+                    <th>Nama & Username</th>
+                    <th>Role</th>
+                    <th>Kanwil</th>
+                    <th>Kantor</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                  <tr><td colspan="6" style="text-align:center; padding:24px;">Memuat data pengguna...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 5: CUTI & ABSENSI
+             ================================================================ -->
+        <div class="module-view" id="view-cuti_absensi">
+          <div class="content-card">
+            <div class="card-title" style="margin-bottom:16px;">
+              <i class="fa-solid fa-fingerprint" style="color:var(--emerald-primary);"></i>
+              <span>Riwayat Presensi Karyawan (Tabel Absensi)</span>
+            </div>
+
+            <div class="table-responsive" style="margin-bottom:28px;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Waktu</th>
+                    <th>Nama Karyawan</th>
+                    <th>Tipe Absen</th>
+                    <th>Status</th>
+                    <th>Lokasi GPS</th>
+                  </tr>
+                </thead>
+                <tbody id="absensiTableBody">
+                  <tr><td colspan="5" style="text-align:center; padding:20px;">Memuat data presensi...</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="card-title" style="margin-bottom:16px;">
+              <i class="fa-solid fa-calendar-xmark" style="color:var(--gold-light);"></i>
+              <span>Pengajuan Cuti Karyawan (Tabel CutiKaryawan)</span>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID Cuti</th>
+                    <th>Nama Karyawan</th>
+                    <th>Tipe Cuti</th>
+                    <th>Periode</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="cutiTableBody">
+                  <tr><td colspan="5" style="text-align:center; padding:20px;">Memuat data cuti...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 6: KONFIGURASI DATABASE (Google Sheets vs Supabase)
+             ================================================================ -->
+        <div class="module-view" id="view-settings">
+          <div class="content-card">
+            <div class="card-title" style="margin-bottom:14px;">
+              <i class="fa-solid fa-sliders" style="color:var(--gold-light);"></i>
+              <span>Pilihan Sumber Database (Google Sheets / Supabase)</span>
+            </div>
+            <p style="color:var(--text-muted); font-size:0.88rem; margin-bottom:20px;">
+              Pilih database yang aktif untuk otentikasi login dan pencatatan riwayat aktivitas.
+            </p>
+
+            <div class="db-selector-grid">
+              <!-- Option 1: Google Sheets -->
+              <div class="db-option-card selected" id="optDbSheets" onclick="selectDatabase('googlesheets')">
+                <div class="db-option-header">
+                  <div class="db-option-title">
+                    <i class="fa-solid fa-file-excel" style="color:#22c55e;"></i>
+                    <span>Google Sheets</span>
+                  </div>
+                  <div class="radio-check"></div>
+                </div>
+                <p style="color:var(--text-muted); font-size:0.82rem; line-height:1.5;">
+                  Terkoneksi langsung ke spreadsheet <code>Users</code> & <code>ActivityLogs</code> publik.
+                </p>
+                <div class="badge badge-success" style="margin-top:12px;">Aktif Saat Ini</div>
+              </div>
+
+              <!-- Option 2: Supabase -->
+              <div class="db-option-card" id="optDbSupabase" onclick="selectDatabase('supabase')">
+                <div class="db-option-header">
+                  <div class="db-option-title">
+                    <i class="fa-solid fa-bolt" style="color:#60a5fa;"></i>
+                    <span>Supabase (PostgreSQL)</span>
+                  </div>
+                  <div class="radio-check"></div>
+                </div>
+                <p style="color:var(--text-muted); font-size:0.82rem; line-height:1.5;">
+                  Database SQL modern dengan performa tinggi, RLS, dan koneksi REST API cepat.
+                </p>
+                <div class="badge badge-blue" style="margin-top:12px;">Siap Dialihkan</div>
+              </div>
+            </div>
+
+            <!-- Supabase Parameters Form -->
+            <div class="switch-card">
+              <h4 style="color:#ffffff; margin-bottom:16px; font-weight:700;">Pengaturan Parameter Supabase</h4>
+              
+              <div class="form-group">
+                <label class="form-label">Supabase Project URL</label>
+                <input type="url" id="supabaseUrlInput" class="form-input" placeholder="https://xyzcompany.supabase.co">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Supabase Anon Key / API Key</label>
+                <input type="password" id="supabaseKeyInput" class="form-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+              </div>
+
+              <div id="supabaseTestResult" style="margin-bottom:14px; font-size:0.88rem; display:none;"></div>
+
+              <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                <button type="button" class="btn-gold" onclick="saveSupabaseConfig()">
+                  <i class="fa-solid fa-floppy-disk"></i> Simpan Konfigurasi
+                </button>
+                <button type="button" class="btn-secondary" onclick="testSupabase()">
+                  <i class="fa-solid fa-plug"></i> Test Koneksi Supabase
+                </button>
+                <a href="/api/download-sql" class="btn-secondary" style="text-decoration:none;">
+                  <i class="fa-solid fa-download"></i> Unduh Skema SQL Supabase
+                </a>
+              </div>
+            </div>
+
+            <!-- Migration Instructions -->
+            <div class="content-card" style="background:rgba(8, 14, 28, 0.4); border-color:var(--border-subtle);">
+              <h4 style="color:var(--gold-light); margin-bottom:10px; font-weight:700;">
+                <i class="fa-solid fa-book-bookmark"></i> Panduan Migrasi ke Supabase
+              </h4>
+              <ol style="color:var(--text-muted); font-size:0.85rem; padding-left:20px; line-height:1.8;">
+                <li>Buka dashboard Supabase Anda di <a href="https://supabase.com" target="_blank" style="color:var(--gold-light);">supabase.com</a> dan buat project baru.</li>
+                <li>Klik menu <strong>SQL Editor</strong> di dashboard Supabase.</li>
+                <li>Unduh skema SQL menggunakan tombol <em>Unduh Skema SQL Supabase</em> di atas, lalu salin dan jalankan di SQL Editor Supabase. Skema ini sudah mencakup pembuatan tabel <code>users</code>, <code>activity_logs</code>, serta data awal (seed).</li>
+                <li>Salin <strong>Project URL</strong> dan <strong>Anon Key</strong> dari menu <em>Project Settings -> API</em> ke form pengaturan di atas.</li>
+                <li>Klik tombol kartu <strong>Supabase (PostgreSQL)</strong> untuk mengalihkan sistem secara langsung!</li>
+              </ol>
+            </div>
+
+          </div>
+        </div>
+
+      </main>
+
+    </div>
+  </div>
+
+  <!-- Main JavaScript File -->
+  <script src="js/app.js"></script>
+</body>
+</html>
