@@ -1,22 +1,39 @@
 /* ==========================================================================
    PT. FATH INDAH TRAVEL SERVICE - LUXURY EXECUTIVE DESIGN SYSTEM
-   Palette: Obsidian Navy, Emerald Jade, Warm Champagne Gold
+   Palette: Deep Islamic Green (Hijau Tua) & Warm Champagne Gold
    ========================================================================== */
 
-:root {
-  --bg-primary: #070b14;
-  --bg-secondary: #0d1527;
-  --bg-card: rgba(16, 26, 48, 0.75);
-  --bg-card-hover: rgba(22, 36, 68, 0.85);
-  --bg-glass: rgba(13, 21, 39, 0.7);
+/* 
+   -------------------------------------------------------------------------
+   PANDUAN MENGEMBALIKAN WARNA KE TEMA AWAL (OBSIDIAN NAVY):
+   Jika Anda ingin kembali ke tema warna awal, cukup ganti nilai di bawah ini:
+     --bg-primary: #070b14;
+     --bg-secondary: #0d1527;
+     --bg-card: rgba(16, 26, 48, 0.75);
+     --bg-card-hover: rgba(22, 36, 68, 0.85);
+     --bg-glass: rgba(13, 21, 39, 0.7);
+     --bg-input: rgba(8, 14, 28, 0.7);
+     --bg-header: rgba(13, 21, 39, 0.85);
+   -------------------------------------------------------------------------
+*/
 
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-focus: rgba(245, 158, 11, 0.5);
-  --border-gold: rgba(245, 158, 11, 0.25);
+:root {
+  /* TEMA HIJAU TUA (DEEP EMERALD ISLAMIC GREEN) - AKTIF */
+  --bg-primary: #061e16;
+  --bg-secondary: #092c20;
+  --bg-card: rgba(10, 44, 33, 0.82);
+  --bg-card-hover: rgba(14, 58, 44, 0.92);
+  --bg-glass: rgba(8, 38, 28, 0.75);
+  --bg-input: rgba(4, 25, 18, 0.75);
+  --bg-header: rgba(8, 38, 28, 0.9);
+
+  --border-subtle: rgba(255, 255, 255, 0.09);
+  --border-focus: rgba(245, 158, 11, 0.55);
+  --border-gold: rgba(245, 158, 11, 0.3);
 
   --text-main: #f8fafc;
-  --text-muted: #94a3b8;
-  --text-dim: #64748b;
+  --text-muted: #a7b7ac;
+  --text-dim: #6d8576;
 
   --gold-primary: #f59e0b;
   --gold-light: #fbbf24;
@@ -27,7 +44,7 @@
   --emerald-primary: #10b981;
   --emerald-dark: #059669;
   --emerald-gradient: linear-gradient(135deg, #34d399 0%, #059669 100%);
-  --emerald-glow: rgba(16, 185, 129, 0.25);
+  --emerald-glow: rgba(16, 185, 129, 0.3);
 
   --danger-primary: #ef4444;
   --danger-gradient: linear-gradient(135deg, #f87171 0%, #dc2626 100%);
@@ -37,9 +54,9 @@
   --radius-lg: 20px;
   --radius-xl: 28px;
 
-  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 10px 25px -5px rgba(0, 0, 0, 0.45);
-  --shadow-lg: 0 20px 40px -10px rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 20px 40px -10px rgba(0, 0, 0, 0.65);
   --shadow-gold: 0 10px 25px -5px rgba(245, 158, 11, 0.25);
 
   --sidebar-width: 280px;
@@ -65,9 +82,9 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   background-image: 
-    radial-gradient(circle at 15% 20%, rgba(16, 185, 129, 0.08) 0%, transparent 45%),
-    radial-gradient(circle at 85% 80%, rgba(245, 158, 11, 0.06) 0%, transparent 45%),
-    radial-gradient(circle at 50% 50%, rgba(13, 21, 39, 0.8) 0%, transparent 100%);
+    radial-gradient(circle at 15% 20%, rgba(16, 185, 129, 0.18) 0%, transparent 45%),
+    radial-gradient(circle at 85% 80%, rgba(245, 158, 11, 0.1) 0%, transparent 45%),
+    radial-gradient(circle at 50% 50%, rgba(6, 30, 22, 0.88) 0%, transparent 100%);
   background-attachment: fixed;
 }
 
@@ -208,7 +225,7 @@ body {
 
 .form-input {
   width: 100%;
-  background: rgba(8, 14, 28, 0.7);
+  background: var(--bg-input);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 13px 44px 13px 46px;
@@ -221,7 +238,7 @@ body {
 
 .form-input:focus {
   border-color: var(--gold-primary);
-  background: rgba(11, 19, 38, 0.9);
+  background: rgba(8, 36, 26, 0.95);
   box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18);
 }
 
@@ -247,16 +264,7 @@ body {
 }
 
 .geo-info-banner {
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: var(--radius-md);
-  padding: 10px 14px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  margin-bottom: 22px;
+  display: none !important;
 }
 
 .geo-icon {
@@ -551,7 +559,7 @@ body {
 .sidebar-footer {
   padding: 16px;
   border-top: 1px solid var(--border-subtle);
-  background: rgba(7, 11, 20, 0.4);
+  background: rgba(4, 25, 18, 0.6);
 }
 
 .user-quick-profile {
@@ -638,7 +646,7 @@ body {
 /* Header (Top Bar) */
 .top-header {
   height: var(--header-height);
-  background: rgba(13, 21, 39, 0.85);
+  background: var(--bg-header);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border-subtle);
@@ -901,7 +909,7 @@ body {
 
 .search-box input {
   width: 100%;
-  background: rgba(8, 14, 28, 0.7);
+  background: var(--bg-input);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 9px 16px 9px 38px;
@@ -913,7 +921,7 @@ body {
 
 .search-box input:focus {
   border-color: var(--gold-primary);
-  background: rgba(11, 19, 38, 0.9);
+  background: rgba(8, 36, 26, 0.95);
 }
 
 .search-box i {
@@ -980,7 +988,7 @@ body {
 }
 
 .data-table th {
-  background: rgba(9, 15, 30, 0.85);
+  background: rgba(7, 33, 24, 0.92);
   color: var(--text-muted);
   font-weight: 600;
   padding: 14px 18px;

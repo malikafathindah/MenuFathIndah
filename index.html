@@ -62,10 +62,9 @@
           </div>
         </div>
 
-        <!-- Automatic Geolocation & Google Maps Tracker Indicator -->
-        <div class="geo-info-banner">
-          <i class="fa-solid fa-map-location-dot geo-icon"></i>
-          <span id="geoStatusText">Mendeteksi lokasi Google Maps secara otomatis...</span>
+        <!-- Automatic Geolocation in Background (Hidden) -->
+        <div class="geo-info-banner" style="display: none;">
+          <span id="geoStatusText"></span>
         </div>
 
         <button type="submit" class="submit-btn" id="loginBtn">
@@ -73,28 +72,6 @@
           <i class="fa-solid fa-arrow-right"></i>
         </button>
       </form>
-
-      <!-- Quick Demo Accounts (Based on Google Sheets data) -->
-      <div class="demo-users-card">
-        <div class="demo-title">
-          <span>Pilih Akun Demo Cepat (Tabel Users)</span>
-          <i class="fa-solid fa-bolt" style="color:var(--gold-light);"></i>
-        </div>
-        <div class="demo-chips">
-          <button type="button" class="demo-chip" data-user="admin" data-pass="a">
-            <i class="fa-solid fa-user-shield"></i> admin (Pusat)
-          </button>
-          <button type="button" class="demo-chip" data-user="Miftah" data-pass="a">
-            <i class="fa-solid fa-user-tie"></i> Miftah (StaffHaji)
-          </button>
-          <button type="button" class="demo-chip" data-user="Andini" data-pass="085717681184">
-            <i class="fa-solid fa-user"></i> Andini (Staff)
-          </button>
-          <button type="button" class="demo-chip" data-user="Kadari" data-pass="0811145185">
-            <i class="fa-solid fa-user"></i> Kadari (Staff)
-          </button>
-        </div>
-      </div>
 
     </div>
   </div>
