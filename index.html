@@ -71,6 +71,18 @@
           <span>Masuk ke Sistem</span>
           <i class="fa-solid fa-arrow-right"></i>
         </button>
+        <!-- Quick Demo Role Switcher on Login -->
+        <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-subtle);">
+          <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Login Cepat Berdasarkan Role:</div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px;">
+            <button type="button" class="demo-chip" data-user="admin" data-pass="admin123" style="font-size:0.72rem; padding:4px 8px; border-radius:4px; background:rgba(212,175,55,0.15); border:1px solid rgba(212,175,55,0.3); color:var(--gold-light); cursor:pointer;">Admin (39 Menu)</button>
+            <button type="button" class="demo-chip" data-user="Miftah" data-pass="a" style="font-size:0.72rem; padding:4px 8px; border-radius:4px; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); color:#34d399; cursor:pointer;">StaffHaji (13 Menu)</button>
+            <button type="button" class="demo-chip" data-user="Imam" data-pass="08123456789" style="font-size:0.72rem; padding:4px 8px; border-radius:4px; background:rgba(96,165,250,0.15); border:1px solid rgba(96,165,250,0.3); color:#93c5fd; cursor:pointer;">StaffUmrah (11 Menu)</button>
+            <button type="button" class="demo-chip" data-user="Endang" data-pass="082254429000" style="font-size:0.72rem; padding:4px 8px; border-radius:4px; background:rgba(168,85,247,0.15); border:1px solid rgba(168,85,247,0.3); color:#c084fc; cursor:pointer;">StaffKanwil (13 Menu)</button>
+            <button type="button" class="demo-chip" data-user="manager" data-pass="manager123" style="font-size:0.72rem; padding:4px 8px; border-radius:4px; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); color:#fcd34d; cursor:pointer;">Manager (3 Menu)</button>
+            <button type="button" class="demo-chip" data-user="staff" data-pass="staff123" style="font-size:0.72rem; padding:4px 8px; border-radius:4px; background:rgba(255,255,255,0.06); border:1px solid var(--border-subtle); color:var(--text-main); cursor:pointer;">Staff (7 Menu)</button>
+          </div>
+        </div>
       </form>
 
     </div>
@@ -101,8 +113,8 @@
         </button>
       </div>
 
-      <!-- Navigation Menu -->
-      <nav class="sidebar-nav">
+      <!-- Navigation Menu (Populated Dynamically by Supabase Modules & User Role) -->
+      <nav class="sidebar-nav" id="sidebarNav">
         <div class="nav-section-title">Menu Utama</div>
 
         <a href="#dashboard" class="nav-item active" data-module="dashboard" data-tooltip="Dashboard">
@@ -119,29 +131,26 @@
           <i class="fa-solid fa-list-check nav-icon"></i>
           <span class="nav-label">Log Aktivitas</span>
         </a>
-
-        <div class="nav-section-title">Manajemen & SDM</div>
-
-        <a href="#users" class="nav-item" data-module="users" data-tooltip="Manajemen Users">
-          <i class="fa-solid fa-user-gear nav-icon"></i>
-          <span class="nav-label">Manajemen Users</span>
-        </a>
-
-        <a href="#cuti_absensi" class="nav-item" data-module="cuti_absensi" data-tooltip="Cuti & Presensi">
-          <i class="fa-regular fa-calendar-check nav-icon"></i>
-          <span class="nav-label">Cuti & Presensi</span>
-        </a>
-
-        <div class="nav-section-title">Sistem</div>
-
-        <a href="#settings" class="nav-item" data-module="settings" data-tooltip="Konfigurasi Database">
-          <i class="fa-solid fa-database nav-icon"></i>
-          <span class="nav-label">Konfigurasi DB</span>
-        </a>
       </nav>
 
       <!-- Sidebar Footer -->
       <div class="sidebar-footer">
+        <!-- Live Role Switcher (Preview) -->
+        <div style="margin-bottom: 8px;">
+          <div style="font-size:0.68rem; color:var(--text-muted); margin-bottom:4px; display:flex; justify-content:space-between;">
+            <span>Ganti Role (Preview):</span>
+            <span id="activeRoleIndicator" style="color:var(--gold-light); font-weight:700;">Admin</span>
+          </div>
+          <select id="roleQuickSwitcher" class="form-input" style="height:28px; font-size:0.75rem; padding:2px 8px; width:100%; background:rgba(0,0,0,0.5); border-color:rgba(212,175,55,0.3); color:var(--gold-light); border-radius:4px;">
+            <option value="Admin">Role: Admin (39 Menu)</option>
+            <option value="StaffHaji">Role: StaffHaji (13 Menu)</option>
+            <option value="StaffUmrah">Role: StaffUmrah (11 Menu)</option>
+            <option value="StaffKanwil">Role: StaffKanwil (13 Menu)</option>
+            <option value="Staff">Role: Staff (7 Menu)</option>
+            <option value="Manager">Role: Manager (3 Menu)</option>
+          </select>
+        </div>
+
         <div class="user-quick-profile">
           <div class="avatar-badge" id="userAvatarLetter">A</div>
           <div class="user-quick-info">
@@ -238,6 +247,35 @@
               </div>
               <div class="stat-value" style="font-size:1.35rem; color:#34d399;">TERHUBUNG</div>
               <div class="stat-subtext"><i class="fa-solid fa-shield-halved"></i> Google Sheets & Supabase Ready</div>
+            </div>
+          </div>
+
+          <!-- Modul & Menu Layanan Berdasarkan Role (Supabase Modules) -->
+          <div class="content-card">
+            <div class="card-header-actions" style="flex-wrap: wrap; gap: 12px;">
+              <div>
+                <div class="card-title">
+                  <i class="fa-solid fa-shapes" style="color:var(--gold-light);"></i>
+                  <span>Daftar Menu & Modul Operasional (Supabase)</span>
+                </div>
+                <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;" id="modulesRoleSubtitle">
+                  Menampilkan menu sesuai hak akses Role: <strong id="currentRoleBadge" style="color:var(--gold-light); font-weight:700;">Admin</strong> (Tabel Modules)
+                </div>
+              </div>
+              <div class="card-actions" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <input type="text" id="moduleSearchInput" class="form-input" placeholder="Cari nama menu..." style="height:36px; font-size:0.82rem; width:220px;">
+                <select id="moduleCategoryFilter" class="form-input" style="height:36px; font-size:0.82rem; width:auto; padding: 4px 12px;">
+                  <option value="ALL">Semua Kategori</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Modules Grid Container -->
+            <div class="modules-grid" id="modulesGridContainer">
+              <div style="grid-column: 1 / -1; text-align:center; padding: 30px; color:var(--text-muted);">
+                <i class="fa-solid fa-spinner fa-spin" style="font-size:1.5rem; color:var(--gold-light);"></i>
+                <div style="margin-top:8px;">Memuat modul dari Supabase...</div>
+              </div>
             </div>
           </div>
 
@@ -562,6 +600,15 @@
               </ol>
             </div>
 
+          </div>
+        </div>
+
+        <!-- ================================================================
+             DYNAMIC MODULE VIEW (Untuk Seluruh Modul dari Supabase Modules)
+             ================================================================ -->
+        <div class="module-view" id="view-dynamic-module">
+          <div class="content-card dynamic-module-box" id="dynamicModuleContent">
+            <!-- Dynamic module details rendered by JavaScript -->
           </div>
         </div>
 

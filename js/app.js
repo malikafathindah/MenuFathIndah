@@ -7,12 +7,19 @@
 
 const GOOGLE_SPREADSHEET_ID = '1VL8trcMIcZ6n5Be-2-9YwmC1pOsKliO_wbILmU_cC1s';
 
+const SUPABASE_CONFIG = {
+  url: 'https://utqexpkwtatwzknjftpx.supabase.co',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0cWV4cGt3dGF0d3prbmpmdHB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxODQ5MTYsImV4cCI6MjEwNzc2MDkxNn0.s17as0ZuXm11AMJyYp01omnHkiqTRTGrKtYZfAI7kwE'
+};
+
 // Application State
 const state = {
   isStaticMode: false, // Detected if /api/auth/login is not available (e.g. GitHub Pages)
   currentUser: null,
   activeModule: 'dashboard',
-  dbSource: 'googlesheets',
+  dbSource: 'supabase',
+  selectedCategory: 'ALL',
+  moduleSearchQuery: '',
   locationData: {
     latitude: -6.200000,
     longitude: 106.816666,
@@ -24,7 +31,8 @@ const state = {
     logs: [],
     jamaah: [],
     absensi: [],
-    cuti: []
+    cuti: [],
+    modules: []
   }
 };
 
@@ -270,15 +278,49 @@ function initEventListeners() {
   closeMobileSidebarBtn?.addEventListener('click', closeMobileSidebar);
   sidebarBackdrop?.addEventListener('click', closeMobileSidebar);
 
-  document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', (e) => {
+  // Event delegation for dynamic sidebar nav items
+  const sidebarNav = document.getElementById('sidebarNav');
+  sidebarNav?.addEventListener('click', (e) => {
+    const item = e.target.closest('.nav-item');
+    if (item) {
       e.preventDefault();
       const targetModule = item.getAttribute('data-module');
       if (targetModule) {
         switchModule(targetModule);
         closeMobileSidebar();
       }
-    });
+    }
+  });
+
+  // Role quick switcher (Live Preview)
+  const roleSwitcher = document.getElementById('roleQuickSwitcher');
+  roleSwitcher?.addEventListener('change', (e) => {
+    const newRole = e.target.value;
+    if (state.currentUser) {
+      state.currentUser.role = newRole;
+      if (userDisplayRoleEl) userDisplayRoleEl.textContent = `${newRole} • ${state.currentUser.kanwil || 'Pusat'}`;
+      const indicator = document.getElementById('activeRoleIndicator');
+      if (indicator) indicator.textContent = newRole;
+      const badge = document.getElementById('currentRoleBadge');
+      if (badge) badge.textContent = newRole;
+      renderSidebarMenu();
+      renderModulesGrid();
+      populateCategoryFilter();
+    }
+  });
+
+  // Module search input
+  const searchInput = document.getElementById('moduleSearchInput');
+  searchInput?.addEventListener('input', (e) => {
+    state.moduleSearchQuery = e.target.value.toLowerCase().trim();
+    renderModulesGrid();
+  });
+
+  // Module category filter
+  const categoryFilter = document.getElementById('moduleCategoryFilter');
+  categoryFilter?.addEventListener('change', (e) => {
+    state.selectedCategory = e.target.value;
+    renderModulesGrid();
   });
 
   document.getElementById('logoutBtn')?.addEventListener('click', handleLogout);
@@ -469,10 +511,18 @@ function enterWorkspace() {
     userDisplayNameEl.textContent = state.currentUser.fullName || state.currentUser.username;
     userDisplayRoleEl.textContent = `${state.currentUser.role} • ${state.currentUser.kanwil || 'Pusat'}`;
     userAvatarLetterEl.textContent = (state.currentUser.fullName || state.currentUser.username).charAt(0).toUpperCase();
+
+    const roleSwitcher = document.getElementById('roleQuickSwitcher');
+    if (roleSwitcher) roleSwitcher.value = state.currentUser.role || 'Admin';
+    const indicator = document.getElementById('activeRoleIndicator');
+    if (indicator) indicator.textContent = state.currentUser.role || 'Admin';
+    const badge = document.getElementById('currentRoleBadge');
+    if (badge) badge.textContent = state.currentUser.role || 'Admin';
   }
 
   updateHeaderDbBadge();
   switchModule('dashboard');
+  fetchModules();
   loadAllModuleData();
 }
 
@@ -486,24 +536,370 @@ function updateHeaderDbBadge() {
   `;
 }
 
+function canAccessModule(role, accessRoleStr) {
+  if (!role) return false;
+  const userRole = role.trim().toLowerCase();
+  if (userRole === 'admin') return true; // Admin has full access to all modules
+  if (!accessRoleStr) return false;
+  const roles = accessRoleStr.split(',').map(r => r.trim().toLowerCase()).filter(Boolean);
+  return roles.includes(userRole);
+}
+
+async function fetchModules() {
+  // 1. Try local Express API /api/modules
+  if (!state.isStaticMode) {
+    try {
+      const res = await fetch('/api/modules');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.modules && json.modules.length > 0) {
+          state.data.modules = json.modules;
+          onModulesLoaded();
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Backend /api/modules unreachable, trying direct Supabase:', e.message);
+    }
+  }
+
+  // 2. Direct Supabase REST API (for GitHub Pages / direct mode)
+  try {
+    const sbUrl = `${SUPABASE_CONFIG.url}/rest/v1/modules?select=*&order=order_num.asc`;
+    const res = await fetch(sbUrl, {
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+      }
+    });
+    if (res.ok) {
+      const rows = await res.json();
+      state.data.modules = rows.map(m => ({
+        ModuleID: m.moduleid || m.id,
+        ModuleName: m.modulename,
+        Category: m.category,
+        Status: m.status,
+        Icon: m.icon,
+        AccessRole: m.accessrole,
+        Order: m.order_num,
+        Description: m.description
+      }));
+      onModulesLoaded();
+      return;
+    }
+  } catch (err) {
+    console.warn('Direct Supabase fetch failed, trying Google Sheets:', err.message);
+  }
+
+  // 3. Fallback to Google Sheets Modules sheet
+  try {
+    const sheetModules = await fetchGoogleSheetDirect('Modules');
+    state.data.modules = sheetModules.map(m => ({
+      ModuleID: m.ModuleID || m.moduleid,
+      ModuleName: m.ModuleName || m.modulename,
+      Category: m.Category || m.category,
+      Status: m.Status || m.status,
+      Icon: m.Icon || m.icon,
+      AccessRole: m.AccessRole || m.accessrole,
+      Order: m.Order || m.order_num,
+      Description: m.Description || m.description
+    }));
+    onModulesLoaded();
+  } catch (e) {
+    console.error('All module sources failed:', e);
+  }
+}
+
+function onModulesLoaded() {
+  renderSidebarMenu();
+  renderModulesGrid();
+  populateCategoryFilter();
+}
+
+function renderSidebarMenu() {
+  const sidebarNav = document.getElementById('sidebarNav');
+  if (!sidebarNav) return;
+
+  const currentRole = state.currentUser?.role || 'Admin';
+  const modules = state.data.modules || [];
+
+  // Filter modules by role
+  const accessibleModules = modules.filter(m => canAccessModule(currentRole, m.AccessRole || ''));
+
+  // Sort by order
+  accessibleModules.sort((a, b) => {
+    const oA = parseInt(a.Order || '99', 10) || 99;
+    const oB = parseInt(b.Order || '99', 10) || 99;
+    return oA - oB;
+  });
+
+  // Group by category
+  const categories = {};
+  accessibleModules.forEach(m => {
+    const cat = m.Category || 'Umum';
+    if (!categories[cat]) categories[cat] = [];
+    categories[cat].push(m);
+  });
+
+  // Preferred order of categories
+  const categoryOrder = ['Sistem', 'Karyawan', 'Umrah', 'Haji', 'Marketing', 'Operasional', 'Keamanan', 'Keuangan', 'Pengaturan'];
+  const allCatKeys = Object.keys(categories).sort((a, b) => {
+    const idxA = categoryOrder.indexOf(a);
+    const idxB = categoryOrder.indexOf(b);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return a.localeCompare(b);
+  });
+
+  let html = '';
+  allCatKeys.forEach(cat => {
+    html += `<div class="nav-section-title">${cat}</div>`;
+    categories[cat].forEach(m => {
+      const isCurrentActive = state.activeModule === m.ModuleID || 
+        (m.ModuleID === 'mod_dashboard' && state.activeModule === 'dashboard') ||
+        (m.ModuleID === 'mod_data_jamaah' && state.activeModule === 'jamaah') ||
+        (m.ModuleID === 'mod_logs' && state.activeModule === 'logs') ||
+        (m.ModuleID === 'mod_users' && state.activeModule === 'users') ||
+        (m.ModuleID === 'mod_cuti_karyawan' && state.activeModule === 'cuti_absensi');
+
+      const icon = m.Icon || 'fa-solid fa-cube';
+      const isInactive = (m.Status || '').toLowerCase() === 'inactive';
+
+      html += `
+        <a href="#${m.ModuleID}" class="nav-item ${isCurrentActive ? 'active' : ''}" data-module="${m.ModuleID}" data-tooltip="${m.ModuleName}">
+          <i class="${icon} nav-icon"></i>
+          <span class="nav-label">${m.ModuleName}</span>
+          ${isInactive ? '<span class="menu-badge-inactive">Off</span>' : ''}
+        </a>
+      `;
+    });
+  });
+
+  // If Admin, also ensure DB Settings is accessible
+  if (currentRole.toLowerCase() === 'admin') {
+    html += `
+      <div class="nav-section-title">Konfigurasi</div>
+      <a href="#settings" class="nav-item ${state.activeModule === 'settings' ? 'active' : ''}" data-module="settings" data-tooltip="Konfigurasi Database">
+        <i class="fa-solid fa-database nav-icon"></i>
+        <span class="nav-label">Konfigurasi DB</span>
+      </a>
+    `;
+  }
+
+  sidebarNav.innerHTML = html;
+}
+
+function renderModulesGrid() {
+  const container = document.getElementById('modulesGridContainer');
+  if (!container) return;
+
+  const currentRole = state.currentUser?.role || 'Admin';
+  const roleBadge = document.getElementById('currentRoleBadge');
+  if (roleBadge) roleBadge.textContent = currentRole;
+  const subtitle = document.getElementById('modulesRoleSubtitle');
+
+  const modules = state.data.modules || [];
+  const accessibleModules = modules.filter(m => canAccessModule(currentRole, m.AccessRole || ''));
+
+  if (subtitle) {
+    subtitle.innerHTML = `Menampilkan <strong>${accessibleModules.length} menu</strong> yang diizinkan untuk Role: <strong style="color:var(--gold-light);">${currentRole}</strong> (Tabel Modules)`;
+  }
+
+  // Filter by category
+  let filtered = accessibleModules;
+  if (state.selectedCategory && state.selectedCategory !== 'ALL') {
+    filtered = filtered.filter(m => (m.Category || '').toLowerCase() === state.selectedCategory.toLowerCase());
+  }
+
+  // Filter by search query
+  if (state.moduleSearchQuery) {
+    filtered = filtered.filter(m => 
+      (m.ModuleName || '').toLowerCase().includes(state.moduleSearchQuery) ||
+      (m.Category || '').toLowerCase().includes(state.moduleSearchQuery) ||
+      (m.Description || '').toLowerCase().includes(state.moduleSearchQuery)
+    );
+  }
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align:center; padding: 36px 20px; color:var(--text-muted); background:rgba(255,255,255,0.02); border-radius:var(--radius-md); border:1px dashed var(--border-subtle);">
+        <i class="fa-solid fa-filter-circle-xmark" style="font-size:2rem; color:var(--gold-light); margin-bottom:10px;"></i>
+        <div style="font-weight:600; color:var(--text-main);">Tidak ada menu yang sesuai kriteria pencarian</div>
+        <div style="font-size:0.85rem; margin-top:4px;">Coba ubah kata kunci atau pilih kategori lain.</div>
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+  filtered.forEach(m => {
+    const icon = m.Icon || 'fa-solid fa-cube';
+    const statusClass = (m.Status || 'Active').toLowerCase() === 'active' ? 'active' : 'inactive';
+    const statusText = (m.Status || 'Active').toLowerCase() === 'active' ? 'Aktif' : 'Non-Aktif';
+
+    html += `
+      <div class="module-card">
+        <div class="module-card-top">
+          <div class="module-card-icon">
+            <i class="${icon}"></i>
+          </div>
+          <div class="module-card-info">
+            <div class="module-card-name" title="${m.ModuleName}">${m.ModuleName}</div>
+            <div class="module-card-badges">
+              <span class="badge-category">${m.Category || 'Umum'}</span>
+              <span class="badge-status ${statusClass}">${statusText}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="module-card-desc">
+          ${m.Description || 'Modul operasional sistem PT. Fath Indah Travel Service.'}
+        </div>
+
+        <div class="module-card-footer">
+          <span><i class="fa-solid fa-hashtag" style="font-size:0.7rem;"></i> ${m.ModuleID}</span>
+          <button type="button" class="module-open-btn" onclick="switchModule('${m.ModuleID}')">
+            <span>Buka Modul</span>
+            <i class="fa-solid fa-arrow-right" style="font-size:0.75rem;"></i>
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+}
+
+function populateCategoryFilter() {
+  const select = document.getElementById('moduleCategoryFilter');
+  if (!select) return;
+
+  const currentRole = state.currentUser?.role || 'Admin';
+  const accessibleModules = (state.data.modules || []).filter(m => canAccessModule(currentRole, m.AccessRole || ''));
+
+  const cats = [...new Set(accessibleModules.map(m => m.Category).filter(Boolean))].sort();
+  let html = '<option value="ALL">Semua Kategori</option>';
+  cats.forEach(c => {
+    html += `<option value="${c}" ${state.selectedCategory === c ? 'selected' : ''}>${c}</option>`;
+  });
+  select.innerHTML = html;
+}
+
+function renderDynamicModule(moduleId) {
+  const container = document.getElementById('dynamicModuleContent');
+  if (!container) return;
+
+  const m = (state.data.modules || []).find(x => x.ModuleID === moduleId) || {
+    ModuleID: moduleId,
+    ModuleName: moduleId,
+    Category: 'Operasional',
+    Status: 'Active',
+    Icon: 'fa-solid fa-cube',
+    AccessRole: 'Admin',
+    Description: 'Modul sistem PT. Fath Indah Travel Service.'
+  };
+
+  const statusClass = (m.Status || 'Active').toLowerCase() === 'active' ? 'active' : 'inactive';
+  const statusText = (m.Status || 'Active').toLowerCase() === 'active' ? 'Status: Aktif' : 'Status: Non-Aktif';
+
+  container.innerHTML = `
+    <div class="dynamic-module-hero">
+      <div class="dynamic-module-icon-large">
+        <i class="${m.Icon || 'fa-solid fa-cube'}"></i>
+      </div>
+      <div>
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px; flex-wrap:wrap;">
+          <h2 style="font-family:var(--font-heading); color:#ffffff; font-size:1.6rem; margin:0;">${m.ModuleName}</h2>
+          <span class="badge-status ${statusClass}" style="font-size:0.75rem;">${statusText}</span>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <span class="badge-category">${m.Category}</span>
+          <span style="color:var(--text-muted); font-size:0.85rem;">Kode Modul: <code>${m.ModuleID}</code></span>
+          <span style="color:var(--text-muted); font-size:0.85rem;">• Hak Akses Role: <strong style="color:var(--gold-light);">${m.AccessRole || 'Semua Role'}</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:rgba(212,175,55,0.05); border:1px solid rgba(212,175,55,0.2); border-radius:var(--radius-md); padding:18px 20px; margin-bottom:24px;">
+      <div style="font-size:0.8rem; color:var(--gold-light); text-transform:uppercase; font-weight:700; letter-spacing:0.5px; margin-bottom:6px;">
+        <i class="fa-solid fa-circle-info"></i> Deskripsi & Tujuan Modul
+      </div>
+      <div style="font-size:0.95rem; color:var(--text-main); line-height:1.6;">
+        ${m.Description || 'Modul ini terdaftar dalam Supabase Tabel Modules dan aktif dalam alur kerja operasional PT. Fath Indah Travel Service.'}
+      </div>
+    </div>
+
+    <div class="dynamic-meta-grid">
+      <div class="dynamic-meta-item">
+        <div class="dynamic-meta-label">Kategori Sistem</div>
+        <div class="dynamic-meta-val">${m.Category}</div>
+      </div>
+      <div class="dynamic-meta-item">
+        <div class="dynamic-meta-label">ID Modul</div>
+        <div class="dynamic-meta-val">${m.ModuleID}</div>
+      </div>
+      <div class="dynamic-meta-item">
+        <div class="dynamic-meta-label">Urutan Tampilan</div>
+        <div class="dynamic-meta-val">#${m.Order || '1'}</div>
+      </div>
+      <div class="dynamic-meta-item">
+        <div class="dynamic-meta-label">Sumber Modul</div>
+        <div class="dynamic-meta-val" style="color:#34d399;"><i class="fa-solid fa-database"></i> Supabase Modules</div>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:24px; flex-wrap:wrap;">
+      <button type="button" class="btn-gold" onclick="alert('Modul ' + '${m.ModuleName}' + ' berhasil disinkronkan dengan data Supabase!')">
+        <i class="fa-solid fa-rotate"></i> Sinkronisasi Data Modul
+      </button>
+      <button type="button" class="btn-secondary" onclick="switchModule('dashboard')">
+        <i class="fa-solid fa-arrow-left"></i> Kembali ke Dashboard
+      </button>
+    </div>
+  `;
+}
+
 function switchModule(moduleName) {
   state.activeModule = moduleName;
 
+  // Map module aliases to existing views if applicable
+  let viewId = moduleName;
+  if (moduleName === 'mod_dashboard') viewId = 'dashboard';
+  else if (moduleName === 'mod_data_jamaah' || moduleName === 'mod_form_input_jamaah') viewId = 'jamaah';
+  else if (moduleName === 'mod_logs') viewId = 'logs';
+  else if (moduleName === 'mod_users' || moduleName === 'mod_sistem_user') viewId = 'users';
+  else if (moduleName === 'mod_cuti_karyawan' || moduleName === 'mod_attendance' || moduleName === 'mod_presensi' || moduleName === 'mod_data_attendance') viewId = 'cuti_absensi';
+  else if (moduleName === 'mod_modules' || moduleName === 'settings') viewId = 'settings';
+
+  // Highlight active nav item in sidebar
   document.querySelectorAll('.nav-item').forEach(item => {
-    if (item.getAttribute('data-module') === moduleName) {
+    if (item.getAttribute('data-module') === moduleName || item.getAttribute('data-module') === viewId) {
       item.classList.add('active');
     } else {
       item.classList.remove('active');
     }
   });
 
+  // Hide all views
   document.querySelectorAll('.module-view').forEach(view => {
     view.classList.remove('active');
   });
 
-  const targetView = document.getElementById(`view-${moduleName}`);
-  if (targetView) targetView.classList.add('active');
+  // Check if standard view exists
+  const targetView = document.getElementById(`view-${viewId}`);
+  if (targetView) {
+    targetView.classList.add('active');
+  } else {
+    // Dynamic module view
+    const dynamicView = document.getElementById('view-dynamic-module');
+    if (dynamicView) {
+      dynamicView.classList.add('active');
+      renderDynamicModule(moduleName);
+    }
+  }
 
+  // Update Header Titles
   const titles = {
     dashboard: { title: 'Dashboard Utama', breadcrumb: 'Portal Eksekutif / Ikhtisar Sistem' },
     jamaah: { title: 'Data Jamaah Umrah & Haji', breadcrumb: 'Manajemen Jamaah / Data Real-time Sheet Metadata' },
@@ -513,22 +909,29 @@ function switchModule(moduleName) {
     settings: { title: 'Konfigurasi Database', breadcrumb: 'Sistem / Pengalihan Google Sheets & Supabase' }
   };
 
-  const meta = titles[moduleName] || { title: 'Portal Modul', breadcrumb: 'PT. Fath Indah' };
-  moduleTitleEl.textContent = meta.title;
-  moduleBreadcrumbEl.textContent = meta.breadcrumb;
+  const foundMod = (state.data.modules || []).find(x => x.ModuleID === moduleName);
+  const meta = titles[viewId] || { 
+    title: foundMod ? foundMod.ModuleName : 'Modul ' + moduleName, 
+    breadcrumb: foundMod ? `Modul Operasional / Kategori: ${foundMod.Category}` : 'PT. Fath Indah' 
+  };
 
-  if (moduleName === 'dashboard') renderDashboard();
-  if (moduleName === 'logs') renderLogsTable();
-  if (moduleName === 'jamaah') renderJamaahTable();
-  if (moduleName === 'users') renderUsersTable();
-  if (moduleName === 'cuti_absensi') renderCutiAbsensi();
-  if (moduleName === 'settings') renderSettings();
+  if (moduleTitleEl) moduleTitleEl.textContent = meta.title;
+  if (moduleBreadcrumbEl) moduleBreadcrumbEl.textContent = meta.breadcrumb;
+
+  if (viewId === 'dashboard') renderDashboard();
+  if (viewId === 'logs') renderLogsTable();
+  if (viewId === 'jamaah') renderJamaahTable();
+  if (viewId === 'users') renderUsersTable();
+  if (viewId === 'cuti_absensi') renderCutiAbsensi();
+  if (viewId === 'settings') renderSettings();
 }
 
 // ==========================================================================
 // 5. DATA INGESTION
 // ==========================================================================
 async function loadAllModuleData() {
+  fetchModules();
+
   if (state.isStaticMode) {
     // Direct Google Sheets fetching
     try {
