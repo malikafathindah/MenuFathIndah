@@ -212,6 +212,18 @@ async function fetchGoogleSheetDirect(sheetName) {
   return parseCSV(csv);
 }
 
+async function fetchSupabaseDirect(table, query = '') {
+  const url = `${SUPABASE_CONFIG.url}/rest/v1/${table}${query ? '?' + query : ''}`;
+  const res = await fetch(url, {
+    headers: {
+      'apikey': SUPABASE_CONFIG.anonKey,
+      'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+    }
+  });
+  if (!res.ok) throw new Error(`Gagal membaca tabel Supabase ${table}: HTTP ${res.status}`);
+  return await res.json();
+}
+
 // Format Timestamp WIB (UTC+7)
 function getWibTimestamp() {
   const d = new Date(Date.now() + (7 * 60 * 60 * 1000));
@@ -356,9 +368,9 @@ async function handleLogin(e) {
   }
 
   loginBtn.disabled = true;
-  loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Mengotentikasi ke Google Sheets...</span>';
+  loginBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Mengotentikasi ke Supabase Database...</span>';
 
-  // 1. If backend API is available, try server login
+  // 1. If backend API is available, try server login (which uses Supabase)
   if (!state.isStaticMode) {
     try {
       const res = await fetch('/api/auth/login', {
@@ -376,7 +388,7 @@ async function handleLogin(e) {
 
       const data = await res.json();
       if (res.ok && data.success) {
-        onLoginSuccess(data.user, data.databaseSource);
+        onLoginSuccess(data.user, 'supabase');
         return;
       } else if (res.status === 401 || res.status === 403) {
         showAlert(data.message || 'Username atau password tidak cocok.');
@@ -384,19 +396,30 @@ async function handleLogin(e) {
         return;
       }
     } catch (err) {
-      console.warn('Backend API request failed, falling back to direct Google Sheets client-side auth');
+      console.warn('Backend API request failed, falling back to direct Supabase client-side auth');
       state.isStaticMode = true;
     }
   }
 
-  // 2. Direct Google Sheets Client-Side Auth (For GitHub Pages & Static Hosts)
+  // 2. Direct Supabase Client-Side Auth (For GitHub Pages & Static Hosts)
   try {
-    const users = await fetchGoogleSheetDirect('Users');
+    const rawUsers = await fetchSupabaseDirect('users');
+    const users = rawUsers.map(u => ({
+      ID: u.id || u.user_id,
+      Username: u.username || u.user_id,
+      Password: u.password,
+      FullName: u.full_name || u.nama || u.username,
+      Kanwil: u.kanwil || 'Pusat',
+      Kantor: u.kantor || 'Pusat',
+      Role: u.role || 'Staff',
+      Status: u.status || 'Active'
+    }));
+
     const trimmedInputUser = username.toLowerCase();
     const matched = users.find(u => (u.Username || '').trim().toLowerCase() === trimmedInputUser);
 
     if (!matched) {
-      showAlert(`Username "${username}" tidak terdaftar pada tabel Users.`);
+      showAlert(`Username "${username}" tidak terdaftar pada tabel users Supabase.`);
       resetLoginBtn();
       return;
     }
@@ -418,20 +441,44 @@ async function handleLogin(e) {
       return;
     }
 
-    // Record Activity Log
+    // Record Activity Log directly to Supabase if possible
     const randId = 'LOG-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    const timestampNow = getWibTimestamp();
     const newLog = {
       LogID: randId,
-      Timestamp: getWibTimestamp(),
+      Timestamp: timestampNow,
       Username: matched.Username,
       IP_Address: 'Browser Client',
       Maps_URL: state.locationData.mapsUrl,
       Location: state.locationData.address,
-      Action: `LOGIN_SUCCESS (User ${matched.FullName} berhasil login)`,
+      Action: `LOGIN_SUCCESS (User ${matched.FullName} berhasil login ke Supabase)`,
       Module: 'Auth',
       isNewSessionLog: true
     };
     recordLocalActivityLog(newLog);
+
+    // Try sending log to Supabase REST API
+    try {
+      fetch(`${SUPABASE_CONFIG.url}/rest/v1/activity_logs`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_CONFIG.anonKey,
+          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          logid: randId,
+          timestamp: timestampNow,
+          username: matched.Username,
+          ip_address: 'Browser Client',
+          maps_url: state.locationData.mapsUrl,
+          location: state.locationData.address,
+          action: `LOGIN_SUCCESS (User ${matched.FullName} berhasil login ke Supabase)`,
+          module: 'Auth'
+        })
+      }).catch(() => {});
+    } catch (e) {}
 
     const safeUser = {
       id: matched.ID || 'USR-001',
@@ -443,10 +490,10 @@ async function handleLogin(e) {
       status: matched.Status || 'Active'
     };
 
-    onLoginSuccess(safeUser, 'googlesheets');
+    onLoginSuccess(safeUser, 'supabase');
 
-  } catch (sheetErr) {
-    showAlert('Gagal terhubung ke Google Sheets: ' + sheetErr.message);
+  } catch (sbErr) {
+    showAlert('Gagal terhubung ke database Supabase: ' + sbErr.message);
     resetLoginBtn();
   }
 }
@@ -933,40 +980,57 @@ async function loadAllModuleData() {
   fetchModules();
 
   if (state.isStaticMode) {
-    // Direct Google Sheets fetching
+    // Direct Supabase REST API fetching (for GitHub Pages & Static Hosts)
     try {
-      fetchGoogleSheetDirect('Users').then(u => {
-        state.data.users = u;
+      fetchSupabaseDirect('users').then(raw => {
+        state.data.users = raw.map(u => ({
+          ID: u.id || u.user_id,
+          Username: u.username,
+          FullName: u.full_name || u.nama,
+          Role: u.role || u.jabatan,
+          Kanwil: u.kanwil,
+          Kantor: u.kantor,
+          Status: u.status
+        }));
         renderUsersTable();
         updateDashboardCounters();
-      });
+      }).catch(e => console.warn('Supabase users error:', e));
 
-      fetchGoogleSheetDirect('ActivityLogs').then(logs => {
+      fetchSupabaseDirect('activity_logs', 'order=timestamp.desc&limit=150').then(logs => {
         const local = getLocalActivityLogs();
-        state.data.logs = [...local, ...logs];
+        state.data.logs = [...local, ...logs.map(l => ({
+          LogID: l.logid || l.log_id || l.id,
+          Timestamp: l.timestamp,
+          Username: l.username,
+          IP_Address: l.ip_address,
+          Maps_URL: l.maps_url,
+          Location: l.location,
+          Action: l.action,
+          Module: l.module
+        }))];
         renderLogsTable();
         renderDashboard();
         updateDashboardCounters();
-      });
+      }).catch(e => console.warn('Supabase logs error:', e));
 
-      fetchGoogleSheetDirect('Metadata').then(j => {
+      fetchSupabaseDirect('jamaah', 'limit=150').then(j => {
         state.data.jamaah = j;
         renderJamaahTable();
         updateDashboardCounters();
-      });
+      }).catch(e => console.warn('Supabase jamaah error:', e));
 
-      fetchGoogleSheetDirect('Absensi').then(a => {
+      fetchSupabaseDirect('absensi', 'limit=100').then(a => {
         state.data.absensi = a;
         renderCutiAbsensi();
-      }).catch(() => {});
+      }).catch(e => console.warn('Supabase absensi error:', e));
 
-      fetchGoogleSheetDirect('CutiKaryawan').then(c => {
+      fetchSupabaseDirect('cuti_karyawan', 'limit=100').then(c => {
         state.data.cuti = c;
         renderCutiAbsensi();
-      }).catch(() => {});
+      }).catch(e => console.warn('Supabase cuti error:', e));
 
     } catch (e) {
-      console.error('Error loading Google Sheets directly:', e);
+      console.error('Error loading Supabase directly:', e);
     }
     return;
   }
@@ -1119,10 +1183,10 @@ function renderJamaahTable() {
   const search = document.getElementById('searchJamaahInput')?.value.toLowerCase() || '';
 
   const filtered = state.data.jamaah.filter(j => {
-    const name = (j['Nama Lengkap'] || '').toLowerCase();
-    const id = (j['ID Jamaah'] || '').toLowerCase();
-    const ref = (j['Referensi'] || '').toLowerCase();
-    const kota = (j['Kabupaten / Kota'] || j['Tempat Lahir'] || '').toLowerCase();
+    const name = (j.nama_lengkap || j['Nama Lengkap'] || '').toLowerCase();
+    const id = (j.id_jamaah || j['ID Jamaah'] || '').toLowerCase();
+    const ref = (j.referensi || j['Referensi'] || '').toLowerCase();
+    const kota = (j.kabupaten_kota || j['Kabupaten / Kota'] || j.tempat_lahir || j['Tempat Lahir'] || '').toLowerCase();
     return name.includes(search) || id.includes(search) || ref.includes(search) || kota.includes(search);
   });
 
@@ -1135,12 +1199,12 @@ function renderJamaahTable() {
   }
 
   tbody.innerHTML = filtered.slice(0, 50).map(j => {
-    const id = j['ID Jamaah'] || '-';
-    const nama = j['Nama Lengkap'] || '-';
-    const jk = j['Jenis Kelamin'] || '-';
-    const paket = j['Jenis Paket Umrah'] || j['Paket'] || 'Topaz Suhem';
-    const kanwil = j['Kanwil'] || 'Solo Raya';
-    const telp = j['Nomor Handphone'] || j['No Telp'] || '-';
+    const id = j.id_jamaah || j['ID Jamaah'] || j.id || '-';
+    const nama = j.nama_lengkap || j['Nama Lengkap'] || '-';
+    const jk = j.jenis_kelamin || j['Jenis Kelamin'] || '-';
+    const paket = j.jenis_paket_umrah || j['Jenis Paket Umrah'] || j['Paket'] || 'Umrah Reguler';
+    const kanwil = j.kantor_cabang || j['Kanwil'] || 'Pusat';
+    const telp = j.nomor_seluler || j['Nomor Handphone'] || j['No Telp'] || '-';
 
     return `
       <tr>
@@ -1208,19 +1272,26 @@ function renderCutiAbsensi() {
   if (absensiTbody) {
     const list = state.data.absensi;
     if (list.length === 0) {
-      absensiTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 20px; color: var(--text-muted);">Memuat riwayat presensi...</td></tr>`;
+      absensiTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 20px; color: var(--text-muted);">Memuat riwayat presensi Supabase...</td></tr>`;
     } else {
-      absensiTbody.innerHTML = list.slice(0, 20).map(a => `
-        <tr>
-          <td>${a.Timestamp || '-'}</td>
-          <td><strong>${a.FULLNAME || a.Username || '-'}</strong></td>
-          <td><span class="badge badge-blue">${a['Tipe Absen'] || 'Masuk'}</span></td>
-          <td>${a.Status || 'Tepat Waktu'}</td>
-          <td>
-            ${a['Maps URL'] ? `<a href="${a['Maps URL']}" target="_blank" class="map-link-btn"><i class="fa-solid fa-map-location-dot"></i> Maps</a>` : '-'}
-          </td>
-        </tr>
-      `).join('');
+      absensiTbody.innerHTML = list.slice(0, 20).map(a => {
+        const time = a.Timestamp || a.timestamp || a.Tanggal || '-';
+        const user = a.NamaKaryawan || a.NamaUser || a.FULLNAME || a.Username || '-';
+        const type = a.Tipe || a['Tipe Absen'] || 'Masuk';
+        const status = a.Status || 'Tepat Waktu';
+        const mapsUrl = a['Link Google Maps'] || a['Maps URL'] || '';
+        return `
+          <tr>
+            <td>${time}</td>
+            <td><strong>${user}</strong></td>
+            <td><span class="badge badge-blue">${type}</span></td>
+            <td>${status}</td>
+            <td>
+              ${mapsUrl ? `<a href="${mapsUrl}" target="_blank" class="map-link-btn"><i class="fa-solid fa-map-location-dot"></i> Maps</a>` : '-'}
+            </td>
+          </tr>
+        `;
+      }).join('');
     }
   }
 
@@ -1228,17 +1299,25 @@ function renderCutiAbsensi() {
   if (cutiTbody) {
     const list = state.data.cuti;
     if (list.length === 0) {
-      cutiTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 20px; color: var(--text-muted);">Memuat riwayat cuti...</td></tr>`;
+      cutiTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 20px; color: var(--text-muted);">Memuat riwayat cuti Supabase...</td></tr>`;
     } else {
-      cutiTbody.innerHTML = list.slice(0, 20).map(c => `
-        <tr>
-          <td><strong>${c.CutiID || '-'}</strong></td>
-          <td>${c.NamaKaryawan || '-'}</td>
-          <td><span class="badge badge-gold">${c.TipeCuti || 'Cuti Tahunan'}</span></td>
-          <td>${c.TanggalMulai || '-'} s/d ${c.TanggalSelesai || '-'}</td>
-          <td><span class="badge badge-success">Disetujui</span></td>
-        </tr>
-      `).join('');
+      cutiTbody.innerHTML = list.slice(0, 20).map(c => {
+        const id = c.cutiid || c.CutiID || '-';
+        const name = c.namakaryawan || c.NamaKaryawan || '-';
+        const type = c.tipecuti || c.TipeCuti || 'Cuti Tahunan';
+        const start = c.tanggalmulai || c.TanggalMulai || '-';
+        const end = c.tanggalselesai || c.TanggalSelesai || '-';
+        const status = c.statusapproval || 'Disetujui';
+        return `
+          <tr>
+            <td><strong>${id}</strong></td>
+            <td>${name}</td>
+            <td><span class="badge badge-gold">${type}</span></td>
+            <td>${start} s/d ${end}</td>
+            <td><span class="badge badge-success">${status}</span></td>
+          </tr>
+        `;
+      }).join('');
     }
   }
 }
