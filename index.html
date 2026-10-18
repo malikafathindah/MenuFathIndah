@@ -31,11 +31,6 @@
         <h1 class="brand-company-title">PT. Fath Indah Travel Service</h1>
         <div class="brand-company-subtitle">Umrah & Hajj Management Portal</div>
         <p class="brand-tagline">Silakan masuk untuk mengakses modul operasional</p>
-        
-        <div class="db-pill supabase" id="loginDbSourcePill">
-          <span class="status-dot"></span>
-          <span>Database: Supabase (PostgreSQL)</span>
-        </div>
       </div>
 
       <!-- Alert Box -->
@@ -71,18 +66,6 @@
           <span>Masuk ke Sistem</span>
           <i class="fa-solid fa-arrow-right"></i>
         </button>
-        <!-- Quick Demo Role Switcher on Login -->
-        <div style="margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-subtle);">
-          <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Login Cepat Berdasarkan Role:</div>
-          <div style="display:flex; flex-wrap:wrap; gap:6px;">
-            <button type="button" class="demo-chip" data-user="admin" data-pass="admin123" style="font-size:0.72rem; padding:4px 8px; border-radius:4px; background:rgba(212,175,55,0.15); border:1px solid rgba(212,175,55,0.3); color:var(--gold-light); cursor:pointer;">Admin (39 Menu)</button>
-            <button type="button" class="demo-chip" data-user="Miftah" data-pass="a" style="font-size:0.72rem; padding:4px 8px; border-radius:4px; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); color:#34d399; cursor:pointer;">StaffHaji (13 Menu)</button>
-            <button type="button" class="demo-chip" data-user="Imam" data-pass="08123456789" style="font-size:0.72rem; padding:4px 8px; border-radius:4px; background:rgba(96,165,250,0.15); border:1px solid rgba(96,165,250,0.3); color:#93c5fd; cursor:pointer;">StaffUmrah (11 Menu)</button>
-            <button type="button" class="demo-chip" data-user="Endang" data-pass="082254429000" style="font-size:0.72rem; padding:4px 8px; border-radius:4px; background:rgba(168,85,247,0.15); border:1px solid rgba(168,85,247,0.3); color:#c084fc; cursor:pointer;">StaffKanwil (13 Menu)</button>
-            <button type="button" class="demo-chip" data-user="manager" data-pass="manager123" style="font-size:0.72rem; padding:4px 8px; border-radius:4px; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); color:#fcd34d; cursor:pointer;">Manager (3 Menu)</button>
-            <button type="button" class="demo-chip" data-user="staff" data-pass="staff123" style="font-size:0.72rem; padding:4px 8px; border-radius:4px; background:rgba(255,255,255,0.06); border:1px solid var(--border-subtle); color:var(--text-main); cursor:pointer;">Staff (7 Menu)</button>
-          </div>
-        </div>
       </form>
 
     </div>
@@ -135,8 +118,8 @@
 
       <!-- Sidebar Footer -->
       <div class="sidebar-footer">
-        <!-- Live Role Switcher (Preview) -->
-        <div style="margin-bottom: 8px;">
+        <!-- Live Role Switcher (Preview) - KHUSUS HANYA UNTUK ROLE ADMIN -->
+        <div id="roleSwitcherContainer" style="margin-bottom: 8px; display: none;">
           <div style="font-size:0.68rem; color:var(--text-muted); margin-bottom:4px; display:flex; justify-content:space-between;">
             <span>Ganti Role (Preview):</span>
             <span id="activeRoleIndicator" style="color:var(--gold-light); font-weight:700;">Admin</span>
@@ -187,12 +170,6 @@
           <!-- Real-time Clock (WIB) -->
           <div class="live-clock-pill" id="liveClock">
             <i class="fa-regular fa-clock"></i> Memuat waktu...
-          </div>
-
-          <!-- Active Database Mode Indicator -->
-          <div class="db-pill" id="headerDbBadge">
-            <span class="status-dot"></span>
-            <span>Database: Google Sheets</span>
           </div>
 
           <!-- Logout Button -->

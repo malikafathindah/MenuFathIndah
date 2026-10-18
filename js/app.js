@@ -264,16 +264,6 @@ function initEventListeners() {
 
   loginForm?.addEventListener('submit', handleLogin);
 
-  document.querySelectorAll('.demo-chip').forEach(chip => {
-    chip.addEventListener('click', (e) => {
-      const u = e.currentTarget.getAttribute('data-user');
-      const p = e.currentTarget.getAttribute('data-pass');
-      usernameInput.value = u;
-      passwordInput.value = p;
-      showAlert(`Akun demo ${u} terpilih. Klik 'Masuk ke Sistem'`, 'success');
-    });
-  });
-
   sidebarToggleBtn?.addEventListener('click', () => {
     sidebar.classList.toggle('collapsed');
     const isCollapsed = sidebar.classList.contains('collapsed');
@@ -503,12 +493,14 @@ function resetLoginBtn() {
   loginBtn.innerHTML = '<span>Masuk ke Sistem</span> <i class="fa-solid fa-arrow-right"></i>';
 }
 
-function onLoginSuccess(user, dbSource = 'googlesheets') {
+function onLoginSuccess(user, dbSource = 'supabase') {
   showAlert('Login berhasil! Mengalihkan ke ruang kerja...', 'success');
   state.currentUser = user;
+  state.actualRole = user.role;
   state.dbSource = dbSource;
   localStorage.setItem('fath_indah_session', JSON.stringify({
     user: user,
+    actualRole: user.role,
     loginTime: Date.now(),
     dbSource: dbSource
   }));
@@ -523,6 +515,7 @@ function handleLogout() {
   if (confirm('Apakah Anda yakin ingin keluar dari sistem?')) {
     localStorage.removeItem('fath_indah_session');
     state.currentUser = null;
+    state.actualRole = '';
     appContainer.classList.remove('active');
     loginWrapper.style.display = 'flex';
     usernameInput.value = '';
@@ -538,7 +531,8 @@ function checkExistingSession() {
       const parsed = JSON.parse(stored);
       if (Date.now() - parsed.loginTime < 12 * 60 * 60 * 1000) {
         state.currentUser = parsed.user;
-        state.dbSource = parsed.dbSource || 'googlesheets';
+        state.actualRole = parsed.actualRole || parsed.user.role;
+        state.dbSource = parsed.dbSource || 'supabase';
         enterWorkspace();
       }
     } catch (e) {
@@ -558,6 +552,13 @@ function enterWorkspace() {
     userDisplayNameEl.textContent = state.currentUser.fullName || state.currentUser.username;
     userDisplayRoleEl.textContent = `${state.currentUser.role} • ${state.currentUser.kanwil || 'Pusat'}`;
     userAvatarLetterEl.textContent = (state.currentUser.fullName || state.currentUser.username).charAt(0).toUpperCase();
+
+    // LAMPIRAN 1: 'Ganti Role (Preview)' HANYA berlaku dan tampil jika pengguna memiliki Role Admin
+    const isActualAdmin = (state.actualRole || state.currentUser.role || '').toLowerCase() === 'admin';
+    const roleSwitcherContainer = document.getElementById('roleSwitcherContainer');
+    if (roleSwitcherContainer) {
+      roleSwitcherContainer.style.display = isActualAdmin ? 'block' : 'none';
+    }
 
     const roleSwitcher = document.getElementById('roleQuickSwitcher');
     if (roleSwitcher) roleSwitcher.value = state.currentUser.role || 'Admin';
