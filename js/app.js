@@ -1406,14 +1406,19 @@ function getRekapCodeLabel(code) {
 }
 
 async function loadRekapAbsensiData(force = false) {
-  if (state.data.rekapAbsensi && !force) {
+  const filterMonth = state.rekapFilter?.month || 10;
+  const filterYear = state.rekapFilter?.year || 2026;
+
+  if (state.data.rekapAbsensi && !force && 
+      state.data.rekapAbsensi.month === filterMonth && 
+      state.data.rekapAbsensi.year === filterYear) {
     return state.data.rekapAbsensi;
   }
 
   // 1. Try Full-stack Node API if not in static mode
   if (!state.isStaticMode) {
     try {
-      const res = await fetch(`/api/rekap-absensi${force ? '?force=true' : ''}`);
+      const res = await fetch(`/api/rekap-absensi?month=${filterMonth}&year=${filterYear}${force ? '&force=true' : ''}`);
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.employees) {
@@ -1422,11 +1427,76 @@ async function loadRekapAbsensiData(force = false) {
         }
       }
     } catch (e) {
-      console.warn('Backend /api/rekap-absensi not reachable, fallback to direct Google Sheet:', e.message);
+      console.warn('Backend /api/rekap-absensi not reachable, fallback to direct sources:', e.message);
     }
   }
 
-  // 2. Direct Google Sheet fetching (Works 100% on GitHub Pages & Static mode)
+  // 2. Direct Supabase Query (Tabel absensi di Supabase)
+  try {
+    const sbUrl = `${SUPABASE_CONFIG.url}/rest/v1/absensi?select=*&bulan=eq.${filterMonth}&tahun=eq.${filterYear}&limit=2000`;
+    const res = await fetch(sbUrl, {
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+      }
+    });
+    if (res.ok) {
+      const records = await res.json();
+      if (records && records.length > 0) {
+        const empMap = {};
+        // Pre-populate with known users
+        (state.data.users || []).forEach((u, idx) => {
+          const fn = (u.FullName || u.fullName || u.Username || '').toUpperCase();
+          if (fn) {
+            empMap[fn] = {
+              no: String(idx + 1),
+              name: fn,
+              location: (u.Kanwil === 'Pusat' ? u.Kantor : u.Kanwil) || 'PUSAT',
+              days: {}
+            };
+          }
+        });
+
+        records.forEach(r => {
+          const name = (r.nama_karyawan || r.nama_user || '').toUpperCase();
+          if (!name) return;
+          if (!empMap[name]) {
+            empMap[name] = {
+              no: String(Object.keys(empMap).length + 1),
+              name: name,
+              location: (r.catatan || 'Lokasi: PUSAT').replace(/^Lokasi:\s*/i, ''),
+              days: {}
+            };
+          }
+          const day = parseInt((r.tanggal || '').slice(8, 10), 10);
+          if (day && r.kode) {
+            empMap[name].days[day] = r.kode.toUpperCase();
+          }
+        });
+
+        const employees = Object.values(empMap).map((e, idx) => ({
+          no: String(idx + 1),
+          name: e.name,
+          location: e.location || 'PUSAT',
+          days: e.days
+        }));
+
+        const data = {
+          month: filterMonth,
+          year: filterYear,
+          count: employees.length,
+          employees,
+          source: 'supabase'
+        };
+        state.data.rekapAbsensi = data;
+        return data;
+      }
+    }
+  } catch (sbErr) {
+    console.warn('Direct Supabase fetch for rekap failed:', sbErr);
+  }
+
+  // 3. Fallback to Direct Google Sheet
   try {
     const sheetName = 'Rekap Absensi';
     const url = `https://docs.google.com/spreadsheets/d/${GOOGLE_SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
@@ -1464,7 +1534,8 @@ async function loadRekapAbsensiData(force = false) {
         month: sheetMonth,
         year: sheetYear,
         count: employees.length,
-        employees
+        employees,
+        source: 'googlesheets'
       };
       state.data.rekapAbsensi = data;
       return data;
