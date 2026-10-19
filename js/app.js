@@ -584,6 +584,12 @@ function updateHeaderDbBadge() {
   `;
 }
 
+function isModuleActive(m) {
+  if (!m) return false;
+  const status = String(m.Status || m.status || 'Active').trim().toLowerCase();
+  return status !== 'inactive' && status !== 'non-aktif' && status !== 'nonaktif' && status !== 'off' && status !== 'disabled';
+}
+
 function canAccessModule(role, accessRoleStr) {
   if (!role) return false;
   const userRole = role.trim().toLowerCase();
@@ -671,8 +677,8 @@ function renderSidebarMenu() {
   const currentRole = state.currentUser?.role || 'Admin';
   const modules = state.data.modules || [];
 
-  // Filter modules by role
-  const accessibleModules = modules.filter(m => canAccessModule(currentRole, m.AccessRole || ''));
+  // Filter modules by role and active status (exclude Inactive modules)
+  const accessibleModules = modules.filter(m => isModuleActive(m) && canAccessModule(currentRole, m.AccessRole || ''));
 
   // Sort by order
   accessibleModules.sort((a, b) => {
@@ -712,13 +718,11 @@ function renderSidebarMenu() {
         (m.ModuleID === 'mod_cuti_karyawan' && state.activeModule === 'cuti_absensi');
 
       const icon = m.Icon || 'fa-solid fa-cube';
-      const isInactive = (m.Status || '').toLowerCase() === 'inactive';
 
       html += `
         <a href="#${m.ModuleID}" class="nav-item ${isCurrentActive ? 'active' : ''}" data-module="${m.ModuleID}" data-tooltip="${m.ModuleName}">
           <i class="${icon} nav-icon"></i>
           <span class="nav-label">${m.ModuleName}</span>
-          ${isInactive ? '<span class="menu-badge-inactive">Off</span>' : ''}
         </a>
       `;
     });
@@ -748,7 +752,8 @@ function renderModulesGrid() {
   const subtitle = document.getElementById('modulesRoleSubtitle');
 
   const modules = state.data.modules || [];
-  const accessibleModules = modules.filter(m => canAccessModule(currentRole, m.AccessRole || ''));
+  // Filter active modules and accessible by current role (exclude Inactive modules)
+  const accessibleModules = modules.filter(m => isModuleActive(m) && canAccessModule(currentRole, m.AccessRole || ''));
 
   if (subtitle) {
     subtitle.innerHTML = `Menampilkan <strong>${accessibleModules.length} menu</strong> yang diizinkan untuk Role: <strong style="color:var(--gold-light);">${currentRole}</strong> (Tabel Modules)`;
@@ -783,8 +788,8 @@ function renderModulesGrid() {
   let html = '';
   filtered.forEach(m => {
     const icon = m.Icon || 'fa-solid fa-cube';
-    const statusClass = (m.Status || 'Active').toLowerCase() === 'active' ? 'active' : 'inactive';
-    const statusText = (m.Status || 'Active').toLowerCase() === 'active' ? 'Aktif' : 'Non-Aktif';
+    const statusClass = 'active';
+    const statusText = 'Aktif';
 
     html += `
       <div class="module-card">
@@ -824,7 +829,8 @@ function populateCategoryFilter() {
   if (!select) return;
 
   const currentRole = state.currentUser?.role || 'Admin';
-  const accessibleModules = (state.data.modules || []).filter(m => canAccessModule(currentRole, m.AccessRole || ''));
+  // Filter active modules only so inactive modules don't leave empty categories
+  const accessibleModules = (state.data.modules || []).filter(m => isModuleActive(m) && canAccessModule(currentRole, m.AccessRole || ''));
 
   const cats = [...new Set(accessibleModules.map(m => m.Category).filter(Boolean))].sort();
   let html = '<option value="ALL">Semua Kategori</option>';
@@ -909,6 +915,16 @@ function renderDynamicModule(moduleId) {
 }
 
 function switchModule(moduleName) {
+  // Prevent navigating to inactive modules
+  const foundMod = (state.data.modules || []).find(x => x.ModuleID === moduleName);
+  if (foundMod && !isModuleActive(foundMod)) {
+    alert(`Modul "${foundMod.ModuleName || moduleName}" berstatus Non-Aktif (Inactive) sehingga tidak dapat diakses.`);
+    if (state.activeModule && state.activeModule !== moduleName) {
+      return;
+    }
+    moduleName = 'dashboard';
+  }
+
   state.activeModule = moduleName;
 
   // Map module aliases to existing views if applicable
@@ -957,7 +973,6 @@ function switchModule(moduleName) {
     settings: { title: 'Konfigurasi Database', breadcrumb: 'Sistem / Pengalihan Google Sheets & Supabase' }
   };
 
-  const foundMod = (state.data.modules || []).find(x => x.ModuleID === moduleName);
   const meta = titles[viewId] || { 
     title: foundMod ? foundMod.ModuleName : 'Modul ' + moduleName, 
     breadcrumb: foundMod ? `Modul Operasional / Kategori: ${foundMod.Category}` : 'PT. Fath Indah' 
