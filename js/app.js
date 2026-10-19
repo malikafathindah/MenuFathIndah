@@ -32,7 +32,14 @@ const state = {
     jamaah: [],
     absensi: [],
     cuti: [],
-    modules: []
+    modules: [],
+    rekapAbsensi: null
+  },
+  rekapFilter: {
+    month: 10,
+    year: 2026,
+    search: '',
+    location: 'ALL'
   }
 };
 
@@ -326,6 +333,7 @@ function initEventListeners() {
   });
 
   document.getElementById('logoutBtn')?.addEventListener('click', handleLogout);
+  initRekapAbsensiEvents();
 }
 
 function closeMobileSidebar() {
@@ -715,7 +723,8 @@ function renderSidebarMenu() {
         (m.ModuleID === 'mod_data_jamaah' && state.activeModule === 'jamaah') ||
         (m.ModuleID === 'mod_logs' && state.activeModule === 'logs') ||
         (m.ModuleID === 'mod_users' && state.activeModule === 'users') ||
-        (m.ModuleID === 'mod_cuti_karyawan' && state.activeModule === 'cuti_absensi');
+        (m.ModuleID === 'mod_cuti_karyawan' && state.activeModule === 'cuti_absensi') ||
+        ((m.ModuleID === 'mod_attendance' || m.ModuleID === 'rekap_absensi') && (state.activeModule === 'rekap_absensi' || state.activeModule === 'mod_attendance'));
 
       const icon = m.Icon || 'fa-solid fa-cube';
 
@@ -933,7 +942,8 @@ function switchModule(moduleName) {
   else if (moduleName === 'mod_data_jamaah' || moduleName === 'mod_form_input_jamaah') viewId = 'jamaah';
   else if (moduleName === 'mod_logs') viewId = 'logs';
   else if (moduleName === 'mod_users' || moduleName === 'mod_sistem_user') viewId = 'users';
-  else if (moduleName === 'mod_cuti_karyawan' || moduleName === 'mod_attendance' || moduleName === 'mod_presensi' || moduleName === 'mod_data_attendance') viewId = 'cuti_absensi';
+  else if (moduleName === 'mod_attendance' || moduleName === 'rekap_absensi' || moduleName === 'mod_rekap_absensi') viewId = 'rekap_absensi';
+  else if (moduleName === 'mod_cuti_karyawan' || moduleName === 'mod_presensi' || moduleName === 'mod_data_attendance') viewId = 'cuti_absensi';
   else if (moduleName === 'mod_modules' || moduleName === 'settings') viewId = 'settings';
 
   // Highlight active nav item in sidebar
@@ -969,6 +979,7 @@ function switchModule(moduleName) {
     jamaah: { title: 'Data Jamaah Umrah & Haji', breadcrumb: 'Manajemen Jamaah / Data Real-time Sheet Metadata' },
     logs: { title: 'Log Aktivitas Pengguna', breadcrumb: 'Audit Trail / Tabel ActivityLogs dengan Google Maps' },
     users: { title: 'Manajemen Pengguna', breadcrumb: 'Master Data / Otorisasi Tabel Users' },
+    rekap_absensi: { title: 'Rekapitulasi Absensi Karyawan', breadcrumb: 'SDM / Rekapitulasi Presensi Matrix & Arsiran Libur' },
     cuti_absensi: { title: 'Presensi & Cuti Karyawan', breadcrumb: 'SDM / Absensi & Pengajuan Cuti' },
     settings: { title: 'Konfigurasi Database', breadcrumb: 'Sistem / Pengalihan Google Sheets & Supabase' }
   };
@@ -985,6 +996,7 @@ function switchModule(moduleName) {
   if (viewId === 'logs') renderLogsTable();
   if (viewId === 'jamaah') renderJamaahTable();
   if (viewId === 'users') renderUsersTable();
+  if (viewId === 'rekap_absensi') renderRekapAbsensi();
   if (viewId === 'cuti_absensi') renderCutiAbsensi();
   if (viewId === 'settings') renderSettings();
 }
@@ -1045,6 +1057,8 @@ async function loadAllModuleData() {
         renderCutiAbsensi();
       }).catch(e => console.warn('Supabase cuti error:', e));
 
+      loadRekapAbsensiData();
+
     } catch (e) {
       console.error('Error loading Supabase directly:', e);
     }
@@ -1084,6 +1098,8 @@ async function loadAllModuleData() {
     fetch('/api/cuti').then(r => r.json()).then(data => {
       if (data.success) state.data.cuti = data.cuti;
     });
+
+    loadRekapAbsensiData();
 
   } catch (err) {
     console.error('Error fetching module data:', err);
@@ -1337,6 +1353,523 @@ function renderCutiAbsensi() {
     }
   }
 }
+
+// ==========================================================================
+// 6B. REKAPITULASI ABSENSI BULANAN (MATRIX REKAP & WEEKEND ARSIRAN)
+// ==========================================================================
+
+const INDO_MONTH_NAMES = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+];
+
+const INDO_DAY_LETTERS = ['M', 'S', 'S', 'R', 'K', 'J', 'S'];
+const INDO_DAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+
+function parseCSVMatrixClient(csvText) {
+  const lines = [];
+  let cur = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < csvText.length; i++) {
+    const c = csvText[i];
+    const next = csvText[i + 1];
+    if (c === '"') {
+      if (inQuotes && next === '"') { field += '"'; i++; }
+      else { inQuotes = !inQuotes; }
+    } else if (c === ',' && !inQuotes) {
+      cur.push(field.trim()); field = '';
+    } else if ((c === '\r' || c === '\n') && !inQuotes) {
+      if (c === '\r' && next === '\n') i++;
+      cur.push(field.trim()); lines.push(cur); cur = []; field = '';
+    } else {
+      field += c;
+    }
+  }
+  if (field || cur.length) { cur.push(field.trim()); lines.push(cur); }
+  return lines;
+}
+
+function getRekapCodeLabel(code) {
+  switch (code) {
+    case 'H': return 'Hadir';
+    case 'S': return 'Sakit';
+    case 'I': return 'Izin';
+    case 'A': return 'Alpha / Tanpa Keterangan';
+    case 'P': return 'Perjalanan Dinas';
+    case 'C': return 'Cuti';
+    case 'L': return 'Lain-lain';
+    case 'W': return 'Work From Home (WFH)';
+    case 'T': return 'Terlambat Datang';
+    default: return code;
+  }
+}
+
+async function loadRekapAbsensiData(force = false) {
+  if (state.data.rekapAbsensi && !force) {
+    return state.data.rekapAbsensi;
+  }
+
+  // 1. Try Full-stack Node API if not in static mode
+  if (!state.isStaticMode) {
+    try {
+      const res = await fetch(`/api/rekap-absensi${force ? '?force=true' : ''}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.employees) {
+          state.data.rekapAbsensi = json;
+          return json;
+        }
+      }
+    } catch (e) {
+      console.warn('Backend /api/rekap-absensi not reachable, fallback to direct Google Sheet:', e.message);
+    }
+  }
+
+  // 2. Direct Google Sheet fetching (Works 100% on GitHub Pages & Static mode)
+  try {
+    const sheetName = 'Rekap Absensi';
+    const url = `https://docs.google.com/spreadsheets/d/${GOOGLE_SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const csvText = await res.text();
+      const matrix = parseCSVMatrixClient(csvText);
+
+      let sheetMonth = 10;
+      let sheetYear = 2026;
+      if (matrix[2] && matrix[2][2]) {
+        const m = parseInt(matrix[2][2], 10);
+        if (!isNaN(m)) sheetMonth = m;
+      }
+      if (matrix[3] && matrix[3][2]) {
+        const y = parseInt(matrix[3][2], 10);
+        if (!isNaN(y)) sheetYear = y;
+      }
+
+      const employees = [];
+      for (let i = 9; i < matrix.length; i++) {
+        const row = matrix[i];
+        if (!row || !row[1]) continue;
+        const no = row[0] || String(employees.length + 1);
+        const name = row[1];
+        const location = row[2] || 'PUSAT';
+        const days = {};
+        for (let d = 1; d <= 31; d++) {
+          days[d] = (row[2 + d] || '').trim().toUpperCase();
+        }
+        employees.push({ no, name, location, days });
+      }
+
+      const data = {
+        month: sheetMonth,
+        year: sheetYear,
+        count: employees.length,
+        employees
+      };
+      state.data.rekapAbsensi = data;
+      return data;
+    }
+  } catch (err) {
+    console.error('Failed to load Rekap Absensi sheet directly:', err);
+  }
+
+  return null;
+}
+
+function initRekapAbsensiEvents() {
+  const monthSelect = document.getElementById('rekapMonthSelect');
+  const yearSelect = document.getElementById('rekapYearSelect');
+  const prevBtn = document.getElementById('rekapPrevMonthBtn');
+  const nextBtn = document.getElementById('rekapNextMonthBtn');
+  const currentBtn = document.getElementById('rekapCurrentMonthBtn');
+  const searchInput = document.getElementById('searchRekapInput');
+  const lokasiSelect = document.getElementById('filterRekapLokasi');
+  const refreshBtn = document.getElementById('refreshRekapBtn');
+  const printBtn = document.getElementById('printRekapBtn');
+
+  monthSelect?.addEventListener('change', (e) => {
+    state.rekapFilter.month = parseInt(e.target.value, 10);
+    renderRekapTable();
+  });
+
+  yearSelect?.addEventListener('change', (e) => {
+    state.rekapFilter.year = parseInt(e.target.value, 10);
+    renderRekapTable();
+  });
+
+  prevBtn?.addEventListener('click', () => {
+    let m = state.rekapFilter.month - 1;
+    let y = state.rekapFilter.year;
+    if (m < 1) {
+      m = 12;
+      y--;
+    }
+    state.rekapFilter.month = m;
+    state.rekapFilter.year = y;
+    if (monthSelect) monthSelect.value = String(m);
+    if (yearSelect) yearSelect.value = String(y);
+    renderRekapTable();
+  });
+
+  nextBtn?.addEventListener('click', () => {
+    let m = state.rekapFilter.month + 1;
+    let y = state.rekapFilter.year;
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
+    state.rekapFilter.month = m;
+    state.rekapFilter.year = y;
+    if (monthSelect) monthSelect.value = String(m);
+    if (yearSelect) yearSelect.value = String(y);
+    renderRekapTable();
+  });
+
+  currentBtn?.addEventListener('click', () => {
+    const targetMonth = 10;
+    const targetYear = 2026;
+    state.rekapFilter.month = targetMonth;
+    state.rekapFilter.year = targetYear;
+    if (monthSelect) monthSelect.value = String(targetMonth);
+    if (yearSelect) yearSelect.value = String(targetYear);
+    renderRekapTable();
+  });
+
+  searchInput?.addEventListener('input', (e) => {
+    state.rekapFilter.search = e.target.value.toLowerCase().trim();
+    renderRekapTable();
+  });
+
+  lokasiSelect?.addEventListener('change', (e) => {
+    state.rekapFilter.location = e.target.value;
+    renderRekapTable();
+  });
+
+  refreshBtn?.addEventListener('click', async () => {
+    const icon = refreshBtn.querySelector('i');
+    if (icon) icon.classList.add('fa-spin');
+    await loadRekapAbsensiData(true);
+    renderRekapTable();
+    if (icon) icon.classList.remove('fa-spin');
+  });
+
+  printBtn?.addEventListener('click', () => {
+    window.print();
+  });
+}
+
+async function renderRekapAbsensi() {
+  if (!state.data.rekapAbsensi) {
+    await loadRekapAbsensiData();
+  }
+  // Sync select inputs with state
+  const monthSelect = document.getElementById('rekapMonthSelect');
+  const yearSelect = document.getElementById('rekapYearSelect');
+  if (monthSelect) monthSelect.value = String(state.rekapFilter.month);
+  if (yearSelect) yearSelect.value = String(state.rekapFilter.year);
+
+  renderRekapTable();
+}
+
+function renderRekapTable() {
+  const thead = document.getElementById('rekapTableHead');
+  const tbody = document.getElementById('rekapTableBody');
+  if (!thead || !tbody) return;
+
+  const month = parseInt(state.rekapFilter.month, 10);
+  const year = parseInt(state.rekapFilter.year, 10);
+  const monthName = INDO_MONTH_NAMES[month - 1] || 'Bulan';
+
+  // Dynamic Day Count for Selected Month and Year (28, 29, 30, or 31)
+  const totalDays = new Date(year, month, 0).getDate();
+
+  // Compute Day Metadata (Detect Saturday & Sunday)
+  const dayMetas = [];
+  for (let d = 1; d <= totalDays; d++) {
+    const dateObj = new Date(year, month - 1, d);
+    const dayOfWeek = dateObj.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const isSaturday = (dayOfWeek === 6);
+    const isSunday = (dayOfWeek === 0);
+    const isWeekend = isSaturday || isSunday;
+    dayMetas.push({
+      day: d,
+      dayOfWeek,
+      isSaturday,
+      isSunday,
+      isWeekend,
+      letter: INDO_DAY_LETTERS[dayOfWeek],
+      dayName: INDO_DAY_NAMES[dayOfWeek]
+    });
+  }
+
+  // 1. BUILD TABLE THEAD
+  // Row 1: Fixed headers + Month Title Colspan + Rekap Summary Colspan
+  let thRow1 = `
+    <tr>
+      <th rowspan="2" class="sticky-col-1">NO</th>
+      <th rowspan="2" class="sticky-col-2">NAMA KARYAWAN</th>
+      <th rowspan="2" class="sticky-col-3">LOKASI</th>
+      <th colspan="${totalDays}" class="month-header-banner">
+        <i class="fa-solid fa-calendar-days" style="margin-right:6px;"></i>
+        BULAN ${monthName.toUpperCase()} ${year}
+      </th>
+      <th colspan="8" class="rekap-summary-banner">
+        <i class="fa-solid fa-chart-simple" style="margin-right:6px;"></i>
+        TOTAL REKAPITULASI
+      </th>
+    </tr>
+  `;
+
+  // Row 2: Days 1..N (with Day Number & Initial) + Summary Codes
+  let thRow2 = '<tr>';
+  dayMetas.forEach(m => {
+    let colClass = 'day-col';
+    if (m.isSaturday) colClass += ' saturday-col';
+    else if (m.isSunday) colClass += ' sunday-col';
+
+    const weekendBadge = m.isWeekend ? ` [${m.dayName} - Akhir Pekan]` : '';
+    thRow2 += `
+      <th class="${colClass}" title="${m.dayName}, ${m.day} ${monthName} ${year}${weekendBadge}">
+        <span class="matrix-day-num">${m.day}</span>
+        <span class="matrix-day-letter">${m.letter}</span>
+      </th>
+    `;
+  });
+
+  // Summary headers: H, S, I, A, P, C, L, %
+  thRow2 += `
+    <th class="rekap-sum-cell" style="color:#34d399;" title="Total Hadir (H)">H</th>
+    <th class="rekap-sum-cell" style="color:#fbbf24;" title="Total Sakit (S)">S</th>
+    <th class="rekap-sum-cell" style="color:#38bdf8;" title="Total Izin (I)">I</th>
+    <th class="rekap-sum-cell" style="color:#f87171;" title="Total Alpha (A)">A</th>
+    <th class="rekap-sum-cell" style="color:#f472b6;" title="Total Dinas (P)">P</th>
+    <th class="rekap-sum-cell" style="color:#5eead4;" title="Total Cuti (C)">C</th>
+    <th class="rekap-sum-cell" style="color:#c084fc;" title="Total Lain-lain (L)">L</th>
+    <th class="rekap-sum-pct" title="Persentase Kehadiran Kerja">%</th>
+  `;
+  thRow2 += '</tr>';
+
+  thead.innerHTML = thRow1 + thRow2;
+
+  // 2. GET & FILTER EMPLOYEES
+  let rawEmployees = state.data.rekapAbsensi?.employees || [];
+  if (rawEmployees.length === 0 && state.data.users?.length > 0) {
+    // Fallback to active users if rekap sheet has not loaded yet
+    rawEmployees = state.data.users.map((u, idx) => ({
+      no: String(idx + 1),
+      name: u.FullName || u.Username,
+      location: (u.Kanwil === 'Pusat' ? u.Kantor : u.Kanwil) || 'PUSAT',
+      days: {}
+    }));
+  }
+
+  const searchQuery = (state.rekapFilter.search || '').toLowerCase().trim();
+  const filterLoc = (state.rekapFilter.location || 'ALL').toUpperCase();
+
+  const filtered = rawEmployees.filter(emp => {
+    const matchSearch = !searchQuery || 
+      emp.name.toLowerCase().includes(searchQuery) || 
+      emp.location.toLowerCase().includes(searchQuery);
+    const matchLoc = (filterLoc === 'ALL') || (emp.location.toUpperCase() === filterLoc);
+    return matchSearch && matchLoc;
+  });
+
+  // Populate dynamic location dropdown options if needed
+  populateRekapLocations(rawEmployees);
+
+  // 3. BUILD TBODY ROWS & CALCULATE KPI STATS
+  let globalTotalH = 0;
+  let globalTotalS = 0;
+  let globalTotalI = 0;
+  let globalTotalA = 0;
+  let globalTotalP = 0;
+  let globalTotalC = 0;
+  let globalTotalL = 0;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="${totalDays + 11}" style="text-align:center; padding: 36px; color: var(--text-muted);">
+          <i class="fa-solid fa-user-slash" style="font-size:1.6rem; margin-bottom:8px; display:block; opacity:0.5;"></i>
+          Tidak ada data karyawan yang cocok dengan filter pencarian ("${state.rekapFilter.search || state.rekapFilter.location}").
+        </td>
+      </tr>
+    `;
+    updateRekapKpis(0, 0, 0, 0, 0);
+    return;
+  }
+
+  const sheetMonth = state.data.rekapAbsensi?.month || 10;
+  const sheetYear = state.data.rekapAbsensi?.year || 2026;
+  const isSheetMonth = (month === sheetMonth && year === sheetYear);
+
+  // Count total workdays (weekdays) in the month
+  const totalWorkdays = dayMetas.filter(m => !m.isWeekend).length;
+
+  const rowsHtml = filtered.map((emp, rowIdx) => {
+    let rowH = 0, rowS = 0, rowI = 0, rowA = 0, rowP = 0, rowC = 0, rowL = 0;
+
+    let dayCellsHtml = '';
+    dayMetas.forEach(m => {
+      let code = '';
+      if (isSheetMonth) {
+        code = (emp.days && emp.days[m.day]) ? emp.days[m.day].trim().toUpperCase() : '';
+      } else {
+        // If another month is selected, match against state.data.absensi if available
+        code = findAttendanceForDate(emp.name, year, month, m.day, m.isWeekend);
+      }
+
+      // Track counters
+      if (code === 'H') rowH++;
+      else if (code === 'S') rowS++;
+      else if (code === 'I') rowI++;
+      else if (code === 'A') rowA++;
+      else if (code === 'P') rowP++;
+      else if (code === 'C') rowC++;
+      else if (code === 'L') rowL++;
+
+      // Weekend vs Weekday Cell Styling
+      let cellClass = 'day-cell';
+      let titleTooltip = `${emp.name} - ${m.dayName}, ${m.day} ${monthName} ${year}`;
+
+      if (m.isSaturday) {
+        cellClass += ' saturday-cell';
+        titleTooltip += ' (Hari Libur Sabtu)';
+      } else if (m.isSunday) {
+        cellClass += ' sunday-cell';
+        titleTooltip += ' (Hari Libur Minggu)';
+      }
+
+      let content = '';
+      if (code) {
+        const label = getRekapCodeLabel(code);
+        titleTooltip += `: ${label} (${code})`;
+        content = `<span class="badge-rekap badge-code-${code}" title="${titleTooltip}">${code}</span>`;
+      } else if (m.isWeekend) {
+        // Empty weekend with arsiran
+        content = '';
+      }
+
+      dayCellsHtml += `<td class="${cellClass}" title="${titleTooltip}">${content}</td>`;
+    });
+
+    // Accumulate globals
+    globalTotalH += rowH;
+    globalTotalS += rowS;
+    globalTotalI += rowI;
+    globalTotalA += rowA;
+    globalTotalP += rowP;
+    globalTotalC += rowC;
+    globalTotalL += rowL;
+
+    // Calculate attendance percentage based on weekdays
+    const pct = totalWorkdays > 0 
+      ? Math.min(100, Math.round(((rowH + rowP) / totalWorkdays) * 100)) 
+      : 100;
+
+    return `
+      <tr>
+        <td class="sticky-col-1">${emp.no || (rowIdx + 1)}</td>
+        <td class="sticky-col-2">
+          <div class="rekap-emp-name" title="${emp.name}">${emp.name}</div>
+        </td>
+        <td class="sticky-col-3">
+          <span class="rekap-emp-loc">${emp.location}</span>
+        </td>
+        ${dayCellsHtml}
+        <td class="rekap-sum-cell rekap-sum-h">${rowH || 0}</td>
+        <td class="rekap-sum-cell rekap-sum-s">${rowS || '-'}</td>
+        <td class="rekap-sum-cell rekap-sum-i">${rowI || '-'}</td>
+        <td class="rekap-sum-cell rekap-sum-a">${rowA || '-'}</td>
+        <td class="rekap-sum-cell">${rowP || '-'}</td>
+        <td class="rekap-sum-cell">${rowC || '-'}</td>
+        <td class="rekap-sum-cell">${rowL || '-'}</td>
+        <td class="rekap-sum-pct">${pct}%</td>
+      </tr>
+    `;
+  }).join('');
+
+  tbody.innerHTML = rowsHtml;
+
+  // 4. UPDATE TOP KPI SUMMARY CARDS
+  updateRekapKpis(
+    filtered.length,
+    globalTotalH,
+    globalTotalS + globalTotalI,
+    globalTotalA,
+    globalTotalP + globalTotalC
+  );
+}
+
+function updateRekapKpis(totalKaryawan, totalHadir, totalSakitIzin, totalAlpha, totalDinasCuti) {
+  const elKaryawan = document.getElementById('kpiTotalKaryawan');
+  const elHadir = document.getElementById('kpiTotalHadir');
+  const elSakitIzin = document.getElementById('kpiTotalSakitIzin');
+  const elAlpha = document.getElementById('kpiTotalAlpha');
+  const elDinasCuti = document.getElementById('kpiTotalDinasCuti');
+
+  if (elKaryawan) elKaryawan.textContent = totalKaryawan.toLocaleString('id-ID');
+  if (elHadir) elHadir.textContent = totalHadir.toLocaleString('id-ID');
+  if (elSakitIzin) elSakitIzin.textContent = totalSakitIzin.toLocaleString('id-ID');
+  if (elAlpha) elAlpha.textContent = totalAlpha.toLocaleString('id-ID');
+  if (elDinasCuti) elDinasCuti.textContent = totalDinasCuti.toLocaleString('id-ID');
+}
+
+function populateRekapLocations(employees) {
+  const select = document.getElementById('filterRekapLokasi');
+  if (!select) return;
+
+  const currentVal = state.rekapFilter.location || 'ALL';
+  const locations = [...new Set(employees.map(e => (e.location || 'PUSAT').trim().toUpperCase()).filter(Boolean))].sort();
+
+  let html = '<option value="ALL">Semua Lokasi</option>';
+  locations.forEach(loc => {
+    const isSelected = (loc === currentVal) ? 'selected' : '';
+    html += `<option value="${loc}" ${isSelected}>${loc}</option>`;
+  });
+  select.innerHTML = html;
+}
+
+function findAttendanceForDate(employeeName, year, month, day, isWeekend) {
+  // If records exist in state.data.absensi, check there
+  const absList = state.data.absensi || [];
+  const empLower = employeeName.toLowerCase();
+  const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  
+  const found = absList.find(a => {
+    const aName = (a.NamaKaryawan || a.NamaUser || a.FULLNAME || a.Username || '').toLowerCase();
+    const aDate = (a.Tanggal || a.Timestamp || a.timestamp || '').slice(0, 10);
+    return aName.includes(empLower) && aDate === dateStr;
+  });
+
+  if (found) {
+    const status = (found.Status || found.Tipe || '').toLowerCase();
+    if (status.includes('sakit')) return 'S';
+    if (status.includes('izin')) return 'I';
+    if (status.includes('dinas')) return 'P';
+    if (status.includes('cuti')) return 'C';
+    if (status.includes('alpha')) return 'A';
+    return 'H';
+  }
+
+  // Weekends have no default attendance
+  if (isWeekend) return '';
+
+  return '';
+}
+
+window.reloadRekapAbsensi = async function() {
+  await loadRekapAbsensiData(true);
+  renderRekapTable();
+};
+
+window.onRekapFilterChange = function() {
+  const searchInput = document.getElementById('searchRekapInput');
+  const lokasiSelect = document.getElementById('filterRekapLokasi');
+  if (searchInput) state.rekapFilter.search = searchInput.value.toLowerCase().trim();
+  if (lokasiSelect) state.rekapFilter.location = lokasiSelect.value;
+  renderRekapTable();
+};
 
 function renderSettings() {
   const optSheets = document.getElementById('optDbSheets');
