@@ -886,6 +886,10 @@
                   <input type="text" id="brosurSearchInput" placeholder="Cari nama brosur, kategori, atau catatan..." oninput="onBrosurFilterChange()">
                 </div>
 
+                <select id="brosurWilayahFilter" class="brosur-filter-select" onchange="onBrosurFilterChange()">
+                  <option value="ALL">Semua Wilayah</option>
+                </select>
+
                 <select id="brosurCategoryFilter" class="brosur-filter-select" onchange="onBrosurFilterChange()">
                   <option value="ALL">Semua Kategori</option>
                 </select>
@@ -908,6 +912,7 @@
                     <tr>
                       <th style="width: 50px;">NO</th>
                       <th>TANGGAL DIBUAT</th>
+                      <th>WILAYAH</th>
                       <th>KATEGORI</th>
                       <th>NAMA BROSUR</th>
                       <th>FILE / GOOGLE DRIVE</th>
@@ -959,7 +964,17 @@
                     </div>
                   </div>
 
-                  <!-- Row 2: Category Dropdown (from MnuLogBrosur) -->
+                  <!-- Row 2: Wilayah Dropdown (from KanwilFathIndah header namakanwill) -->
+                  <div class="form-group">
+                    <label class="form-label" for="inputBrosurWilayah">
+                      <i class="fa-solid fa-map-location-dot" style="color:var(--gold-light);"></i> Wilayah Brosur (<code style="color:var(--gold-light);">namakanwill</code> dari Tabel KanwilFathIndah) <span style="color:#ef4444;">*</span>
+                    </label>
+                    <select id="inputBrosurWilayah" class="form-input" required onchange="onBrosurWilayahChange()">
+                      <option value="">-- Pilih Wilayah Brosur --</option>
+                    </select>
+                  </div>
+
+                  <!-- Row 3: Category Dropdown (from MnuLogBrosur header catagory) -->
                   <div class="form-group">
                     <label class="form-label" for="inputBrosurCategory">
                       <i class="fa-solid fa-layer-group" style="color:var(--gold-light);"></i> Kategori Brosur (<code style="color:var(--gold-light);">catagory</code> dari Tabel MnuLogBrosur) <span style="color:#ef4444;">*</span>
@@ -969,17 +984,20 @@
                     </select>
                   </div>
 
-                  <!-- Row 3: Brochure Name Dropdown (from MnuLogBrosur filtered by category) -->
-                  <div class="form-group">
+                  <!-- Row 4: Brochure Name Dropdown (from MnuLogBrosur header brosurname - Hidden until Category is selected) -->
+                  <div class="form-group" id="groupBrosurName" style="display:none; transition: all 0.3s ease;">
                     <label class="form-label" for="inputBrosurName">
                       <i class="fa-solid fa-file-signature" style="color:var(--gold-light);"></i> Nama Brosur (<code style="color:var(--gold-light);">brosurname</code> dari Tabel MnuLogBrosur) <span style="color:#ef4444;">*</span>
                     </label>
-                    <select id="inputBrosurName" class="form-input" required onchange="onBrosurNameChange()">
-                      <option value="">-- Pilih Nama Brosur --</option>
+                    <select id="inputBrosurName" class="form-input" onchange="onBrosurNameChange()">
+                      <option value="">-- Pilih Kategori Terlebih Dahulu --</option>
                     </select>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
+                      <i class="fa-solid fa-circle-info"></i> Pilihan nama brosur difilter otomatis berdasarkan Kategori yang dipilih.
+                    </div>
                   </div>
 
-                  <!-- Row 4: Local File Picker (Ambil dari local folder) -->
+                  <!-- Row 5: Local File Picker (Ambil dari local folder) -->
                   <div class="form-group">
                     <label class="form-label">
                       <i class="fa-solid fa-folder-open" style="color:var(--gold-light);"></i> Ambil File dari Local Folder / Komputer Anda
@@ -999,26 +1017,36 @@
                     </div>
 
                     <!-- Selected File Info Banner -->
-                    <div class="selected-file-banner" id="selectedFileBanner" style="display:none;">
-                      <div class="file-info-icon"><i class="fa-solid fa-file-circle-check"></i></div>
-                      <div class="file-info-details">
-                        <div class="file-info-name" id="selectedFileName">Nama_file.pdf</div>
-                        <div class="file-info-meta" id="selectedFileMeta">Ukuran: 0 KB • Tipe: PDF</div>
+                    <div class="selected-file-banner" id="selectedFileBanner" style="display:none; flex-direction:column; gap:10px; align-items:stretch;">
+                      <div style="display:flex; align-items:center; gap:12px;">
+                        <div class="file-info-icon"><i class="fa-solid fa-file-circle-check"></i></div>
+                        <div class="file-info-details">
+                          <div class="file-info-name" id="selectedFileName">Nama_file.pdf</div>
+                          <div class="file-info-meta" id="selectedFileMeta">Ukuran: 0 KB • Tipe: PDF</div>
+                        </div>
+                        <button type="button" class="btn-clear-file" onclick="clearSelectedFile()" title="Hapus Pilihan File">
+                          <i class="fa-solid fa-xmark"></i>
+                        </button>
                       </div>
-                      <button type="button" class="btn-clear-file" onclick="clearSelectedFile()" title="Hapus Pilihan File">
-                        <i class="fa-solid fa-xmark"></i>
-                      </button>
+                      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;">
+                        <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=drive_link" 
+                          target="_blank" rel="noopener noreferrer" class="btn-gdrive-folder" style="font-size:0.78rem; padding:6px 14px;"
+                          onclick="onUploadToGDriveClick()">
+                          <i class="fa-brands fa-google-drive"></i>
+                          <span>Simpan ke Google Drive & Salin Nama Standar</span>
+                        </a>
+                      </div>
                     </div>
                   </div>
 
-                  <!-- Row 5: Generated Specific & Readable Filename (Requirement #5) -->
+                  <!-- Row 6: Generated Specific & Readable Filename (Requirement #5) -->
                   <div class="form-group">
                     <label class="form-label">
                       <i class="fa-solid fa-tag" style="color:var(--gold-light);"></i> Nama File Spesifik & Mudah Dibaca (Standar Penamaan Otomatis)
                     </label>
                     <div class="specific-filename-box">
                       <div class="specific-filename-text" id="generatedSpecificFileName">
-                        Pilih kategori, nama brosur dan file lokal untuk membuat nama spesifik...
+                        Pilih wilayah, kategori, nama brosur dan file lokal untuk membuat nama spesifik...
                       </div>
                       <button type="button" class="btn-copy-filename" id="btnCopyFileName" onclick="copySpecificFileName()" title="Salin nama file spesifik">
                         <i class="fa-regular fa-copy"></i>
@@ -1027,23 +1055,23 @@
                     </div>
                   </div>
 
-                  <!-- Row 6: Google Drive Link (Requirement #5) -->
+                  <!-- Row 7: Google Drive Link (Requirement #5) -->
                   <div class="form-group">
                     <label class="form-label" for="inputBrosurLink">
                       <i class="fa-brands fa-google-drive" style="color:#38bdf8;"></i> Link Penyimpanan Google Drive (<code style="color:var(--gold-light);">link</code>)
                     </label>
                     <div style="display:flex; gap:10px;">
                       <input type="url" id="inputBrosurLink" class="form-input" 
-                        value="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=sharing" 
+                        value="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=drive_link" 
                         required placeholder="https://drive.google.com/drive/folders/...">
-                      <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=sharing" 
+                      <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=drive_link" 
                         target="_blank" rel="noopener noreferrer" class="btn-open-gdrive-link" title="Buka Folder Google Drive Target">
                         <i class="fa-solid fa-arrow-up-right-from-square"></i>
                         <span>Buka Drive</span>
                       </a>
                     </div>
                     <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
-                      <i class="fa-solid fa-circle-info"></i> Folder Target Fath Indah: <code>https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=sharing</code>
+                      <i class="fa-solid fa-circle-info"></i> Folder Target Fath Indah: <code>https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=drive_link</code>
                     </div>
                   </div>
 
