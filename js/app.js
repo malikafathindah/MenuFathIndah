@@ -1787,6 +1787,9 @@ const DEFAULT_LOG_BROSUR = [
   {
     id: 'BRS-20261020-001',
     created_at: '2026-10-20T08:15:00.000Z',
+    tglupload: '2026-10-20',
+    validuntil: '2026-12-31',
+    status: 'Aktif',
     wilayah: 'Pusat',
     catagory: 'Umrah',
     brosurname: 'Paket Umrah Reguler 9 Hari',
@@ -1796,6 +1799,9 @@ const DEFAULT_LOG_BROSUR = [
   {
     id: 'BRS-20261019-002',
     created_at: '2026-10-19T10:30:00.000Z',
+    tglupload: '2026-10-19',
+    validuntil: '2026-11-30',
+    status: 'Aktif',
     wilayah: 'Solo Raya',
     catagory: 'Haji Khusus & Furoda',
     brosurname: 'Brosur Haji Furoda / Mujamalah VVIP',
@@ -1805,6 +1811,9 @@ const DEFAULT_LOG_BROSUR = [
   {
     id: 'BRS-20261018-003',
     created_at: '2026-10-18T14:45:00.000Z',
+    tglupload: '2026-10-18',
+    validuntil: '2026-10-25',
+    status: 'Expired',
     wilayah: 'Samarinda',
     catagory: 'Promo & Seasonal',
     brosurname: 'Flyer Promo Early Bird 1448H',
@@ -2582,16 +2591,21 @@ window.resetBrosurForm = function() {
   // Populate dropdowns dari master data
   populateBrosurDropdowns();
 
-  // Sembunyikan kembali dropdown Nama Brosur saat form di-reset (Requirement #3)
+  // Sembunyikan kembali dropdown Nama Brosur saat form di-reset
   const groupName = document.getElementById('groupBrosurName');
   if (groupName) groupName.style.display = 'none';
 
-  // ID dan CreatedAt diisi otomatis oleh database Supabase
-  const idInput = document.getElementById('inputBrosurId');
-  if (idInput) idInput.value = 'Otomatis diisi oleh Supabase';
+  // Tanggal Upload diisi otomatis tanggal hari ini (yyyy-mm-dd)
+  const todayYmd = new Date().toISOString().slice(0, 10);
+  const tglUploadInput = document.getElementById('inputBrosurTglUpload');
+  if (tglUploadInput) tglUploadInput.value = todayYmd;
 
-  const createdInput = document.getElementById('inputBrosurCreatedAt');
-  if (createdInput) createdInput.value = 'Otomatis (Waktu Sistem Supabase)';
+  // Valid Until default kosong (wajib dipilih user lewat DTPICKER)
+  const validUntilInput = document.getElementById('inputBrosurValidUntil');
+  if (validUntilInput) {
+    validUntilInput.value = '';
+    validUntilInput.min = todayYmd;
+  }
 
   const linkInput = document.getElementById('inputBrosurLink');
   if (linkInput) linkInput.value = GDRIVE_BROSUR_FOLDER_URL;
@@ -2671,6 +2685,8 @@ window.submitBrosurForm = async function(event) {
   const wilayah = document.getElementById('inputBrosurWilayah')?.value || '';
   const catagory = document.getElementById('inputBrosurCategory')?.value;
   const brosurname = document.getElementById('inputBrosurName')?.value;
+  const validuntil = document.getElementById('inputBrosurValidUntil')?.value;
+  const tglupload = document.getElementById('inputBrosurTglUpload')?.value || new Date().toISOString().slice(0, 10);
   let link = document.getElementById('inputBrosurLink')?.value.trim() || GDRIVE_BROSUR_FOLDER_URL;
   const catatan = document.getElementById('inputBrosurCatatan')?.value.trim() || '';
 
@@ -2689,13 +2705,18 @@ window.submitBrosurForm = async function(event) {
     return;
   }
 
+  if (!validuntil) {
+    alert('Harap tentukan tanggal batas berlaku brosur (Valid Until)!');
+    return;
+  }
+
   const selectedFile = state.selectedLocalBrosurFile;
   const specificName = state.generatedSpecificFileName || (selectedFile ? selectedFile.name : '');
   const gdriveWebhookUrl = getGDriveWebhookUrl();
 
   // Jika file lokal dipilih tapi webhook belum dipasang, tampilkan modal interaktif untuk konfirmasi
   if (selectedFile && !gdriveWebhookUrl) {
-    pendingBrosurPayload = { wilayah, catagory, brosurname, link, catatan, selectedFile, specificName };
+    pendingBrosurPayload = { wilayah, catagory, brosurname, link, catatan, validuntil, tglupload, status: 'Aktif', selectedFile, specificName };
     openGDrivePromptModal(selectedFile.name);
     return;
   }
@@ -2746,22 +2767,25 @@ window.submitBrosurForm = async function(event) {
     btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan ke Supabase LogBrosur...';
   }
 
-  await executeSaveBrosurToSupabase({ wilayah, catagory, brosurname, link, catatan, specificName });
+  await executeSaveBrosurToSupabase({ wilayah, catagory, brosurname, link, catatan, validuntil, tglupload, status: 'Aktif', specificName });
 };
 
 async function executeSaveBrosurToSupabase(payload) {
-  const { wilayah, catagory, brosurname, link, catatan, specificName } = payload;
+  const { wilayah, catagory, brosurname, link, catatan, validuntil, tglupload, status, specificName } = payload;
   const btnSubmit = document.getElementById('btnSubmitBrosur');
 
   const fullCatatan = catatan + (specificName ? ` [File: ${specificName}]` : '');
 
   // Sesuai skema tabel Supabase LogBrosur:
-  // Kolom: catagory, brosurname, lokasibrosur, link, catatan (id dan created_at otomatis dibuat oleh Supabase)
+  // Kolom: catagory, brosurname, lokasibrosur, link, validuntil, tglupload, status, catatan
   const supabasePayload = {
     catagory: catagory,
     brosurname: brosurname,
     lokasibrosur: wilayah,
     link: link,
+    validuntil: validuntil || null,
+    tglupload: tglupload || new Date().toISOString().slice(0, 10),
+    status: status || 'Aktif',
     catatan: fullCatatan
   };
 
@@ -2824,6 +2848,9 @@ async function executeSaveBrosurToSupabase(payload) {
       lokasibrosur: wilayah,
       wilayah: wilayah,
       link: link,
+      validuntil: validuntil || null,
+      tglupload: tglupload || new Date().toISOString().slice(0, 10),
+      status: status || 'Aktif',
       catatan: fullCatatan
     };
   } else {
@@ -2859,12 +2886,13 @@ function renderBrosurTable() {
 
   // Filter
   const filtered = list.filter(item => {
-    const wil = (item.wilayah || '').toLowerCase();
+    const wil = (item.wilayah || item.lokasibrosur || '').toLowerCase();
     const cat = (item.catagory || item.category || '').toLowerCase();
     const name = (item.brosurname || item.name || '').toLowerCase();
     const notes = (item.catatan || '').toLowerCase();
+    const status = (item.status || 'aktif').toLowerCase();
 
-    if (wilayahFilter !== 'ALL' && (item.wilayah || '') !== wilayahFilter) {
+    if (wilayahFilter !== 'ALL' && (item.wilayah || item.lokasibrosur || '') !== wilayahFilter) {
       return false;
     }
 
@@ -2872,7 +2900,7 @@ function renderBrosurTable() {
       return false;
     }
 
-    if (search && !wil.includes(search) && !cat.includes(search) && !name.includes(search) && !notes.includes(search)) {
+    if (search && !wil.includes(search) && !cat.includes(search) && !name.includes(search) && !notes.includes(search) && !status.includes(search)) {
       return false;
     }
 
@@ -2891,7 +2919,7 @@ function renderBrosurTable() {
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="8" style="text-align:center; padding:36px; color:#64748b;">
+        <td colspan="9" style="text-align:center; padding:36px; color:#64748b;">
           <i class="fa-regular fa-folder-open" style="font-size:2rem; color:var(--gold-light); margin-bottom:10px;"></i>
           <div>Tidak ada brosur yang sesuai filter. Klik <strong>Input Brosur Baru</strong> untuk mendaftarkan brosur.</div>
         </td>
@@ -2899,6 +2927,8 @@ function renderBrosurTable() {
     `;
     return;
   }
+
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   tbody.innerHTML = filtered.map((item, idx) => {
     const no = idx + 1;
@@ -2908,21 +2938,24 @@ function renderBrosurTable() {
     const notes = item.catatan || '-';
     const link = item.link || GDRIVE_BROSUR_FOLDER_URL;
     const idBadge = item.id ? (typeof item.id === 'number' ? `ID: #${item.id}` : item.id) : '';
-    
-    // Format Created Date
-    let dateDisplay = '-';
-    if (item.created_at) {
-      const d = new Date(item.created_at);
-      if (!isNaN(d.getTime())) {
-        const day = d.getDate();
-        const m = INDO_MONTH_NAMES[d.getMonth()] || '';
-        const y = d.getFullYear();
-        const time = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-        dateDisplay = `${day} ${m} ${y} ${time}`;
-      } else {
-        dateDisplay = String(item.created_at).slice(0, 16);
-      }
+
+    // Tanggal Upload (yyyy-mm-dd)
+    let tglUploadDisplay = item.tglupload || '';
+    if (!tglUploadDisplay && item.created_at) {
+      tglUploadDisplay = String(item.created_at).slice(0, 10);
     }
+    if (!tglUploadDisplay) tglUploadDisplay = '-';
+
+    // Valid Until (yyyy-mm-dd)
+    const validUntilDisplay = item.validuntil || '-';
+
+    // Status Brosur (Aktif / Expired)
+    let rawStatus = (item.status || 'Aktif').trim();
+    const isPastDate = item.validuntil && item.validuntil < todayStr;
+    const isExpired = rawStatus.toLowerCase() === 'expired' || isPastDate;
+    const statusLabel = isExpired ? 'Expired' : 'Aktif';
+    const statusPillClass = isExpired ? 'expired' : 'aktif';
+    const statusIcon = isExpired ? 'fa-clock-rotate-left' : 'fa-circle-check';
 
     // Category Badge Class
     const catLower = cat.toLowerCase();
@@ -2932,10 +2965,17 @@ function renderBrosurTable() {
     else if (catLower.includes('wisata')) badgeClass = 'wisata';
     else if (catLower.includes('promo')) badgeClass = 'promo';
 
+    const safeId = String(item.id || `LOCAL-${idx}`);
+
     return `
       <tr>
         <td style="color:#64748b; font-weight:600;">${no}</td>
-        <td style="white-space:nowrap; font-size:0.84rem; color:#cbd5e1;">${dateDisplay}</td>
+        <td style="white-space:nowrap; font-size:0.82rem; color:#cbd5e1; font-family:'JetBrains Mono',monospace;">
+          <i class="fa-regular fa-calendar" style="color:var(--text-dim); margin-right:4px;"></i>${tglUploadDisplay}
+        </td>
+        <td style="white-space:nowrap; font-size:0.82rem; font-family:'JetBrains Mono',monospace; ${isPastDate ? 'color:#f87171;' : 'color:#38bdf8;'}">
+          <i class="fa-regular fa-calendar-check" style="margin-right:4px;"></i><strong>${validUntilDisplay}</strong>
+        </td>
         <td>
           <span style="color:#38bdf8; font-weight:600; font-size:0.82rem; display:inline-flex; align-items:center; gap:5px;">
             <i class="fa-solid fa-location-dot"></i> ${wil}
@@ -2948,27 +2988,173 @@ function renderBrosurTable() {
           <strong style="color:#ffffff; font-size:0.9rem;">${name}</strong>
           <div style="font-size:0.75rem; color:#94a3b8; font-family:'JetBrains Mono',monospace;">${idBadge}</div>
         </td>
-        <td>
-          <a href="${link}" target="_blank" rel="noopener noreferrer" class="btn-open-drive" title="Buka File di Google Drive">
-            <i class="fa-brands fa-google-drive"></i>
-            <span>Buka Drive</span>
-          </a>
+        <td style="text-align:center;">
+          <span class="brosur-status-pill ${statusPillClass}">
+            <i class="fa-solid ${statusIcon}"></i> ${statusLabel}
+          </span>
         </td>
-        <td style="font-size:0.84rem; color:#94a3b8; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${notes}">
+        <td style="font-size:0.84rem; color:#94a3b8; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${notes}">
           ${notes}
         </td>
         <td style="text-align:center; white-space:nowrap;">
-          <button type="button" class="btn-action-icon" onclick="copyBrosurLink('${link}')" title="Salin Link Google Drive">
-            <i class="fa-regular fa-copy"></i>
-          </button>
-          <a href="${link}" target="_blank" rel="noopener noreferrer" class="btn-action-icon" title="Buka di Tab Baru">
+          <a href="${link}" target="_blank" rel="noopener noreferrer" class="btn-action-icon" title="Buka File / Google Drive">
             <i class="fa-solid fa-arrow-up-right-from-square"></i>
           </a>
+          <button type="button" class="btn-action-icon btn-action-edit" onclick="openUpdateStatusModal('${safeId}')" title="Update Status Brosur (Aktif / Expired)">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </button>
+          <button type="button" class="btn-action-icon btn-action-delete" onclick="deleteBrosurRecord('${safeId}')" title="Hapus Brosur">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
         </td>
       </tr>
     `;
   }).join('');
 }
+
+window.openUpdateStatusModal = function(id) {
+  const modal = document.getElementById('updateStatusModal');
+  if (!modal) return;
+
+  const list = state.data.logBrosur || [];
+  const item = list.find(x => String(x.id) === String(id));
+  if (!item) {
+    alert('Data brosur tidak ditemukan.');
+    return;
+  }
+
+  const idInput = document.getElementById('modalStatusBrosurId');
+  const nameEl = document.getElementById('modalStatusBrosurName');
+  const wilEl = document.getElementById('modalStatusBrosurWilayah');
+  const catEl = document.getElementById('modalStatusBrosurCat');
+  const tglUpEl = document.getElementById('modalStatusBrosurTglUpload');
+  const validEl = document.getElementById('modalStatusBrosurValidUntil');
+  const linkEl = document.getElementById('modalStatusBrosurLink');
+  const selectEl = document.getElementById('modalStatusSelect');
+
+  if (idInput) idInput.value = item.id;
+  if (nameEl) nameEl.textContent = item.brosurname || item.name || '-';
+  if (wilEl) wilEl.textContent = item.lokasibrosur || item.wilayah || 'Pusat';
+  if (catEl) catEl.textContent = item.catagory || item.category || '-';
+  if (tglUpEl) tglUpEl.textContent = item.tglupload || (item.created_at ? String(item.created_at).slice(0, 10) : '-');
+  if (validEl) validEl.textContent = item.validuntil || '-';
+  if (linkEl) {
+    linkEl.href = item.link || GDRIVE_BROSUR_FOLDER_URL;
+  }
+
+  if (selectEl) {
+    const curStatus = (item.status || 'Aktif').trim();
+    selectEl.value = curStatus.toLowerCase() === 'expired' ? 'Expired' : 'Aktif';
+  }
+
+  modal.style.display = 'flex';
+};
+
+window.closeUpdateStatusModal = function() {
+  const modal = document.getElementById('updateStatusModal');
+  if (modal) modal.style.display = 'none';
+};
+
+window.saveBrochureStatus = async function() {
+  const id = document.getElementById('modalStatusBrosurId')?.value;
+  const selectEl = document.getElementById('modalStatusSelect');
+  const newStatus = selectEl ? selectEl.value : 'Aktif';
+
+  if (!id) return;
+
+  const btnSave = document.getElementById('btnSaveStatusChange');
+  if (btnSave) {
+    btnSave.disabled = true;
+    btnSave.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan Status...';
+  }
+
+  let updated = false;
+
+  // 1. Direct fetch ke Supabase
+  try {
+    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/LogBrosur?id=eq.${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({ status: newStatus })
+    });
+    if (res.ok) {
+      updated = true;
+    }
+  } catch (e) {
+    console.warn('Gagal PATCH status ke Supabase:', e.message);
+  }
+
+  // 2. Fallback backend server
+  if (!updated && !state.isStaticMode) {
+    try {
+      const apiRes = await fetch(`/api/brosur/log/${encodeURIComponent(id)}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      });
+      if (apiRes.ok) updated = true;
+    } catch (_) {}
+  }
+
+  // Update item di local state
+  if (state.data.logBrosur) {
+    const item = state.data.logBrosur.find(x => String(x.id) === String(id));
+    if (item) {
+      item.status = newStatus;
+    }
+    localStorage.setItem('fath_indah_log_brosur', JSON.stringify(state.data.logBrosur));
+  }
+
+  if (btnSave) {
+    btnSave.disabled = false;
+    btnSave.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan Perubahan Status';
+  }
+
+  closeUpdateStatusModal();
+  renderBrosurTable();
+  alert(`Status brosur berhasil diubah menjadi: "${newStatus}"!`);
+};
+
+window.deleteBrosurRecord = async function(id) {
+  const list = state.data.logBrosur || [];
+  const item = list.find(x => String(x.id) === String(id));
+  const brosurName = item ? (item.brosurname || item.name) : 'brosur';
+
+  const confirmDelete = confirm(`Apakah Anda yakin ingin menghapus brosur "${brosurName}" dari daftar dan database LogBrosur?`);
+  if (!confirmDelete) return;
+
+  // 1. Direct delete Supabase
+  try {
+    await fetch(`${SUPABASE_CONFIG.url}/rest/v1/LogBrosur?id=eq.${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+      }
+    });
+  } catch (e) {
+    console.warn('Gagal DELETE langsung ke Supabase:', e.message);
+  }
+
+  // 2. Delete server API jika running
+  if (!state.isStaticMode) {
+    try {
+      await fetch(`/api/brosur/log/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    } catch (_) {}
+  }
+
+  // Hapus dari state
+  state.data.logBrosur = list.filter(x => String(x.id) !== String(id));
+  localStorage.setItem('fath_indah_log_brosur', JSON.stringify(state.data.logBrosur));
+
+  renderBrosurTable();
+  alert(`Brosur "${brosurName}" berhasil dihapus dari database!`);
+};
 
 window.copyBrosurLink = function(url) {
   navigator.clipboard.writeText(url).then(() => {
