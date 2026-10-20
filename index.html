@@ -129,6 +129,11 @@
           <i class="fa-solid fa-clipboard-user nav-icon"></i>
           <span class="nav-label">Riwayat Log Absensi</span>
         </a>
+
+        <a href="#launching_brosur" class="nav-item" data-module="mod_input_brosur" data-tooltip="Launching Brosur">
+          <i class="fa-solid fa-bullhorn nav-icon"></i>
+          <span class="nav-label">Launching Brosur</span>
+        </a>
       </nav>
 
       <!-- Sidebar Footer -->
@@ -800,6 +805,272 @@
                   </tr>
                 </tbody>
               </table>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 5D: LAUNCHING BROSUR (TABEL LOGBROSUR & MNULOGBROSUR)
+             Tampilan Manajemen Arsip & Input Peluncuran Brosur
+             ================================================================ -->
+        <div class="module-view" id="view-launching_brosur">
+          <div class="content-card brosur-card">
+            
+            <!-- Module Top Bar with Tabs and Google Drive link -->
+            <div class="brosur-top-header">
+              <div class="brosur-header-title">
+                <div class="card-title">
+                  <i class="fa-solid fa-bullhorn" style="color:var(--gold-light);"></i>
+                  <span>Launching & Manajemen Brosur Promosi</span>
+                </div>
+                <div class="brosur-header-subtitle">
+                  Sumber Data: Tabel <code>LogBrosur</code> & <code>MnuLogBrosur</code> di Supabase • Cloud Storage Google Drive
+                </div>
+              </div>
+
+              <div class="brosur-header-actions">
+                <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=sharing" target="_blank" rel="noopener noreferrer" class="btn-gdrive-folder" title="Buka Folder Penyimpanan Google Drive">
+                  <i class="fa-brands fa-google-drive"></i>
+                  <span>Buka Google Drive</span>
+                </a>
+              </div>
+            </div>
+
+            <!-- Tab Switcher Navigation -->
+            <div class="brosur-tabs-nav">
+              <button type="button" class="brosur-tab-btn active" id="tabBtnBrosurList" onclick="switchBrosurTab('list')">
+                <i class="fa-solid fa-folder-open"></i>
+                <span>📋 Daftar & Arsip Brosur (LogBrosur)</span>
+              </button>
+              <button type="button" class="brosur-tab-btn" id="tabBtnBrosurInput" onclick="switchBrosurTab('input')">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                <span>🚀 Input Brosur Baru (Form Inputan)</span>
+              </button>
+            </div>
+
+            <!-- TAB PANE 1: DAFTAR & ARSIP BROSUR -->
+            <div class="brosur-tab-pane active" id="tabPaneBrosurList">
+              
+              <!-- Quick Stats Grid -->
+              <div class="brosur-stats-grid">
+                <div class="brosur-stat-card">
+                  <div class="brosur-stat-icon gold"><i class="fa-solid fa-file-pdf"></i></div>
+                  <div>
+                    <div class="brosur-stat-val" id="brosurStatTotal">0</div>
+                    <div class="brosur-stat-lbl">Total Brosur Terdaftar</div>
+                  </div>
+                </div>
+
+                <div class="brosur-stat-card">
+                  <div class="brosur-stat-icon emerald"><i class="fa-solid fa-tags"></i></div>
+                  <div>
+                    <div class="brosur-stat-val" id="brosurStatCategory">0</div>
+                    <div class="brosur-stat-lbl">Kategori Materi</div>
+                  </div>
+                </div>
+
+                <div class="brosur-stat-card">
+                  <div class="brosur-stat-icon blue"><i class="fa-brands fa-google-drive"></i></div>
+                  <div>
+                    <div class="brosur-stat-val" style="font-size:1.1rem; color:#38bdf8;">Google Drive</div>
+                    <div class="brosur-stat-lbl" style="font-size:0.75rem;">1nDoE-UPkzVwt6m...</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Filter & Search Toolbar -->
+              <div class="brosur-toolbar">
+                <div class="brosur-search-box">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" id="brosurSearchInput" placeholder="Cari nama brosur, kategori, atau catatan..." oninput="onBrosurFilterChange()">
+                </div>
+
+                <select id="brosurCategoryFilter" class="brosur-filter-select" onchange="onBrosurFilterChange()">
+                  <option value="ALL">Semua Kategori</option>
+                </select>
+
+                <button type="button" class="btn-refresh-brosur" onclick="reloadBrosurData()" title="Segarkan Data dari Supabase">
+                  <i class="fa-solid fa-rotate"></i>
+                  <span>Refresh</span>
+                </button>
+
+                <button type="button" class="btn-add-brosur-shortcut" onclick="switchBrosurTab('input')">
+                  <i class="fa-solid fa-plus"></i>
+                  <span>Input Brosur Baru</span>
+                </button>
+              </div>
+
+              <!-- Table Container -->
+              <div class="table-responsive brosur-table-container">
+                <table class="table-brosur">
+                  <thead>
+                    <tr>
+                      <th style="width: 50px;">NO</th>
+                      <th>TANGGAL DIBUAT</th>
+                      <th>KATEGORI</th>
+                      <th>NAMA BROSUR</th>
+                      <th>FILE / GOOGLE DRIVE</th>
+                      <th>CATATAN</th>
+                      <th style="text-align: center;">AKSI</th>
+                    </tr>
+                  </thead>
+                  <tbody id="logBrosurTableBody">
+                    <tr>
+                      <td colspan="7" style="text-align:center; padding:36px; color:#64748b;">
+                        <i class="fa-solid fa-spinner fa-spin" style="color:var(--gold-light); font-size:1.5rem;"></i>
+                        <div style="margin-top:10px;">Memuat data dari tabel LogBrosur Supabase...</div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+            </div>
+
+            <!-- TAB PANE 2: INPUT BROSUR BARU -->
+            <div class="brosur-tab-pane" id="tabPaneBrosurInput">
+              
+              <div class="brosur-form-card">
+                <div class="brosur-form-title">
+                  <i class="fa-solid fa-file-circle-plus" style="color:var(--gold-light);"></i>
+                  <span>Formulir Pendaftaran & Launching Brosur Baru</span>
+                </div>
+                <p class="brosur-form-desc">
+                  Isi formulir berikut untuk mendaftarkan brosur ke tabel <code>LogBrosur</code>. ID dan Waktu Dibuat diisi otomatis oleh sistem. File dapat dipilih dari komputer lokal dan diarahkan ke Google Drive Folder.
+                </p>
+
+                <form id="brosurInputForm" onsubmit="submitBrosurForm(event)">
+                  
+                  <!-- Row 1: System Info (Auto-generated) -->
+                  <div class="form-row-grid">
+                    <div class="form-group">
+                      <label class="form-label">
+                        <i class="fa-solid fa-hashtag" style="color:var(--gold-light);"></i> ID Brosur (Auto System)
+                      </label>
+                      <input type="text" id="inputBrosurId" class="form-input readonly-input" readonly>
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label">
+                        <i class="fa-solid fa-calendar-days" style="color:var(--gold-light);"></i> Tanggal Dibuat (created_at Auto System)
+                      </label>
+                      <input type="text" id="inputBrosurCreatedAt" class="form-input readonly-input" readonly>
+                    </div>
+                  </div>
+
+                  <!-- Row 2: Category Dropdown (from MnuLogBrosur) -->
+                  <div class="form-group">
+                    <label class="form-label" for="inputBrosurCategory">
+                      <i class="fa-solid fa-layer-group" style="color:var(--gold-light);"></i> Kategori Brosur (<code style="color:var(--gold-light);">catagory</code> dari Tabel MnuLogBrosur) <span style="color:#ef4444;">*</span>
+                    </label>
+                    <select id="inputBrosurCategory" class="form-input" required onchange="onBrosurCategoryChange()">
+                      <option value="">-- Pilih Kategori --</option>
+                    </select>
+                  </div>
+
+                  <!-- Row 3: Brochure Name Dropdown (from MnuLogBrosur filtered by category) -->
+                  <div class="form-group">
+                    <label class="form-label" for="inputBrosurName">
+                      <i class="fa-solid fa-file-signature" style="color:var(--gold-light);"></i> Nama Brosur (<code style="color:var(--gold-light);">brosurname</code> dari Tabel MnuLogBrosur) <span style="color:#ef4444;">*</span>
+                    </label>
+                    <select id="inputBrosurName" class="form-input" required onchange="onBrosurNameChange()">
+                      <option value="">-- Pilih Kategori Terlebih Dahulu --</option>
+                    </select>
+                  </div>
+
+                  <!-- Row 4: Local File Picker (Ambil dari local folder) -->
+                  <div class="form-group">
+                    <label class="form-label">
+                      <i class="fa-solid fa-folder-open" style="color:var(--gold-light);"></i> Ambil File dari Local Folder / Komputer Anda
+                    </label>
+                    
+                    <div class="brosur-drop-zone" id="brosurDropZone" onclick="document.getElementById('localBrosurFileInput').click()">
+                      <input type="file" id="localBrosurFileInput" style="display:none;" accept=".pdf,image/*,.doc,.docx" onchange="handleLocalFileSelect(event)">
+                      <div class="drop-zone-icon">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                      </div>
+                      <div class="drop-zone-text" id="dropZoneText">
+                        <strong>Klik untuk memilih file</strong> atau seret file brosur ke sini
+                      </div>
+                      <div class="drop-zone-sub">
+                        Mendukung format: PDF, JPG, PNG, WEBP, Word Doc (Maks 50 MB)
+                      </div>
+                    </div>
+
+                    <!-- Selected File Info Banner -->
+                    <div class="selected-file-banner" id="selectedFileBanner" style="display:none;">
+                      <div class="file-info-icon"><i class="fa-solid fa-file-circle-check"></i></div>
+                      <div class="file-info-details">
+                        <div class="file-info-name" id="selectedFileName">Nama_file.pdf</div>
+                        <div class="file-info-meta" id="selectedFileMeta">Ukuran: 0 KB • Tipe: PDF</div>
+                      </div>
+                      <button type="button" class="btn-clear-file" onclick="clearSelectedFile()" title="Hapus Pilihan File">
+                        <i class="fa-solid fa-xmark"></i>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Row 5: Generated Specific & Readable Filename (Requirement #5) -->
+                  <div class="form-group">
+                    <label class="form-label">
+                      <i class="fa-solid fa-tag" style="color:var(--gold-light);"></i> Nama File Spesifik & Mudah Dibaca (Standar Penamaan Otomatis)
+                    </label>
+                    <div class="specific-filename-box">
+                      <div class="specific-filename-text" id="generatedSpecificFileName">
+                        Pilih kategori, nama brosur dan file lokal untuk membuat nama spesifik...
+                      </div>
+                      <button type="button" class="btn-copy-filename" id="btnCopyFileName" onclick="copySpecificFileName()" title="Salin nama file spesifik">
+                        <i class="fa-regular fa-copy"></i>
+                        <span>Salin Nama</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Row 6: Google Drive Link (Requirement #5) -->
+                  <div class="form-group">
+                    <label class="form-label" for="inputBrosurLink">
+                      <i class="fa-brands fa-google-drive" style="color:#38bdf8;"></i> Link Penyimpanan Google Drive (<code style="color:var(--gold-light);">link</code>)
+                    </label>
+                    <div style="display:flex; gap:10px;">
+                      <input type="url" id="inputBrosurLink" class="form-input" 
+                        value="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=sharing" 
+                        required placeholder="https://drive.google.com/drive/folders/...">
+                      <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=sharing" 
+                        target="_blank" rel="noopener noreferrer" class="btn-open-gdrive-link" title="Buka Folder Google Drive Target">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        <span>Buka Drive</span>
+                      </a>
+                    </div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
+                      <i class="fa-solid fa-circle-info"></i> Folder Target Fath Indah: <code>https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=sharing</code>
+                    </div>
+                  </div>
+
+                  <!-- Row 7: Catatan (catatan) -->
+                  <div class="form-group">
+                    <label class="form-label" for="inputBrosurCatatan">
+                      <i class="fa-solid fa-comment-dots" style="color:var(--gold-light);"></i> Catatan / Deskripsi Tambahan (<code style="color:var(--gold-light);">catatan</code>)
+                    </label>
+                    <textarea id="inputBrosurCatatan" class="form-input" rows="3" placeholder="Masukkan keterangan brosur, target promosi, atau rincian paket..."></textarea>
+                  </div>
+
+                  <!-- Submit Button Bar -->
+                  <div class="brosur-form-footer">
+                    <button type="button" class="btn-secondary" onclick="resetBrosurForm()">
+                      <i class="fa-solid fa-rotate-left"></i>
+                      <span>Reset Form</span>
+                    </button>
+                    <button type="submit" class="btn-gold" id="btnSubmitBrosur">
+                      <i class="fa-solid fa-cloud-arrow-up"></i>
+                      <span>Simpan ke LogBrosur (Supabase)</span>
+                    </button>
+                  </div>
+
+                </form>
+
+              </div>
+
             </div>
 
           </div>

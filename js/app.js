@@ -33,7 +33,9 @@ const state = {
     absensi: [],
     cuti: [],
     modules: [],
-    rekapAbsensi: null
+    rekapAbsensi: null,
+    logBrosur: [],
+    mnuLogBrosur: []
   },
   rekapFilter: {
     month: 10,
@@ -48,7 +50,12 @@ const state = {
   logAbsensiSort: {
     column: 'timestamp',
     dir: 'desc'
-  }
+  },
+  brosurFilter: {
+    search: '',
+    category: 'ALL'
+  },
+  selectedLocalBrosurFile: null
 };
 
 // DOM Elements
@@ -733,6 +740,7 @@ function renderSidebarMenu() {
         (m.ModuleID === 'mod_users' && state.activeModule === 'users') ||
         (m.ModuleID === 'mod_cuti_karyawan' && state.activeModule === 'cuti_absensi') ||
         (m.ModuleID === 'mod_data_attendance' && (state.activeModule === 'log_absensi' || state.activeModule === 'mod_data_attendance')) ||
+        (m.ModuleID === 'mod_input_brosur' && (state.activeModule === 'launching_brosur' || state.activeModule === 'mod_input_brosur')) ||
         ((m.ModuleID === 'mod_attendance' || m.ModuleID === 'rekap_absensi') && (state.activeModule === 'rekap_absensi' || state.activeModule === 'mod_attendance'));
 
       const icon = m.Icon || 'fa-solid fa-cube';
@@ -954,6 +962,7 @@ function switchModule(moduleName) {
   else if (moduleName === 'mod_attendance' || moduleName === 'rekap_absensi' || moduleName === 'mod_rekap_absensi') viewId = 'rekap_absensi';
   else if (moduleName === 'mod_data_attendance' || moduleName === 'log_absensi' || moduleName === 'riwayat_log_absensi') viewId = 'log_absensi';
   else if (moduleName === 'mod_cuti_karyawan' || moduleName === 'mod_presensi') viewId = 'cuti_absensi';
+  else if (moduleName === 'mod_input_brosur' || moduleName === 'launching_brosur' || moduleName === 'mod_view_brochure') viewId = 'launching_brosur';
   else if (moduleName === 'mod_modules' || moduleName === 'settings') viewId = 'settings';
 
   // Highlight active nav item in sidebar
@@ -991,6 +1000,7 @@ function switchModule(moduleName) {
     users: { title: 'Manajemen Pengguna', breadcrumb: 'Master Data / Otorisasi Tabel Users' },
     rekap_absensi: { title: 'Rekapitulasi Absensi Karyawan', breadcrumb: 'SDM / Rekapitulasi Presensi Matrix & Arsiran Libur' },
     log_absensi: { title: 'Riwayat Log Absensi', breadcrumb: 'SDM & Karyawan / Akses Data Tabel Absensi Supabase' },
+    launching_brosur: { title: 'Launching Brosur', breadcrumb: 'Marketing / Manajemen Tabel LogBrosur & MnuLogBrosur' },
     cuti_absensi: { title: 'Presensi & Cuti Karyawan', breadcrumb: 'SDM / Absensi & Pengajuan Cuti' },
     settings: { title: 'Konfigurasi Database', breadcrumb: 'Sistem / Pengalihan Google Sheets & Supabase' }
   };
@@ -1009,6 +1019,7 @@ function switchModule(moduleName) {
   if (viewId === 'users') renderUsersTable();
   if (viewId === 'rekap_absensi') renderRekapAbsensi();
   if (viewId === 'log_absensi') renderLogAbsensiTable();
+  if (viewId === 'launching_brosur') initLaunchingBrosurView();
   if (viewId === 'cuti_absensi') renderCutiAbsensi();
   if (viewId === 'settings') renderSettings();
 }
@@ -1071,6 +1082,7 @@ async function loadAllModuleData() {
       }).catch(e => console.warn('Supabase cuti error:', e));
 
       loadRekapAbsensiData();
+      loadBrosurData();
 
     } catch (e) {
       console.error('Error loading Supabase directly:', e);
@@ -1120,6 +1132,7 @@ async function loadAllModuleData() {
     });
 
     loadRekapAbsensiData();
+    loadBrosurData();
 
   } catch (err) {
     console.error('Error fetching module data:', err);
@@ -1718,6 +1731,525 @@ window.reloadLogAbsensiData = async function() {
   }
 
   renderLogAbsensiTable();
+};
+
+// ==========================================================================
+// 6D. LAUNCHING BROSUR (TABEL LOGBROSUR & MNULOGBROSUR SUPABASE)
+// ==========================================================================
+
+const GDRIVE_BROSUR_FOLDER_URL = 'https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=sharing';
+
+// Master data fallback untuk MnuLogBrosur jika tabel di Supabase belum selesai sinkronisasi izin RLS
+const DEFAULT_MNU_LOG_BROSUR = [
+  { id: 'MNU-001', catagory: 'Umrah', brosurname: 'Paket Umrah Reguler 9 Hari', status: 'Active', catatan: 'Brosur paket standar bintang 4' },
+  { id: 'MNU-002', catagory: 'Umrah', brosurname: 'Paket Umrah Ramadhan Awal', status: 'Active', catatan: 'Brosur paket awal Ramadhan' },
+  { id: 'MNU-003', catagory: 'Umrah', brosurname: 'Paket Umrah Ramadhan Lailatul Qadar', status: 'Active', catatan: 'Brosur paket 10 hari akhir Ramadhan' },
+  { id: 'MNU-004', catagory: 'Umrah', brosurname: 'Paket Umrah Plus Turki 12 Hari', status: 'Active', catatan: 'Wisata sejarah Istanbul & Bursa' },
+  { id: 'MNU-005', catagory: 'Umrah', brosurname: 'Paket Umrah Plus Dubai', status: 'Active', catatan: 'Wisata Dubai & Abu Dhabi' },
+  { id: 'MNU-006', catagory: 'Umrah', brosurname: 'Paket Umrah VIP Bintang 5', status: 'Active', catatan: 'Hotel depan pelataran Masjidil Haram' },
+  { id: 'MNU-007', catagory: 'Haji Khusus & Furoda', brosurname: 'Brosur Haji Khusus Kuota Kemenag', status: 'Active', catatan: 'Masa tunggu resmi kemenag' },
+  { id: 'MNU-008', catagory: 'Haji Khusus & Furoda', brosurname: 'Brosur Haji Furoda / Mujamalah VVIP', status: 'Active', catatan: 'Berangkat langsung tanpa antri' },
+  { id: 'MNU-009', catagory: 'Haji Khusus & Furoda', brosurname: 'Brosur Rincian Fasilitas Maktab Haji', status: 'Active', catatan: 'Maktab VIP tenda AC berkarpet' },
+  { id: 'MNU-010', catagory: 'Haji Terencana', brosurname: 'Brosur Program Tabungan Haji Terencana', status: 'Active', catatan: 'Skema porsi awal terencana' },
+  { id: 'MNU-011', catagory: 'Haji Terencana', brosurname: 'Brosur Skema Angsuran Terencana', status: 'Active', catatan: 'Tabel angsuran berkala' },
+  { id: 'MNU-012', catagory: 'Wisata Halal', brosurname: 'Brosur Tour Muslim Turki Cappadochia', status: 'Active', catatan: 'Paket liburan musim dingin & semi' },
+  { id: 'MNU-013', catagory: 'Wisata Halal', brosurname: 'Brosur Wisata Halal Aqsho - Jordan - Mesir', status: 'Active', catatan: 'Napak tilas tiga masjid suci' },
+  { id: 'MNU-014', catagory: 'Wisata Halal', brosurname: 'Brosur Tour Muslim Eropa Barat', status: 'Active', catatan: 'Paris, Swiss, Italia & Belanda' },
+  { id: 'MNU-015', catagory: 'Promo & Seasonal', brosurname: 'Flyer Promo Early Bird 1448H', status: 'Active', catatan: 'Diskon khusus pendaftar awal' },
+  { id: 'MNU-016', catagory: 'Promo & Seasonal', brosurname: 'Katalog Brosur Milad PT Fath Indah', status: 'Active', catatan: 'Edisi spesial milad travel' }
+];
+
+// Initial sample LogBrosur jika tabel di Supabase belum berisi
+const DEFAULT_LOG_BROSUR = [
+  {
+    id: 'BRS-20261020-001',
+    created_at: '2026-10-20T08:15:00.000Z',
+    catagory: 'Umrah',
+    brosurname: 'Paket Umrah Reguler 9 Hari',
+    link: 'https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=sharing',
+    catatan: 'Edisi revisi keberangkatan musim 1448H dengan hotel bintang 4 Madinah'
+  },
+  {
+    id: 'BRS-20261019-002',
+    created_at: '2026-10-19T10:30:00.000Z',
+    catagory: 'Haji Khusus & Furoda',
+    brosurname: 'Brosur Haji Furoda / Mujamalah VVIP',
+    link: 'https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=sharing',
+    catatan: 'Brosur resmi kuota langsung visa haji mujamalah Fath Indah Travel'
+  },
+  {
+    id: 'BRS-20261018-003',
+    created_at: '2026-10-18T14:45:00.000Z',
+    catagory: 'Promo & Seasonal',
+    brosurname: 'Flyer Promo Early Bird 1448H',
+    link: 'https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=sharing',
+    catatan: 'Flyer digital untuk share Instagram & WhatsApp marketing cabang'
+  }
+];
+
+function initLaunchingBrosurView() {
+  loadBrosurData();
+  resetBrosurForm();
+}
+
+window.switchBrosurTab = function(tabName) {
+  const btnList = document.getElementById('tabBtnBrosurList');
+  const btnInput = document.getElementById('tabBtnBrosurInput');
+  const paneList = document.getElementById('tabPaneBrosurList');
+  const paneInput = document.getElementById('tabPaneBrosurInput');
+
+  if (tabName === 'input') {
+    btnList?.classList.remove('active');
+    btnInput?.classList.add('active');
+    paneList?.classList.remove('active');
+    paneInput?.classList.add('active');
+    resetBrosurForm();
+  } else {
+    btnInput?.classList.remove('active');
+    btnList?.classList.add('active');
+    paneInput?.classList.remove('active');
+    paneList?.classList.add('active');
+    renderBrosurTable();
+  }
+};
+
+async function loadBrosurData(force = false) {
+  // 1. Load MnuLogBrosur (Master Menu Kategori & Brosur)
+  let mnuData = [];
+  try {
+    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/MnuLogBrosur?select=*&order=catagory.asc,brosurname.asc`, {
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+      }
+    });
+    if (res.ok) {
+      mnuData = await res.json();
+    }
+  } catch (e) {
+    console.warn('Gagal fetch MnuLogBrosur dari Supabase:', e.message);
+  }
+
+  if (!mnuData || mnuData.length === 0) {
+    const localMnu = localStorage.getItem('fath_indah_mnu_log_brosur');
+    mnuData = localMnu ? JSON.parse(localMnu) : DEFAULT_MNU_LOG_BROSUR;
+  }
+  state.data.mnuLogBrosur = mnuData;
+  populateBrosurDropdowns();
+
+  // 2. Load LogBrosur (Daftar Brosur Terdaftar)
+  let logData = [];
+  try {
+    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/LogBrosur?select=*&order=created_at.desc`, {
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+      }
+    });
+    if (res.ok) {
+      logData = await res.json();
+    }
+  } catch (e) {
+    console.warn('Gagal fetch LogBrosur dari Supabase:', e.message);
+  }
+
+  if (!logData || logData.length === 0) {
+    const localLog = localStorage.getItem('fath_indah_log_brosur');
+    logData = localLog ? JSON.parse(localLog) : DEFAULT_LOG_BROSUR;
+  }
+  state.data.logBrosur = logData;
+  renderBrosurTable();
+}
+
+function populateBrosurDropdowns() {
+  const mnuList = state.data.mnuLogBrosur || DEFAULT_MNU_LOG_BROSUR;
+  
+  // Extract distinct categories
+  const categories = [...new Set(mnuList.map(m => (m.catagory || m.category || '').trim()).filter(Boolean))].sort();
+
+  // Populate Filter Select
+  const filterSelect = document.getElementById('brosurCategoryFilter');
+  if (filterSelect) {
+    const currentVal = state.brosurFilter.category || 'ALL';
+    let filterHtml = '<option value="ALL">Semua Kategori</option>';
+    categories.forEach(cat => {
+      filterHtml += `<option value="${cat}" ${cat === currentVal ? 'selected' : ''}>${cat}</option>`;
+    });
+    filterSelect.innerHTML = filterHtml;
+  }
+
+  // Populate Form Category Select
+  const inputCategory = document.getElementById('inputBrosurCategory');
+  if (inputCategory) {
+    const prevSelected = inputCategory.value;
+    let inputCatHtml = '<option value="">-- Pilih Kategori --</option>';
+    categories.forEach(cat => {
+      inputCatHtml += `<option value="${cat}" ${cat === prevSelected ? 'selected' : ''}>${cat}</option>`;
+    });
+    inputCategory.innerHTML = inputCatHtml;
+  }
+}
+
+window.onBrosurCategoryChange = function() {
+  const categorySelect = document.getElementById('inputBrosurCategory');
+  const nameSelect = document.getElementById('inputBrosurName');
+  if (!categorySelect || !nameSelect) return;
+
+  const selectedCat = categorySelect.value;
+  const mnuList = state.data.mnuLogBrosur || DEFAULT_MNU_LOG_BROSUR;
+
+  if (!selectedCat) {
+    nameSelect.innerHTML = '<option value="">-- Pilih Kategori Terlebih Dahulu --</option>';
+    updateGeneratedFileName();
+    return;
+  }
+
+  // Filter brosur name matching this category
+  const filtered = mnuList.filter(m => (m.catagory || m.category || '').trim().toLowerCase() === selectedCat.trim().toLowerCase());
+  const distinctNames = [...new Set(filtered.map(m => (m.brosurname || m.name || '').trim()).filter(Boolean))].sort();
+
+  let html = '<option value="">-- Pilih Nama Brosur --</option>';
+  distinctNames.forEach(name => {
+    html += `<option value="${name}">${name}</option>`;
+  });
+  nameSelect.innerHTML = html;
+
+  updateGeneratedFileName();
+};
+
+window.onBrosurNameChange = function() {
+  updateGeneratedFileName();
+};
+
+window.handleLocalFileSelect = function(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  state.selectedLocalBrosurFile = file;
+
+  // Show banner
+  const banner = document.getElementById('selectedFileBanner');
+  const nameEl = document.getElementById('selectedFileName');
+  const metaEl = document.getElementById('selectedFileMeta');
+
+  if (banner) banner.style.display = 'flex';
+  if (nameEl) nameEl.textContent = file.name;
+  if (metaEl) {
+    const sizeKB = Math.round(file.size / 1024);
+    const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+    const sizeStr = sizeKB > 1024 ? `${sizeMB} MB` : `${sizeKB} KB`;
+    metaEl.textContent = `Ukuran: ${sizeStr} • Format: ${file.type || file.name.split('.').pop().toUpperCase()}`;
+  }
+
+  updateGeneratedFileName();
+};
+
+window.clearSelectedFile = function() {
+  state.selectedLocalBrosurFile = null;
+  const fileInput = document.getElementById('localBrosurFileInput');
+  if (fileInput) fileInput.value = '';
+  const banner = document.getElementById('selectedFileBanner');
+  if (banner) banner.style.display = 'none';
+  updateGeneratedFileName();
+};
+
+function sanitizeFileNamePart(str) {
+  return (str || '')
+    .trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '_');
+}
+
+function updateGeneratedFileName() {
+  const cat = document.getElementById('inputBrosurCategory')?.value || '';
+  const name = document.getElementById('inputBrosurName')?.value || '';
+  const file = state.selectedLocalBrosurFile;
+  const displayBox = document.getElementById('generatedSpecificFileName');
+  if (!displayBox) return;
+
+  if (!cat && !name && !file) {
+    displayBox.textContent = 'Pilih kategori, nama brosur dan file lokal untuk membuat nama spesifik...';
+    displayBox.style.color = 'var(--text-muted)';
+    return;
+  }
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const catPart = sanitizeFileNamePart(cat).toUpperCase() || 'BROSUR';
+  const namePart = sanitizeFileNamePart(name) || 'Materi';
+  
+  let ext = 'pdf';
+  if (file && file.name.includes('.')) {
+    ext = file.name.split('.').pop().toLowerCase();
+  }
+
+  const generated = `${catPart}_${namePart}_${todayStr}.${ext}`;
+  state.generatedSpecificFileName = generated;
+
+  displayBox.textContent = generated;
+  displayBox.style.color = '#38bdf8';
+}
+
+window.copySpecificFileName = function() {
+  const text = state.generatedSpecificFileName || document.getElementById('generatedSpecificFileName')?.textContent;
+  if (!text || text.includes('...')) {
+    alert('Harap pilih kategori dan nama brosur terlebih dahulu.');
+    return;
+  }
+
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('btnCopyFileName');
+    if (btn) {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-check" style="color:#34d399;"></i> <span>Tersalin!</span>';
+      setTimeout(() => { btn.innerHTML = orig; }, 2000);
+    }
+  }).catch(e => {
+    prompt('Salin nama file berikut:', text);
+  });
+};
+
+window.resetBrosurForm = function() {
+  const form = document.getElementById('brosurInputForm');
+  if (form) form.reset();
+
+  // Generate ID: BRS-YYYYMMDD-XXXX
+  const now = new Date();
+  const dateCode = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const randNum = String(Math.floor(1000 + Math.random() * 9000));
+  const newId = `BRS-${dateCode}-${randNum}`;
+
+  const idInput = document.getElementById('inputBrosurId');
+  if (idInput) idInput.value = newId;
+
+  const createdInput = document.getElementById('inputBrosurCreatedAt');
+  if (createdInput) createdInput.value = now.toISOString().replace('T', ' ').slice(0, 19);
+
+  const linkInput = document.getElementById('inputBrosurLink');
+  if (linkInput) linkInput.value = GDRIVE_BROSUR_FOLDER_URL;
+
+  clearSelectedFile();
+  updateGeneratedFileName();
+};
+
+window.submitBrosurForm = async function(event) {
+  event.preventDefault();
+
+  const id = document.getElementById('inputBrosurId')?.value;
+  const createdAt = new Date().toISOString();
+  const catagory = document.getElementById('inputBrosurCategory')?.value;
+  const brosurname = document.getElementById('inputBrosurName')?.value;
+  const link = document.getElementById('inputBrosurLink')?.value.trim() || GDRIVE_BROSUR_FOLDER_URL;
+  const catatan = document.getElementById('inputBrosurCatatan')?.value.trim();
+
+  if (!catagory || !brosurname) {
+    alert('Harap pilih Kategori dan Nama Brosur!');
+    return;
+  }
+
+  const btnSubmit = document.getElementById('btnSubmitBrosur');
+  if (btnSubmit) {
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan ke Supabase...';
+  }
+
+  const newEntry = {
+    id: id || `BRS-${Date.now()}`,
+    created_at: createdAt,
+    catagory: catagory,
+    brosurname: brosurname,
+    link: link,
+    catatan: catatan + (state.generatedSpecificFileName ? ` [File: ${state.generatedSpecificFileName}]` : '')
+  };
+
+  let savedToSupabase = false;
+
+  // Try direct Supabase insertion
+  try {
+    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/LogBrosur`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(newEntry)
+    });
+
+    if (res.ok || res.status === 201) {
+      savedToSupabase = true;
+    }
+  } catch (e) {
+    console.warn('Gagal insert langsung ke Supabase LogBrosur:', e.message);
+  }
+
+  // If not saved directly and in fullstack mode, try server API
+  if (!savedToSupabase && !state.isStaticMode) {
+    try {
+      const res = await fetch('/api/brosur/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newEntry)
+      });
+      const data = await res.json();
+      if (data.success) savedToSupabase = true;
+    } catch (e) {
+      console.warn('Gagal call /api/brosur/log:', e.message);
+    }
+  }
+
+  // Prepend to state list and cache in localStorage
+  state.data.logBrosur = [newEntry, ...(state.data.logBrosur || [])];
+  localStorage.setItem('fath_indah_log_brosur', JSON.stringify(state.data.logBrosur));
+
+  if (btnSubmit) {
+    btnSubmit.disabled = false;
+    btnSubmit.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> <span>Simpan ke LogBrosur (Supabase)</span>';
+  }
+
+  alert(`Brosur "${brosurname}" berhasil didaftarkan!\n${savedToSupabase ? 'Tersimpan langsung ke tabel LogBrosur Supabase.' : 'Tersimpan di sistem lokal Fath Indah (Izin RLS Supabase terdeteksi perlu GRANT).'}`);
+
+  switchBrosurTab('list');
+};
+
+function renderBrosurTable() {
+  const tbody = document.getElementById('logBrosurTableBody');
+  if (!tbody) return;
+
+  const list = state.data.logBrosur || [];
+  const search = (state.brosurFilter.search || '').toLowerCase();
+  const category = state.brosurFilter.category || 'ALL';
+
+  // Filter
+  const filtered = list.filter(item => {
+    const cat = (item.catagory || item.category || '').toLowerCase();
+    const name = (item.brosurname || item.name || '').toLowerCase();
+    const notes = (item.catatan || '').toLowerCase();
+
+    if (category !== 'ALL' && (item.catagory || item.category) !== category) {
+      return false;
+    }
+
+    if (search && !cat.includes(search) && !name.includes(search) && !notes.includes(search)) {
+      return false;
+    }
+
+    return true;
+  });
+
+  // Update Stats
+  const elTotal = document.getElementById('brosurStatTotal');
+  const elCat = document.getElementById('brosurStatCategory');
+  if (elTotal) elTotal.textContent = list.length;
+  if (elCat) {
+    const cats = new Set(list.map(x => x.catagory || x.category).filter(Boolean));
+    elCat.textContent = cats.size || 0;
+  }
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center; padding:36px; color:#64748b;">
+          <i class="fa-regular fa-folder-open" style="font-size:2rem; color:var(--gold-light); margin-bottom:10px;"></i>
+          <div>Tidak ada brosur yang sesuai filter. Klik <strong>Input Brosur Baru</strong> untuk mendaftarkan brosur.</div>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((item, idx) => {
+    const no = idx + 1;
+    const cat = item.catagory || item.category || 'Umum';
+    const name = item.brosurname || item.name || '-';
+    const notes = item.catatan || '-';
+    const link = item.link || GDRIVE_BROSUR_FOLDER_URL;
+    
+    // Format Created Date
+    let dateDisplay = '-';
+    if (item.created_at) {
+      const d = new Date(item.created_at);
+      if (!isNaN(d.getTime())) {
+        const day = d.getDate();
+        const m = INDO_MONTH_NAMES[d.getMonth()] || '';
+        const y = d.getFullYear();
+        const time = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+        dateDisplay = `${day} ${m} ${y} ${time}`;
+      } else {
+        dateDisplay = String(item.created_at).slice(0, 16);
+      }
+    }
+
+    // Category Badge Class
+    const catLower = cat.toLowerCase();
+    let badgeClass = 'default';
+    if (catLower.includes('umrah')) badgeClass = 'umrah';
+    else if (catLower.includes('haji')) badgeClass = 'haji';
+    else if (catLower.includes('wisata')) badgeClass = 'wisata';
+    else if (catLower.includes('promo')) badgeClass = 'promo';
+
+    return `
+      <tr>
+        <td style="color:#64748b; font-weight:600;">${no}</td>
+        <td style="white-space:nowrap; font-size:0.84rem; color:#cbd5e1;">${dateDisplay}</td>
+        <td>
+          <span class="brosur-cat-badge ${badgeClass}">${cat}</span>
+        </td>
+        <td>
+          <strong style="color:#ffffff; font-size:0.9rem;">${name}</strong>
+          <div style="font-size:0.75rem; color:#94a3b8; font-family:'JetBrains Mono',monospace;">${item.id || ''}</div>
+        </td>
+        <td>
+          <a href="${link}" target="_blank" rel="noopener noreferrer" class="btn-open-drive" title="Buka File di Google Drive">
+            <i class="fa-brands fa-google-drive"></i>
+            <span>Buka Drive</span>
+          </a>
+        </td>
+        <td style="font-size:0.84rem; color:#94a3b8; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${notes}">
+          ${notes}
+        </td>
+        <td style="text-align:center; white-space:nowrap;">
+          <button type="button" class="btn-action-icon" onclick="copyBrosurLink('${link}')" title="Salin Link Google Drive">
+            <i class="fa-regular fa-copy"></i>
+          </button>
+          <a href="${link}" target="_blank" rel="noopener noreferrer" class="btn-action-icon" title="Buka di Tab Baru">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+          </a>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+window.copyBrosurLink = function(url) {
+  navigator.clipboard.writeText(url).then(() => {
+    alert('Link Google Drive berhasil disalin ke clipboard!');
+  }).catch(() => {
+    prompt('Salin link Google Drive berikut:', url);
+  });
+};
+
+window.onBrosurFilterChange = function() {
+  const searchInput = document.getElementById('brosurSearchInput');
+  const catSelect = document.getElementById('brosurCategoryFilter');
+  if (searchInput) state.brosurFilter.search = searchInput.value.trim();
+  if (catSelect) state.brosurFilter.category = catSelect.value;
+  renderBrosurTable();
+};
+
+window.reloadBrosurData = async function() {
+  const tbody = document.getElementById('logBrosurTableBody');
+  if (tbody) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center; padding:36px; color:#64748b;">
+          <i class="fa-solid fa-spinner fa-spin" style="color:var(--gold-light); font-size:1.5rem;"></i>
+          <div style="margin-top:10px;">Menghubungi Supabase dan memperbarui data brosur...</div>
+        </td>
+      </tr>
+    `;
+  }
+  await loadBrosurData(true);
 };
 
 // ==========================================================================
