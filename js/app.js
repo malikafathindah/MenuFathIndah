@@ -1788,8 +1788,9 @@ const DEFAULT_LOG_BROSUR = [
 ];
 
 function initLaunchingBrosurView() {
-  loadBrosurData();
+  populateBrosurDropdowns();
   resetBrosurForm();
+  loadBrosurData();
 }
 
 window.switchBrosurTab = function(tabName) {
@@ -1824,16 +1825,43 @@ async function loadBrosurData(force = false) {
       }
     });
     if (res.ok) {
-      mnuData = await res.json();
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        mnuData = data;
+      }
     }
   } catch (e) {
     console.warn('Gagal fetch MnuLogBrosur dari Supabase:', e.message);
   }
 
+  // Fallback ke server API jika tabel Supabase kosong
+  if (!mnuData || mnuData.length === 0) {
+    try {
+      const apiRes = await fetch('/api/brosur/menu');
+      if (apiRes.ok) {
+        const json = await apiRes.json();
+        if (json.data && Array.isArray(json.data) && json.data.length > 0) {
+          mnuData = json.data;
+        }
+      }
+    } catch (_) {}
+  }
+
+  // Fallback ke localStorage atau default seed
   if (!mnuData || mnuData.length === 0) {
     const localMnu = localStorage.getItem('fath_indah_mnu_log_brosur');
-    mnuData = localMnu ? JSON.parse(localMnu) : DEFAULT_MNU_LOG_BROSUR;
+    try {
+      if (localMnu) {
+        const parsed = JSON.parse(localMnu);
+        if (Array.isArray(parsed) && parsed.length > 0) mnuData = parsed;
+      }
+    } catch (_) {}
   }
+
+  if (!mnuData || mnuData.length === 0) {
+    mnuData = DEFAULT_MNU_LOG_BROSUR;
+  }
+
   state.data.mnuLogBrosur = mnuData;
   populateBrosurDropdowns();
 
@@ -1847,27 +1875,54 @@ async function loadBrosurData(force = false) {
       }
     });
     if (res.ok) {
-      logData = await res.json();
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        logData = data;
+      }
     }
   } catch (e) {
     console.warn('Gagal fetch LogBrosur dari Supabase:', e.message);
   }
 
   if (!logData || logData.length === 0) {
-    const localLog = localStorage.getItem('fath_indah_log_brosur');
-    logData = localLog ? JSON.parse(localLog) : DEFAULT_LOG_BROSUR;
+    try {
+      const apiRes = await fetch('/api/brosur/log');
+      if (apiRes.ok) {
+        const json = await apiRes.json();
+        if (json.data && Array.isArray(json.data) && json.data.length > 0) {
+          logData = json.data;
+        }
+      }
+    } catch (_) {}
   }
+
+  if (!logData || logData.length === 0) {
+    const localLog = localStorage.getItem('fath_indah_log_brosur');
+    try {
+      if (localLog) {
+        const parsed = JSON.parse(localLog);
+        if (Array.isArray(parsed) && parsed.length > 0) logData = parsed;
+      }
+    } catch (_) {}
+  }
+
+  if (!logData || logData.length === 0) {
+    logData = DEFAULT_LOG_BROSUR;
+  }
+
   state.data.logBrosur = logData;
   renderBrosurTable();
 }
 
 function populateBrosurDropdowns() {
-  const mnuList = state.data.mnuLogBrosur || DEFAULT_MNU_LOG_BROSUR;
+  const mnuList = (state.data.mnuLogBrosur && state.data.mnuLogBrosur.length > 0)
+    ? state.data.mnuLogBrosur
+    : DEFAULT_MNU_LOG_BROSUR;
   
-  // Extract distinct categories
+  // Extract distinct categories dari header 'catagory' tabel MnuLogBrosur (Lampiran 1)
   const categories = [...new Set(mnuList.map(m => (m.catagory || m.category || '').trim()).filter(Boolean))].sort();
 
-  // Populate Filter Select
+  // 1. Populate Table Filter Select
   const filterSelect = document.getElementById('brosurCategoryFilter');
   if (filterSelect) {
     const currentVal = state.brosurFilter.category || 'ALL';
@@ -1878,7 +1933,7 @@ function populateBrosurDropdowns() {
     filterSelect.innerHTML = filterHtml;
   }
 
-  // Populate Form Category Select
+  // 2. Populate Form Category Select (Lampiran 1: catagory dari Tabel MnuLogBrosur)
   const inputCategory = document.getElementById('inputBrosurCategory');
   if (inputCategory) {
     const prevSelected = inputCategory.value;
@@ -1888,36 +1943,75 @@ function populateBrosurDropdowns() {
     });
     inputCategory.innerHTML = inputCatHtml;
   }
+
+  // 3. Populate Form Brochure Name Select (Lampiran 2: brosurname dari Tabel MnuLogBrosur)
+  const selectedCat = inputCategory ? inputCategory.value : '';
+  populateBrosurNameDropdown(selectedCat);
+}
+
+function populateBrosurNameDropdown(selectedCategory = '') {
+  const nameSelect = document.getElementById('inputBrosurName');
+  if (!nameSelect) return;
+
+  const mnuList = (state.data.mnuLogBrosur && state.data.mnuLogBrosur.length > 0)
+    ? state.data.mnuLogBrosur
+    : DEFAULT_MNU_LOG_BROSUR;
+
+  const prevVal = nameSelect.value;
+
+  // Filter brosur berdasarkan kategori jika dipilih, atau tampilkan semua brosurname dari MnuLogBrosur jika belum dipilih
+  let filtered = mnuList;
+  if (selectedCategory && selectedCategory.trim()) {
+    filtered = mnuList.filter(m => (m.catagory || m.category || '').trim().toLowerCase() === selectedCategory.trim().toLowerCase());
+  }
+
+  // Extract distinct brochure names dari header 'brosurname' tabel MnuLogBrosur (Lampiran 2)
+  const distinctNames = [...new Set(filtered.map(m => (m.brosurname || m.brosur_name || m.name || '').trim()).filter(Boolean))].sort();
+
+  let placeholderText = '-- Pilih Nama Brosur --';
+  if (selectedCategory && selectedCategory.trim()) {
+    placeholderText = `-- Pilih Nama Brosur (${selectedCategory}) --`;
+  }
+
+  let html = `<option value="">${placeholderText}</option>`;
+  distinctNames.forEach(name => {
+    html += `<option value="${name}" ${name === prevVal ? 'selected' : ''}>${name}</option>`;
+  });
+  nameSelect.innerHTML = html;
 }
 
 window.onBrosurCategoryChange = function() {
   const categorySelect = document.getElementById('inputBrosurCategory');
-  const nameSelect = document.getElementById('inputBrosurName');
-  if (!categorySelect || !nameSelect) return;
+  const selectedCat = categorySelect ? categorySelect.value : '';
 
-  const selectedCat = categorySelect.value;
-  const mnuList = state.data.mnuLogBrosur || DEFAULT_MNU_LOG_BROSUR;
-
-  if (!selectedCat) {
-    nameSelect.innerHTML = '<option value="">-- Pilih Kategori Terlebih Dahulu --</option>';
-    updateGeneratedFileName();
-    return;
-  }
-
-  // Filter brosur name matching this category
-  const filtered = mnuList.filter(m => (m.catagory || m.category || '').trim().toLowerCase() === selectedCat.trim().toLowerCase());
-  const distinctNames = [...new Set(filtered.map(m => (m.brosurname || m.name || '').trim()).filter(Boolean))].sort();
-
-  let html = '<option value="">-- Pilih Nama Brosur --</option>';
-  distinctNames.forEach(name => {
-    html += `<option value="${name}">${name}</option>`;
-  });
-  nameSelect.innerHTML = html;
-
+  // Sinkronisasi Lampiran 2 (brosurname) berdasarkan pilihan kategori Lampiran 1
+  populateBrosurNameDropdown(selectedCat);
   updateGeneratedFileName();
 };
 
 window.onBrosurNameChange = function() {
+  const categorySelect = document.getElementById('inputBrosurCategory');
+  const nameSelect = document.getElementById('inputBrosurName');
+  
+  // Jika pengguna memilih Nama Brosur (Lampiran 2) terlebih dahulu, otomatis sinkronkan Kategori (Lampiran 1)
+  if (nameSelect && categorySelect) {
+    const selectedName = nameSelect.value;
+    if (selectedName) {
+      const mnuList = (state.data.mnuLogBrosur && state.data.mnuLogBrosur.length > 0)
+        ? state.data.mnuLogBrosur
+        : DEFAULT_MNU_LOG_BROSUR;
+      const found = mnuList.find(m => (m.brosurname || m.brosur_name || m.name || '').trim() === selectedName.trim());
+      if (found) {
+        const cat = (found.catagory || found.category || '').trim();
+        if (cat && categorySelect.value !== cat) {
+          categorySelect.value = cat;
+          populateBrosurNameDropdown(cat);
+          nameSelect.value = selectedName;
+        }
+      }
+    }
+  }
+
   updateGeneratedFileName();
 };
 
@@ -2011,6 +2105,9 @@ window.copySpecificFileName = function() {
 window.resetBrosurForm = function() {
   const form = document.getElementById('brosurInputForm');
   if (form) form.reset();
+
+  // Pastikan dropdown kategori (catagory) dan nama brosur (brosurname) terpopulasi dari master MnuLogBrosur
+  populateBrosurDropdowns();
 
   // Generate ID: BRS-YYYYMMDD-XXXX
   const now = new Date();
