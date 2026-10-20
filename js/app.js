@@ -34,6 +34,7 @@ const state = {
     cuti: [],
     modules: [],
     rekapAbsensi: null,
+    catPaket: [],
     logBrosur: [],
     mnuLogBrosur: [],
     kanwilFathIndah: []
@@ -1739,7 +1740,16 @@ window.reloadLogAbsensiData = async function() {
 // 6D. LAUNCHING BROSUR (TABEL LOGBROSUR & MNULOGBROSUR SUPABASE)
 // ==========================================================================
 
-const GDRIVE_BROSUR_FOLDER_URL = 'https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=drive_link';
+const GDRIVE_BROSUR_FOLDER_URL = 'https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc';
+
+// Master data fallback untuk CatPaket (Kategori Brosur) jika tabel di Supabase belum selesai sinkronisasi izin RLS
+const DEFAULT_CAT_PAKET = [
+  { id: 1, catagory: 'Umrah' },
+  { id: 2, catagory: 'Haji Khusus & Furoda' },
+  { id: 3, catagory: 'Haji Terencana' },
+  { id: 4, catagory: 'Wisata Halal' },
+  { id: 5, catagory: 'Promo & Seasonal' }
+];
 
 // Master data fallback untuk KanwilFathIndah jika tabel di Supabase belum selesai sinkronisasi izin RLS
 const DEFAULT_KANWIL_FATH_INDAH = [
@@ -1779,7 +1789,7 @@ const DEFAULT_LOG_BROSUR = [
     wilayah: 'Pusat',
     catagory: 'Umrah',
     brosurname: 'Paket Umrah Reguler 9 Hari',
-    link: 'https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=drive_link',
+    link: 'https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc',
     catatan: 'Edisi revisi keberangkatan musim 1448H dengan hotel bintang 4 Madinah'
   },
   {
@@ -1788,7 +1798,7 @@ const DEFAULT_LOG_BROSUR = [
     wilayah: 'Solo Raya',
     catagory: 'Haji Khusus & Furoda',
     brosurname: 'Brosur Haji Furoda / Mujamalah VVIP',
-    link: 'https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=drive_link',
+    link: 'https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc',
     catatan: 'Brosur resmi kuota langsung visa haji mujamalah Fath Indah Travel'
   },
   {
@@ -1797,7 +1807,7 @@ const DEFAULT_LOG_BROSUR = [
     wilayah: 'Samarinda',
     catagory: 'Promo & Seasonal',
     brosurname: 'Flyer Promo Early Bird 1448H',
-    link: 'https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=drive_link',
+    link: 'https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc',
     catatan: 'Flyer digital untuk share Instagram & WhatsApp marketing cabang'
   }
 ];
@@ -1876,7 +1886,55 @@ async function loadBrosurData(force = false) {
   }
   state.data.kanwilFathIndah = kanwilData;
 
-  // 1. Load MnuLogBrosur (Master Menu Kategori & Brosur)
+  // 1. Load CatPaket (Master Kategori Brosur dari tabel CatPaket header catagory - Requirement #1)
+  let catPaketData = [];
+  try {
+    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/CatPaket?select=*&order=catagory.asc`, {
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+      }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        catPaketData = data;
+      }
+    }
+  } catch (e) {
+    console.warn('Gagal fetch CatPaket dari Supabase:', e.message);
+  }
+
+  // Fallback ke server API jika tabel Supabase perlu service_role
+  if (!catPaketData || catPaketData.length === 0) {
+    try {
+      const apiRes = await fetch('/api/brosur/catpaket');
+      if (apiRes.ok) {
+        const json = await apiRes.json();
+        if (json.data && Array.isArray(json.data) && json.data.length > 0) {
+          catPaketData = json.data;
+        }
+      }
+    } catch (_) {}
+  }
+
+  // Fallback ke localStorage atau default seed
+  if (!catPaketData || catPaketData.length === 0) {
+    const localCat = localStorage.getItem('fath_indah_cat_paket');
+    try {
+      if (localCat) {
+        const parsed = JSON.parse(localCat);
+        if (Array.isArray(parsed) && parsed.length > 0) catPaketData = parsed;
+      }
+    } catch (_) {}
+  }
+
+  if (!catPaketData || catPaketData.length === 0) {
+    catPaketData = DEFAULT_CAT_PAKET;
+  }
+  state.data.catPaket = catPaketData;
+
+  // 2. Load MnuLogBrosur (Master Menu Kategori & Brosur)
   let mnuData = [];
   try {
     const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/MnuLogBrosur?select=*&order=catagory.asc,brosurname.asc`, {
@@ -2004,11 +2062,11 @@ function populateBrosurDropdowns() {
     inputWilayah.innerHTML = inputWilHtml;
   }
 
-  // 2. Kategori Brosur: ONLY pivot from MnuLogBrosur header catagory (Requirement #1)
-  const mnuList = (state.data.mnuLogBrosur && state.data.mnuLogBrosur.length > 0)
-    ? state.data.mnuLogBrosur
-    : DEFAULT_MNU_LOG_BROSUR;
-  const categories = [...new Set(mnuList.map(m => (m.catagory || m.category || '').trim()).filter(Boolean))].sort();
+  // 2. Kategori Brosur: ONLY from CatPaket header catagory (Requirement #1)
+  const catList = (state.data.catPaket && state.data.catPaket.length > 0)
+    ? state.data.catPaket
+    : DEFAULT_CAT_PAKET;
+  const categories = [...new Set(catList.map(c => (c.catagory || c.category || '').trim()).filter(Boolean))].sort();
 
   // Populate Table Filter Category
   const catFilter = document.getElementById('brosurCategoryFilter');
@@ -2021,7 +2079,7 @@ function populateBrosurDropdowns() {
     catFilter.innerHTML = filterHtml;
   }
 
-  // Populate Form Category Select
+  // Populate Form Category Select (dari Tabel CatPaket header catagory)
   const inputCategory = document.getElementById('inputBrosurCategory');
   if (inputCategory) {
     const prevSelected = inputCategory.value;
@@ -2032,7 +2090,7 @@ function populateBrosurDropdowns() {
     inputCategory.innerHTML = inputCatHtml;
   }
 
-  // 3. Nama Brosur: ONLY pivot from MnuLogBrosur header brosurname (Requirement #2 & #3)
+  // 3. Nama Brosur: ambil hasil pemilihan Kategori Brosur, lalu cari pada tabel MnuLogBrosur apabila ditemukan isikan dropdown brosurname (Requirement #2)
   syncBrosurNameVisibility();
 }
 
@@ -2044,23 +2102,27 @@ function syncBrosurNameVisibility() {
 
   const selectedCat = categorySelect ? categorySelect.value.trim() : '';
 
-  // Requirement #3: dropdown Nama Brosur tidak akan muncul apabila dropdown Kategori Brosur tidak terisi dengan benar
+  // Requirement: dropdown Nama Brosur tidak akan muncul apabila dropdown Kategori Brosur tidak terisi dengan benar
   if (!selectedCat) {
     groupName.style.display = 'none';
     nameSelect.innerHTML = '<option value="">-- Pilih Kategori Terlebih Dahulu --</option>';
     nameSelect.value = '';
     nameSelect.removeAttribute('required');
-  } else {
-    // Munculkan dropdown Nama Brosur dan isi pivot dari tabel MnuLogBrosur header brosurname (Requirement #2)
+    return;
+  }
+
+  // Cari pada tabel MnuLogBrosur apabila ditemukan isikan dropdown dengan header brosurname (Requirement #2)
+  const mnuList = (state.data.mnuLogBrosur && state.data.mnuLogBrosur.length > 0)
+    ? state.data.mnuLogBrosur
+    : DEFAULT_MNU_LOG_BROSUR;
+
+  const matched = mnuList.filter(m => (m.catagory || m.category || '').trim().toLowerCase() === selectedCat.toLowerCase());
+
+  if (matched.length > 0) {
     groupName.style.display = 'block';
     nameSelect.setAttribute('required', 'required');
 
-    const mnuList = (state.data.mnuLogBrosur && state.data.mnuLogBrosur.length > 0)
-      ? state.data.mnuLogBrosur
-      : DEFAULT_MNU_LOG_BROSUR;
-
-    const filtered = mnuList.filter(m => (m.catagory || m.category || '').trim().toLowerCase() === selectedCat.toLowerCase());
-    const distinctNames = [...new Set(filtered.map(m => (m.brosurname || m.brosur_name || '').trim()).filter(Boolean))].sort();
+    const distinctNames = [...new Set(matched.map(m => (m.brosurname || m.brosur_name || '').trim()).filter(Boolean))].sort();
 
     const prevVal = nameSelect.value;
     let html = `<option value="">-- Pilih Nama Brosur (${selectedCat}) --</option>`;
@@ -2068,6 +2130,11 @@ function syncBrosurNameVisibility() {
       html += `<option value="${name}" ${name === prevVal ? 'selected' : ''}>${name}</option>`;
     });
     nameSelect.innerHTML = html;
+  } else {
+    // Apabila kategori terpilih belum memiliki data brosurname di MnuLogBrosur
+    groupName.style.display = 'block';
+    nameSelect.setAttribute('required', 'required');
+    nameSelect.innerHTML = `<option value="">-- Belum ada brosur di MnuLogBrosur untuk "${selectedCat}" --</option>`;
   }
 }
 

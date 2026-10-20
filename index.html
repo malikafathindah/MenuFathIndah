@@ -825,14 +825,14 @@
                   <span>Launching & Manajemen Brosur Promosi</span>
                 </div>
                 <div class="brosur-header-subtitle">
-                  Sumber Data: Tabel <code>LogBrosur</code> & <code>MnuLogBrosur</code> di Supabase • Cloud Storage Google Drive
+                  Sumber Data: Tabel <code>LogBrosur</code>, <code>MnuLogBrosur</code>, <code>CatPaket</code> di Supabase • Cloud Storage Google Drive
                 </div>
               </div>
 
               <div class="brosur-header-actions">
-                <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=sharing" target="_blank" rel="noopener noreferrer" class="btn-gdrive-folder" title="Buka Folder Penyimpanan Google Drive">
+                <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc" target="_blank" rel="noopener noreferrer" class="btn-gdrive-folder" title="Buka Folder Penyimpanan Google Drive">
                   <i class="fa-brands fa-google-drive"></i>
-                  <span>Buka Google Drive</span>
+                  <span>Brosur - Google Drive</span>
                 </a>
               </div>
             </div>
@@ -974,10 +974,10 @@
                     </select>
                   </div>
 
-                  <!-- Row 3: Category Dropdown (from MnuLogBrosur header catagory) -->
+                  <!-- Row 3: Category Dropdown (from CatPaket header catagory) -->
                   <div class="form-group">
                     <label class="form-label" for="inputBrosurCategory">
-                      <i class="fa-solid fa-layer-group" style="color:var(--gold-light);"></i> Kategori Brosur (<code style="color:var(--gold-light);">catagory</code> dari Tabel MnuLogBrosur) <span style="color:#ef4444;">*</span>
+                      <i class="fa-solid fa-layer-group" style="color:var(--gold-light);"></i> Kategori Brosur (<code style="color:var(--gold-light);">catagory</code> dari Tabel CatPaket) <span style="color:#ef4444;">*</span>
                     </label>
                     <select id="inputBrosurCategory" class="form-input" required onchange="onBrosurCategoryChange()">
                       <option value="">-- Pilih Kategori --</option>
@@ -993,7 +993,7 @@
                       <option value="">-- Pilih Kategori Terlebih Dahulu --</option>
                     </select>
                     <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
-                      <i class="fa-solid fa-circle-info"></i> Pilihan nama brosur difilter otomatis berdasarkan Kategori yang dipilih.
+                      <i class="fa-solid fa-circle-info"></i> Pilihan nama brosur dicari otomatis dari tabel MnuLogBrosur berdasarkan Kategori yang dipilih.
                     </div>
                   </div>
 
@@ -1029,11 +1029,11 @@
                         </button>
                       </div>
                       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;">
-                        <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=drive_link" 
+                        <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc" 
                           target="_blank" rel="noopener noreferrer" class="btn-gdrive-folder" style="font-size:0.78rem; padding:6px 14px;"
                           onclick="onUploadToGDriveClick()">
                           <i class="fa-brands fa-google-drive"></i>
-                          <span>Simpan ke Google Drive & Salin Nama Standar</span>
+                          <span>Brosur - Google Drive (Salin Nama Standar)</span>
                         </a>
                       </div>
                     </div>
@@ -1055,23 +1055,23 @@
                     </div>
                   </div>
 
-                  <!-- Row 7: Google Drive Link (Requirement #5) -->
+                  <!-- Row 7: Google Drive Link (Requirement #3) -->
                   <div class="form-group">
                     <label class="form-label" for="inputBrosurLink">
                       <i class="fa-brands fa-google-drive" style="color:#38bdf8;"></i> Link Penyimpanan Google Drive (<code style="color:var(--gold-light);">link</code>)
                     </label>
                     <div style="display:flex; gap:10px;">
                       <input type="url" id="inputBrosurLink" class="form-input" 
-                        value="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=drive_link" 
+                        value="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc" 
                         required placeholder="https://drive.google.com/drive/folders/...">
-                      <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=drive_link" 
+                      <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc" 
                         target="_blank" rel="noopener noreferrer" class="btn-open-gdrive-link" title="Buka Folder Google Drive Target">
                         <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                        <span>Buka Drive</span>
+                        <span>Brosur - Google Drive</span>
                       </a>
                     </div>
                     <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
-                      <i class="fa-solid fa-circle-info"></i> Folder Target Fath Indah: <code>https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc?usp=drive_link</code>
+                      <i class="fa-solid fa-circle-info"></i> Folder Target Fath Indah: <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;">Brosur - Google Drive</a>
                     </div>
                   </div>
 
