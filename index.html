@@ -124,6 +124,11 @@
           <i class="fa-solid fa-calendar-check nav-icon"></i>
           <span class="nav-label">Rekap Absensi</span>
         </a>
+
+        <a href="#log_absensi" class="nav-item" data-module="mod_data_attendance" data-tooltip="Riwayat Log Absensi">
+          <i class="fa-solid fa-clipboard-user nav-icon"></i>
+          <span class="nav-label">Riwayat Log Absensi</span>
+        </a>
       </nav>
 
       <!-- Sidebar Footer -->
@@ -702,6 +707,95 @@
                     <td colspan="42" style="text-align:center; padding:36px; color:var(--text-muted);">
                       <i class="fa-solid fa-spinner fa-spin" style="margin-right:8px;"></i>
                       Memuat data matriks rekapitulasi absensi...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 5C: RIWAYAT LOG ABSENSI (TABEL ABSENSI SUPABASE)
+             Desain antarmuka cyber dark & glowing cyan persis sesuai lampiran
+             ================================================================ -->
+        <div class="module-view" id="view-log_absensi">
+          <div class="content-card log-absensi-card">
+            
+            <div class="log-absensi-header">
+              <div class="log-absensi-title-wrap">
+                <div class="card-title">
+                  <i class="fa-solid fa-clipboard-user" style="color:#00e5ff;"></i>
+                  <span>Riwayat Log Absensi Karyawan</span>
+                </div>
+                <div class="log-absensi-subtitle">
+                  Sumber Data: Tabel <code>absensi</code> di Supabase • Real-time Monitoring & GPS Map
+                </div>
+              </div>
+
+              <div class="log-absensi-actions">
+                <div class="log-absensi-search">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" id="logAbsensiSearchInput" placeholder="Cari nama karyawan..." oninput="onLogAbsensiFilterChange()">
+                </div>
+                
+                <select id="logAbsensiTypeFilter" class="log-absensi-select" onchange="onLogAbsensiFilterChange()">
+                  <option value="ALL">Semua Tipe</option>
+                  <option value="Datang">Datang / Hadir</option>
+                  <option value="Izin">Izin</option>
+                  <option value="Sakit">Sakit</option>
+                  <option value="Pulang">Pulang</option>
+                </select>
+
+                <button type="button" class="btn-refresh-absensi" onclick="reloadLogAbsensiData()" title="Segarkan Data Absensi">
+                  <i class="fa-solid fa-rotate"></i>
+                  <span>Refresh</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Total badges bar -->
+            <div class="log-absensi-stats-bar">
+              <div class="absensi-stat-item">
+                <span class="stat-bullet cyan"></span>
+                <span>Total Data Absensi: <strong id="absensiStatTotal" style="color:#00e5ff;">0</strong></span>
+              </div>
+              <div class="absensi-stat-item">
+                <span class="stat-bullet green"></span>
+                <span>Hadir/Datang: <strong id="absensiStatDatang" style="color:#10b981;">0</strong></span>
+              </div>
+              <div class="absensi-stat-item">
+                <span class="stat-bullet blue"></span>
+                <span>Izin/Lainnya: <strong id="absensiStatIzin" style="color:#38bdf8;">0</strong></span>
+              </div>
+              <div class="absensi-stat-item" style="margin-left:auto; font-size:0.78rem; color:var(--text-muted);">
+                <i class="fa-solid fa-arrow-down-wide-short"></i> Urutan: <span id="absensiSortIndicator" style="color:#00e5ff;">Tanggal & Jam Terbaru (Desc)</span>
+              </div>
+            </div>
+
+            <div class="table-responsive log-absensi-table-container">
+              <table class="table-log-absensi">
+                <thead>
+                  <tr>
+                    <th class="col-no">NO</th>
+                    <th class="col-tanggal sortable" onclick="toggleSortLogAbsensi('tanggal')" title="Klik untuk mengurutkan Tanggal">
+                      TANGGAL <i class="fa-solid fa-caret-down sort-arrow" id="sortArrowTanggal"></i>
+                    </th>
+                    <th class="col-jam sortable" onclick="toggleSortLogAbsensi('jam')" title="Klik untuk mengurutkan Jam">
+                      JAM <i class="fa-solid fa-caret-down sort-arrow" id="sortArrowJam"></i>
+                    </th>
+                    <th class="col-nama">NAMA KARYAWAN</th>
+                    <th class="col-tipe">TIPE</th>
+                    <th class="col-kode">KODE</th>
+                    <th class="col-peta">PETA</th>
+                  </tr>
+                </thead>
+                <tbody id="logAbsensiTableBody">
+                  <tr>
+                    <td colspan="7" style="text-align:center; padding:36px; color:#64748b;">
+                      <i class="fa-solid fa-spinner fa-spin" style="color:#00e5ff; font-size:1.5rem;"></i>
+                      <div style="margin-top:10px;">Memuat data tabel absensi...</div>
                     </td>
                   </tr>
                 </tbody>

@@ -40,6 +40,14 @@ const state = {
     year: 2026,
     search: '',
     location: 'ALL'
+  },
+  logAbsensiFilter: {
+    search: '',
+    type: 'ALL'
+  },
+  logAbsensiSort: {
+    column: 'timestamp',
+    dir: 'desc'
   }
 };
 
@@ -724,6 +732,7 @@ function renderSidebarMenu() {
         (m.ModuleID === 'mod_logs' && state.activeModule === 'logs') ||
         (m.ModuleID === 'mod_users' && state.activeModule === 'users') ||
         (m.ModuleID === 'mod_cuti_karyawan' && state.activeModule === 'cuti_absensi') ||
+        (m.ModuleID === 'mod_data_attendance' && (state.activeModule === 'log_absensi' || state.activeModule === 'mod_data_attendance')) ||
         ((m.ModuleID === 'mod_attendance' || m.ModuleID === 'rekap_absensi') && (state.activeModule === 'rekap_absensi' || state.activeModule === 'mod_attendance'));
 
       const icon = m.Icon || 'fa-solid fa-cube';
@@ -943,7 +952,8 @@ function switchModule(moduleName) {
   else if (moduleName === 'mod_logs') viewId = 'logs';
   else if (moduleName === 'mod_users' || moduleName === 'mod_sistem_user') viewId = 'users';
   else if (moduleName === 'mod_attendance' || moduleName === 'rekap_absensi' || moduleName === 'mod_rekap_absensi') viewId = 'rekap_absensi';
-  else if (moduleName === 'mod_cuti_karyawan' || moduleName === 'mod_presensi' || moduleName === 'mod_data_attendance') viewId = 'cuti_absensi';
+  else if (moduleName === 'mod_data_attendance' || moduleName === 'log_absensi' || moduleName === 'riwayat_log_absensi') viewId = 'log_absensi';
+  else if (moduleName === 'mod_cuti_karyawan' || moduleName === 'mod_presensi') viewId = 'cuti_absensi';
   else if (moduleName === 'mod_modules' || moduleName === 'settings') viewId = 'settings';
 
   // Highlight active nav item in sidebar
@@ -980,6 +990,7 @@ function switchModule(moduleName) {
     logs: { title: 'Log Aktivitas Pengguna', breadcrumb: 'Audit Trail / Tabel ActivityLogs dengan Google Maps' },
     users: { title: 'Manajemen Pengguna', breadcrumb: 'Master Data / Otorisasi Tabel Users' },
     rekap_absensi: { title: 'Rekapitulasi Absensi Karyawan', breadcrumb: 'SDM / Rekapitulasi Presensi Matrix & Arsiran Libur' },
+    log_absensi: { title: 'Riwayat Log Absensi', breadcrumb: 'SDM & Karyawan / Akses Data Tabel Absensi Supabase' },
     cuti_absensi: { title: 'Presensi & Cuti Karyawan', breadcrumb: 'SDM / Absensi & Pengajuan Cuti' },
     settings: { title: 'Konfigurasi Database', breadcrumb: 'Sistem / Pengalihan Google Sheets & Supabase' }
   };
@@ -997,6 +1008,7 @@ function switchModule(moduleName) {
   if (viewId === 'jamaah') renderJamaahTable();
   if (viewId === 'users') renderUsersTable();
   if (viewId === 'rekap_absensi') renderRekapAbsensi();
+  if (viewId === 'log_absensi') renderLogAbsensiTable();
   if (viewId === 'cuti_absensi') renderCutiAbsensi();
   if (viewId === 'settings') renderSettings();
 }
@@ -1047,8 +1059,9 @@ async function loadAllModuleData() {
         updateDashboardCounters();
       }).catch(e => console.warn('Supabase jamaah error:', e));
 
-      fetchSupabaseDirect('absensi', 'limit=100').then(a => {
+      fetchSupabaseDirect('absensi', 'order=timestamp.desc&limit=500').then(a => {
         state.data.absensi = a;
+        renderLogAbsensiTable();
         renderCutiAbsensi();
       }).catch(e => console.warn('Supabase absensi error:', e));
 
@@ -1094,6 +1107,7 @@ async function loadAllModuleData() {
     fetch('/api/absensi').then(r => r.json()).then(data => {
       if (data.success) {
         state.data.absensi = data.absensi;
+        renderLogAbsensiTable();
         renderCutiAbsensi();
       }
     });
@@ -1385,6 +1399,326 @@ function renderCutiAbsensi() {
     }
   }
 }
+
+// ==========================================================================
+// 6C. RIWAYAT LOG ABSENSI (TABEL ABSENSI SESUAI LAMPIRAN CYBER DARK / NEON CYAN)
+// ==========================================================================
+
+function formatIndonesianDateDisplay(row) {
+  let dateStr = '';
+  if (row.tanggal && /^\d{4}-\d{2}-\d{2}/.test(String(row.tanggal))) {
+    dateStr = String(row.tanggal).slice(0, 10);
+  } else if (row.Tahun && row.Bulan && row.Tanggal) {
+    const y = String(row.Tahun).trim();
+    const m = String(row.Bulan).trim().padStart(2, '0');
+    const d = String(row.Tanggal).trim().padStart(2, '0');
+    dateStr = `${y}-${m}-${d}`;
+  } else if (row.timestamp || row.Timestamp) {
+    const raw = String(row.timestamp || row.Timestamp).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+      dateStr = raw.slice(0, 10);
+    } else {
+      const dt = new Date(raw);
+      if (!isNaN(dt.getTime())) {
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, '0');
+        const d = String(dt.getDate()).padStart(2, '0');
+        dateStr = `${y}-${m}-${d}`;
+      }
+    }
+  } else if (row.tanggal) {
+    const num = parseInt(String(row.tanggal).trim(), 10);
+    if (!isNaN(num) && num >= 1 && num <= 31) {
+      dateStr = `2026-10-${String(num).padStart(2, '0')}`;
+    }
+  }
+
+  if (dateStr && dateStr.length === 10) {
+    const parts = dateStr.split('-');
+    const year = parts[0];
+    const monthIdx = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const monthNames = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+    const monthName = monthNames[monthIdx] || 'Oktober';
+    return `${day} ${monthName} ${year}`;
+  }
+
+  return '20 Oktober 2026';
+}
+
+function extractTimeStr(row) {
+  const ts = row.timestamp || row.Timestamp || '';
+  if (ts) {
+    const match = String(ts).match(/(\d{2}:\d{2}:\d{2})/);
+    if (match) return match[1];
+    const matchShort = String(ts).match(/(\d{2}:\d{2})/);
+    if (matchShort) return matchShort[1] + ':00';
+  }
+  if (row.jam || row.Jam || row.waktu) {
+    const j = String(row.jam || row.Jam || row.waktu).trim();
+    if (/^\d{2}:\d{2}:\d{2}$/.test(j)) return j;
+    if (/^\d{2}:\d{2}$/.test(j)) return j + ':00';
+  }
+  return '08:00:00';
+}
+
+function getIsoDateForSort(row) {
+  let dateStr = '';
+  if (row.tanggal && /^\d{4}-\d{2}-\d{2}/.test(String(row.tanggal))) {
+    dateStr = String(row.tanggal).slice(0, 10);
+  } else if (row.timestamp || row.Timestamp) {
+    const raw = String(row.timestamp || row.Timestamp).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) dateStr = raw.slice(0, 10);
+  }
+  return dateStr || '2026-10-20';
+}
+
+function renderLogAbsensiTable() {
+  const tbody = document.getElementById('logAbsensiTableBody');
+  if (!tbody) return;
+
+  const list = state.data.absensi || [];
+  if (list.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center; padding:36px; color:#64748b;">
+          <i class="fa-regular fa-folder-open" style="font-size:2rem; color:#00e5ff; margin-bottom:10px;"></i>
+          <div>Tidak ada data absensi di tabel Supabase. Klik Refresh untuk memuat ulang.</div>
+        </td>
+      </tr>
+    `;
+    updateLogAbsensiStats(0, 0, 0);
+    return;
+  }
+
+  // Filter Search & Type
+  const searchQuery = (state.logAbsensiFilter?.search || '').toLowerCase();
+  const typeFilter = state.logAbsensiFilter?.type || 'ALL';
+
+  let filtered = list.filter(item => {
+    const name = (item.nama_karyawan || item.NamaKaryawan || item.nama_user || item.NamaUser || item.FULLNAME || item.Username || '').toLowerCase();
+    const tipe = (item.tipe || item.Tipe || '').toLowerCase();
+
+    if (searchQuery && !name.includes(searchQuery)) return false;
+    if (typeFilter !== 'ALL') {
+      if (typeFilter === 'Datang' && !(tipe.includes('datang') || tipe.includes('hadir'))) return false;
+      if (typeFilter === 'Izin' && !tipe.includes('izin')) return false;
+      if (typeFilter === 'Sakit' && !tipe.includes('sakit')) return false;
+      if (typeFilter === 'Pulang' && !tipe.includes('pulang')) return false;
+    }
+    return true;
+  });
+
+  // Sorting
+  const sortCol = state.logAbsensiSort?.column || 'timestamp';
+  const sortDir = state.logAbsensiSort?.dir || 'desc';
+
+  filtered.sort((a, b) => {
+    let valA = '';
+    let valB = '';
+
+    if (sortCol === 'tanggal') {
+      valA = getIsoDateForSort(a);
+      valB = getIsoDateForSort(b);
+    } else if (sortCol === 'jam') {
+      valA = extractTimeStr(a);
+      valB = extractTimeStr(b);
+    } else {
+      valA = (a.timestamp || a.Timestamp || (getIsoDateForSort(a) + ' ' + extractTimeStr(a)));
+      valB = (b.timestamp || b.Timestamp || (getIsoDateForSort(b) + ' ' + extractTimeStr(b)));
+    }
+
+    if (valA < valB) return sortDir === 'asc' ? -1 : 1;
+    if (valA > valB) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // Update Stats
+  const totalCount = filtered.length;
+  const datangCount = filtered.filter(x => {
+    const t = (x.tipe || x.Tipe || '').toLowerCase();
+    const k = (x.kode || '').toUpperCase();
+    return t.includes('datang') || t.includes('hadir') || k === 'H';
+  }).length;
+  const izinCount = totalCount - datangCount;
+  updateLogAbsensiStats(totalCount, datangCount, izinCount);
+
+  // Update Sort Indicator
+  const sortIndicator = document.getElementById('absensiSortIndicator');
+  if (sortIndicator) {
+    const colName = sortCol === 'tanggal' ? 'Tanggal' : (sortCol === 'jam' ? 'Jam' : 'Waktu');
+    sortIndicator.textContent = `${colName} (${sortDir.toUpperCase()})`;
+  }
+
+  // Update Sort Arrow Icons
+  const arrowTanggal = document.getElementById('sortArrowTanggal');
+  const arrowJam = document.getElementById('sortArrowJam');
+  if (arrowTanggal) {
+    if (sortCol === 'tanggal') {
+      arrowTanggal.className = sortDir === 'asc' ? 'fa-solid fa-caret-up sort-arrow' : 'fa-solid fa-caret-down sort-arrow';
+    } else {
+      arrowTanggal.className = 'fa-solid fa-caret-down sort-arrow';
+    }
+  }
+  if (arrowJam) {
+    if (sortCol === 'jam') {
+      arrowJam.className = sortDir === 'asc' ? 'fa-solid fa-caret-up sort-arrow' : 'fa-solid fa-caret-down sort-arrow';
+    } else {
+      arrowJam.className = 'fa-solid fa-caret-down sort-arrow';
+    }
+  }
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center; padding:36px; color:#64748b;">
+          <div>Tidak ada data absensi yang sesuai filter.</div>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((row, idx) => {
+    const no = idx + 1;
+    const tanggalText = formatIndonesianDateDisplay(row);
+    const jamText = extractTimeStr(row);
+    const namaKaryawan = (row.nama_karyawan || row.NamaKaryawan || row.nama_user || row.NamaUser || row.FULLNAME || row.Username || '-').toUpperCase();
+    
+    // Tipe pill
+    const rawTipe = (row.tipe || row.Tipe || (row.kode === 'H' ? 'Datang' : (row.kode === 'I' ? 'Izin' : 'Hadir'))).trim();
+    const tipeLower = rawTipe.toLowerCase();
+    let tipeClass = 'tipe-pill-datang';
+    let displayTipe = rawTipe;
+
+    if (tipeLower.includes('izin')) {
+      tipeClass = 'tipe-pill-izin';
+      displayTipe = 'Izin';
+    } else if (tipeLower.includes('sakit')) {
+      tipeClass = 'tipe-pill-sakit';
+      displayTipe = 'Sakit';
+    } else if (tipeLower.includes('pulang')) {
+      tipeClass = 'tipe-pill-pulang';
+      displayTipe = 'Pulang';
+    } else if (tipeLower.includes('datang') || tipeLower.includes('hadir')) {
+      tipeClass = 'tipe-pill-datang';
+      displayTipe = 'Datang';
+    }
+
+    // Kode box
+    const rawKode = (row.kode || row.Kode || (tipeLower.includes('izin') ? 'L' : 'H')).toUpperCase().trim();
+    let kodeClass = 'kode-box-h';
+    if (rawKode === 'H') kodeClass = 'kode-box-h';
+    else if (rawKode === 'L') kodeClass = 'kode-box-l';
+    else if (rawKode === 'I') kodeClass = 'kode-box-i';
+    else if (rawKode === 'S') kodeClass = 'kode-box-s';
+    else if (rawKode === 'A') kodeClass = 'kode-box-a';
+    else kodeClass = 'kode-box-default';
+
+    // Map URL
+    let mapsUrl = row.link_google_maps || row['Link Google Maps'] || row.maps_url || '';
+    if (!mapsUrl && row.latitude && row.longitude) {
+      mapsUrl = `https://maps.google.com/?q=${row.latitude},${row.longitude}`;
+    }
+    if (!mapsUrl && (row.catatan || row.location)) {
+      const loc = (row.catatan || row.location).replace(/^Lokasi:\s*/i, '').trim();
+      if (loc) {
+        mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('PT Fath Indah ' + loc)}`;
+      }
+    }
+    if (!mapsUrl) {
+      mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('PT Fath Indah Travel Service')}`;
+    }
+
+    return `
+      <tr>
+        <td class="col-no">${no}</td>
+        <td class="col-tanggal">${tanggalText}</td>
+        <td class="col-jam">${jamText}</td>
+        <td class="col-nama">${namaKaryawan}</td>
+        <td class="col-tipe">
+          <span class="tipe-pill ${tipeClass}">${displayTipe}</span>
+        </td>
+        <td class="col-kode">
+          <span class="kode-box ${kodeClass}">${rawKode}</span>
+        </td>
+        <td class="col-peta">
+          <a href="${mapsUrl}" target="_blank" rel="noopener noreferrer" class="btn-buka-peta">
+            <i class="fa-solid fa-map-location-dot"></i>
+            <span>Buka Peta</span>
+          </a>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function updateLogAbsensiStats(total, datang, izin) {
+  const elTotal = document.getElementById('absensiStatTotal');
+  const elDatang = document.getElementById('absensiStatDatang');
+  const elIzin = document.getElementById('absensiStatIzin');
+  if (elTotal) elTotal.textContent = total.toLocaleString('id-ID');
+  if (elDatang) elDatang.textContent = datang.toLocaleString('id-ID');
+  if (elIzin) elIzin.textContent = izin.toLocaleString('id-ID');
+}
+
+window.toggleSortLogAbsensi = function(column) {
+  if (state.logAbsensiSort.column === column) {
+    state.logAbsensiSort.dir = state.logAbsensiSort.dir === 'desc' ? 'asc' : 'desc';
+  } else {
+    state.logAbsensiSort.column = column;
+    state.logAbsensiSort.dir = 'desc';
+  }
+  renderLogAbsensiTable();
+};
+
+window.onLogAbsensiFilterChange = function() {
+  const searchInput = document.getElementById('logAbsensiSearchInput');
+  const typeFilter = document.getElementById('logAbsensiTypeFilter');
+  if (searchInput) state.logAbsensiFilter.search = searchInput.value.trim();
+  if (typeFilter) state.logAbsensiFilter.type = typeFilter.value;
+  renderLogAbsensiTable();
+};
+
+window.reloadLogAbsensiData = async function() {
+  const tbody = document.getElementById('logAbsensiTableBody');
+  if (tbody) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center; padding:36px; color:#64748b;">
+          <i class="fa-solid fa-spinner fa-spin" style="color:#00e5ff; font-size:1.5rem;"></i>
+          <div style="margin-top:10px;">Menghubungi Supabase dan memperbarui data absensi...</div>
+        </td>
+      </tr>
+    `;
+  }
+
+  if (state.isStaticMode) {
+    try {
+      const records = await fetchSupabaseDirect('absensi', 'order=timestamp.desc&limit=500');
+      if (records) {
+        state.data.absensi = records;
+      }
+    } catch (e) {
+      console.warn('Gagal memuat absensi langsung dari Supabase:', e);
+    }
+  } else {
+    try {
+      const res = await fetch('/api/absensi');
+      const data = await res.json();
+      if (data.success && data.absensi) {
+        state.data.absensi = data.absensi;
+      }
+    } catch (e) {
+      console.warn('Gagal fetch /api/absensi:', e);
+    }
+  }
+
+  renderLogAbsensiTable();
+};
 
 // ==========================================================================
 // 6B. REKAPITULASI ABSENSI BULANAN (MATRIX REKAP & WEEKEND ARSIRAN)
