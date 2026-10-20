@@ -1431,66 +1431,98 @@ async function loadRekapAbsensiData(force = false) {
     }
   }
 
-  // 2. Direct Supabase Query (Tabel absensi di Supabase)
+  // 2. Direct Supabase Query (Tabel users & absensi di Supabase)
   try {
-    const sbUrl = `${SUPABASE_CONFIG.url}/rest/v1/absensi?select=*&bulan=eq.${filterMonth}&tahun=eq.${filterYear}&limit=2000`;
+    // 2a. Ambil data Nama Karyawan dari Tabel users dengan Header full_name
+    // Dimana NoUrut bernilai lebih dari 1 atau not NULL dan diurutkan NoUrut secara ascending
+    let usersList = [];
+    try {
+      const uUrl = `${SUPABASE_CONFIG.url}/rest/v1/users?select=id,username,nama,full_name,kanwil,kantor,status,NoUrut&NoUrut=not.is.null&order=NoUrut.asc`;
+      const uRes = await fetch(uUrl, {
+        headers: {
+          'apikey': SUPABASE_CONFIG.anonKey,
+          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+        }
+      });
+      if (uRes.ok) {
+        usersList = await uRes.json();
+      }
+    } catch (uErr) {
+      console.warn('Gagal fetch users dengan NoUrut dari Supabase REST API:', uErr);
+    }
+
+    if (!usersList || usersList.length === 0) {
+      usersList = state.data.users || [];
+    }
+
+    // Filter NoUrut bernilai > 1 atau not NULL (angka valid >= 1 dan bukan null)
+    const validUsers = (usersList || []).filter(u => {
+      const nu = u.NoUrut !== undefined ? u.NoUrut : u.noUrut;
+      if (nu === null || nu === undefined || nu === '') return false;
+      const num = Number(nu);
+      return !isNaN(num) && (num >= 1 || nu !== null);
+    });
+
+    // Urutkan NoUrut secara ascending
+    validUsers.sort((a, b) => {
+      const na = Number(a.NoUrut !== undefined ? a.NoUrut : a.noUrut);
+      const nb = Number(b.NoUrut !== undefined ? b.NoUrut : b.noUrut);
+      return na - nb;
+    });
+
+    const employees = [];
+    const seenNames = new Set();
+    const empIndexMap = {};
+
+    validUsers.forEach(u => {
+      const fullName = (u.full_name || u.FullName || u.nama || u.username || '').trim().toUpperCase();
+      if (!fullName || seenNames.has(fullName)) return;
+      seenNames.add(fullName);
+
+      const no = String(u.NoUrut !== undefined ? u.NoUrut : (u.noUrut || (employees.length + 1)));
+      const loc = (u.kantor || u.Kantor || u.kanwil || u.Kanwil || 'PUSAT').toUpperCase();
+      const empObj = {
+        no,
+        name: fullName,
+        location: loc,
+        days: {}
+      };
+      empIndexMap[fullName] = empObj;
+      employees.push(empObj);
+    });
+
+    // 2b. Ambil data presensi dari Tabel absensi sesuai bulan & tahun
+    const sbUrl = `${SUPABASE_CONFIG.url}/rest/v1/absensi?select=*&bulan=eq.${filterMonth}&tahun=eq.${filterYear}&limit=5000`;
     const res = await fetch(sbUrl, {
       headers: {
         'apikey': SUPABASE_CONFIG.anonKey,
         'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
       }
     });
+
     if (res.ok) {
       const records = await res.json();
       if (records && records.length > 0) {
-        const empMap = {};
-        // Pre-populate with known users
-        (state.data.users || []).forEach((u, idx) => {
-          const fn = (u.FullName || u.fullName || u.Username || '').toUpperCase();
-          if (fn) {
-            empMap[fn] = {
-              no: String(idx + 1),
-              name: fn,
-              location: (u.Kanwil === 'Pusat' ? u.Kantor : u.Kanwil) || 'PUSAT',
-              days: {}
-            };
-          }
-        });
-
         records.forEach(r => {
-          const name = (r.nama_karyawan || r.nama_user || '').toUpperCase();
-          if (!name) return;
-          if (!empMap[name]) {
-            empMap[name] = {
-              no: String(Object.keys(empMap).length + 1),
-              name: name,
-              location: (r.catatan || 'Lokasi: PUSAT').replace(/^Lokasi:\s*/i, ''),
-              days: {}
-            };
-          }
+          const empName = (r.nama_karyawan || r.nama_user || '').trim().toUpperCase();
+          if (!empName || !empIndexMap[empName]) return;
+
           const day = parseInt((r.tanggal || '').slice(8, 10), 10);
           if (day && r.kode) {
-            empMap[name].days[day] = r.kode.toUpperCase();
+            empIndexMap[empName].days[day] = r.kode.toUpperCase();
           }
         });
-
-        const employees = Object.values(empMap).map((e, idx) => ({
-          no: String(idx + 1),
-          name: e.name,
-          location: e.location || 'PUSAT',
-          days: e.days
-        }));
-
-        const data = {
-          month: filterMonth,
-          year: filterYear,
-          count: employees.length,
-          employees,
-          source: 'supabase'
-        };
-        state.data.rekapAbsensi = data;
-        return data;
       }
+
+      const data = {
+        month: filterMonth,
+        year: filterYear,
+        count: employees.length,
+        employees,
+        source: 'supabase'
+      };
+      state.data.rekapAbsensi = data;
+      return data;
     }
   } catch (sbErr) {
     console.warn('Direct Supabase fetch for rekap failed:', sbErr);
@@ -1725,13 +1757,31 @@ function renderRekapTable() {
   // 2. GET & FILTER EMPLOYEES
   let rawEmployees = state.data.rekapAbsensi?.employees || [];
   if (rawEmployees.length === 0 && state.data.users?.length > 0) {
-    // Fallback to active users if rekap sheet has not loaded yet
-    rawEmployees = state.data.users.map((u, idx) => ({
-      no: String(idx + 1),
-      name: u.FullName || u.Username,
-      location: (u.Kanwil === 'Pusat' ? u.Kantor : u.Kanwil) || 'PUSAT',
-      days: {}
-    }));
+    // Fallback to active users with NoUrut > 1 / not NULL
+    const validFallback = state.data.users
+      .filter(u => {
+        const nu = u.NoUrut !== undefined ? u.NoUrut : u.noUrut;
+        return nu !== null && nu !== undefined && nu !== '' && !isNaN(Number(nu)) && Number(nu) >= 1;
+      })
+      .sort((a, b) => {
+        const na = Number(a.NoUrut !== undefined ? a.NoUrut : a.noUrut);
+        const nb = Number(b.NoUrut !== undefined ? b.NoUrut : b.noUrut);
+        return na - nb;
+      });
+
+    const seenNames = new Set();
+    rawEmployees = [];
+    validFallback.forEach((u, idx) => {
+      const fn = (u.FullName || u.full_name || u.Username || '').trim().toUpperCase();
+      if (!fn || seenNames.has(fn)) return;
+      seenNames.add(fn);
+      rawEmployees.push({
+        no: String(u.NoUrut || idx + 1),
+        name: fn,
+        location: (u.Kantor || u.kantor || u.Kanwil || u.kanwil || 'PUSAT').toUpperCase(),
+        days: {}
+      });
+    });
   }
 
   const searchQuery = (state.rekapFilter.search || '').toLowerCase().trim();
