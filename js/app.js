@@ -1092,11 +1092,17 @@ async function loadAllModuleData() {
     });
 
     fetch('/api/absensi').then(r => r.json()).then(data => {
-      if (data.success) state.data.absensi = data.absensi;
+      if (data.success) {
+        state.data.absensi = data.absensi;
+        renderCutiAbsensi();
+      }
     });
 
     fetch('/api/cuti').then(r => r.json()).then(data => {
-      if (data.success) state.data.cuti = data.cuti;
+      if (data.success) {
+        state.data.cuti = data.cuti;
+        renderCutiAbsensi();
+      }
     });
 
     loadRekapAbsensiData();
@@ -1306,18 +1312,44 @@ function renderCutiAbsensi() {
     if (list.length === 0) {
       absensiTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 20px; color: var(--text-muted);">Memuat riwayat presensi Supabase...</td></tr>`;
     } else {
-      absensiTbody.innerHTML = list.slice(0, 20).map(a => {
-        const time = a.Timestamp || a.timestamp || a.Tanggal || '-';
-        const user = a.NamaKaryawan || a.NamaUser || a.FULLNAME || a.Username || '-';
-        const type = a.Tipe || a['Tipe Absen'] || 'Masuk';
-        const status = a.Status || 'Tepat Waktu';
-        const mapsUrl = a['Link Google Maps'] || a['Maps URL'] || '';
+      absensiTbody.innerHTML = list.slice(0, 50).map(a => {
+        let tanggalStr = '';
+        if (a.tanggal && /^\d{4}-\d{2}-\d{2}/.test(String(a.tanggal))) {
+          tanggalStr = String(a.tanggal).slice(0, 10);
+        } else if (a.Tahun && a.Bulan && a.Tanggal) {
+          const y = String(a.Tahun).trim();
+          const m = String(a.Bulan).trim().padStart(2, '0');
+          const d = String(a.Tanggal).trim().padStart(2, '0');
+          tanggalStr = `${y}-${m}-${d}`;
+        } else if (a.timestamp || a.Timestamp) {
+          const raw = String(a.timestamp || a.Timestamp).trim();
+          if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
+            tanggalStr = raw.slice(0, 10);
+          } else {
+            const dt = new Date(raw);
+            if (!isNaN(dt.getTime())) {
+              const y = dt.getFullYear();
+              const m = String(dt.getMonth() + 1).padStart(2, '0');
+              const d = String(dt.getDate()).padStart(2, '0');
+              tanggalStr = `${y}-${m}-${d}`;
+            } else {
+              tanggalStr = raw.split(' ')[0] || '-';
+            }
+          }
+        } else {
+          tanggalStr = a.Tanggal || '-';
+        }
+
+        const user = a.nama_karyawan || a.NamaKaryawan || a.nama_user || a.NamaUser || a.FULLNAME || a.Username || '-';
+        const type = a.tipe || a.Tipe || a['Tipe Absen'] || 'Masuk';
+        const status = a.kode || a.Status || 'Tepat Waktu';
+        const mapsUrl = a.link_google_maps || a['Link Google Maps'] || a['Maps URL'] || '';
         return `
           <tr>
-            <td>${time}</td>
+            <td><code style="color:var(--gold-light); font-weight:600;">${tanggalStr}</code></td>
             <td><strong>${user}</strong></td>
             <td><span class="badge badge-blue">${type}</span></td>
-            <td>${status}</td>
+            <td><span class="badge badge-active">${status}</span></td>
             <td>
               ${mapsUrl ? `<a href="${mapsUrl}" target="_blank" class="map-link-btn"><i class="fa-solid fa-map-location-dot"></i> Maps</a>` : '-'}
             </td>
