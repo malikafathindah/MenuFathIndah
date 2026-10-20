@@ -95,6 +95,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initEventListeners();
   await detectEnvironment();
   checkExistingSession();
+  updateGDriveStatusUI();
 });
 
 async function detectEnvironment() {
@@ -1816,6 +1817,8 @@ function initLaunchingBrosurView() {
   populateBrosurDropdowns();
   resetBrosurForm();
   loadBrosurData();
+  updateGDriveStatusUI();
+  setupDropZoneListeners();
 }
 
 window.switchBrosurTab = function(tabName) {
@@ -2160,6 +2163,311 @@ window.onBrosurNameChange = function() {
   updateGeneratedFileName();
 };
 
+// Google Apps Script source code template for 1-click copy
+const APPS_SCRIPT_SOURCE_CODE = `/**
+ * ============================================================================
+ * GOOGLE APPS SCRIPT: AUTO-UPLOADER BROSUR PT. FATH INDAH TRAVEL SERVICE
+ * Target Folder ID: 1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc
+ * ============================================================================
+ */
+const TARGET_FOLDER_ID = "1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc";
+
+function doPost(e) {
+  try {
+    if (!e || !e.postData || !e.postData.contents) {
+      return createJsonResponse({ success: false, message: "Payload tidak ditemukan." });
+    }
+    var payload = JSON.parse(e.postData.contents);
+    var folderId = payload.folderId || TARGET_FOLDER_ID;
+    var folder = DriveApp.getFolderById(folderId);
+    if (!folder) {
+      return createJsonResponse({ success: false, message: "Folder tidak ditemukan dengan ID: " + folderId });
+    }
+    var fileName = payload.fileName || ("BROSUR_" + Utilities.formatDate(new Date(), "GMT+7", "yyyyMMdd_HHmmss") + ".pdf");
+    var mimeType = payload.mimeType || "application/pdf";
+    var base64String = payload.base64;
+    if (!base64String) {
+      return createJsonResponse({ success: false, message: "Konten file Base64 kosong." });
+    }
+    if (base64String.indexOf(",") > -1) {
+      base64String = base64String.split(",")[1];
+    }
+    var decoded = Utilities.base64Decode(base64String);
+    var blob = Utilities.newBlob(decoded, mimeType, fileName);
+    var createdFile = folder.createFile(blob);
+    try {
+      createdFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (shareErr) {}
+    var fileId = createdFile.getId();
+    var directViewUrl = "https://drive.google.com/file/d/" + fileId + "/view?usp=sharing";
+    return createJsonResponse({
+      success: true,
+      message: "File brosur berhasil diunggah ke Google Drive!",
+      fileId: fileId,
+      fileName: createdFile.getName(),
+      directLink: directViewUrl,
+      fileUrl: directViewUrl,
+      folderUrl: "https://drive.google.com/drive/folders/" + folderId,
+      sizeBytes: createdFile.getSize()
+    });
+  } catch (error) {
+    return createJsonResponse({ success: false, message: error.toString() });
+  }
+}
+
+function doGet(e) {
+  return createJsonResponse({
+    success: true,
+    status: "active",
+    message: "Google Drive Uploader Webhook PT Fath Indah aktif.",
+    targetFolderId: TARGET_FOLDER_ID,
+    targetFolderUrl: "https://drive.google.com/drive/folders/" + TARGET_FOLDER_ID
+  });
+}
+
+function createJsonResponse(data) {
+  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
+}`;
+
+let pendingBrosurPayload = null;
+
+function getGDriveWebhookUrl() {
+  return (localStorage.getItem('fath_indah_gdrive_script_url') || '').trim();
+}
+
+function setGDriveWebhookUrl(url) {
+  localStorage.setItem('fath_indah_gdrive_script_url', (url || '').trim());
+  updateGDriveStatusUI();
+}
+
+function updateGDriveStatusUI() {
+  const url = getGDriveWebhookUrl();
+  const hasUrl = !!url;
+
+  // Status Pill di Form Brosur
+  const pill = document.getElementById('gdriveWebhookStatusPill');
+  const pillText = document.getElementById('gdriveWebhookStatusText');
+  if (pill && pillText) {
+    if (hasUrl) {
+      pill.className = 'gdrive-status-badge active';
+      pillText.textContent = 'Auto-Upload Drive: Terhubung';
+      pill.title = `Terkoneksi ke: ${url}`;
+    } else {
+      pill.className = 'gdrive-status-badge pending';
+      pillText.textContent = 'Auto-Upload Drive: Belum Dikonfigurasi';
+      pill.title = 'Klik untuk memasang Webhook Google Apps Script';
+    }
+  }
+
+  // Status Badge di Konfigurasi DB
+  const badgeDb = document.getElementById('gdriveConfigStatusBadgeDb');
+  if (badgeDb) {
+    if (hasUrl) {
+      badgeDb.className = 'gdrive-status-badge active';
+      badgeDb.innerHTML = '<i class="fa-solid fa-check"></i> <span>Terhubung</span>';
+    } else {
+      badgeDb.className = 'gdrive-status-badge pending';
+      badgeDb.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> <span>Belum Terhubung</span>';
+    }
+  }
+
+  const inputModal = document.getElementById('inputGDriveScriptUrl');
+  if (inputModal && !inputModal.value) {
+    inputModal.value = url;
+  }
+
+  const inputDb = document.getElementById('inputGDriveScriptUrlDb');
+  if (inputDb && !inputDb.value) {
+    inputDb.value = url;
+  }
+}
+
+window.openGDriveConfigModal = function() {
+  const modal = document.getElementById('gdriveConfigModal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  const urlInput = document.getElementById('inputGDriveScriptUrl');
+  if (urlInput) urlInput.value = getGDriveWebhookUrl();
+  const codeBox = document.getElementById('appsScriptCodeBlock');
+  if (codeBox) codeBox.textContent = APPS_SCRIPT_SOURCE_CODE;
+  updateGDriveStatusUI();
+};
+
+window.closeGDriveConfigModal = function() {
+  const modal = document.getElementById('gdriveConfigModal');
+  if (modal) modal.style.display = 'none';
+};
+
+window.openGDrivePromptModal = function(fileName) {
+  const modal = document.getElementById('gdrivePromptModal');
+  if (!modal) return;
+  const textEl = document.getElementById('promptFileNameText');
+  if (textEl) textEl.textContent = fileName || 'File Brosur';
+  modal.style.display = 'flex';
+};
+
+window.closeGDrivePromptModal = function() {
+  const modal = document.getElementById('gdrivePromptModal');
+  if (modal) modal.style.display = 'none';
+};
+
+window.toggleGDriveGuide = function() {
+  const content = document.getElementById('gdriveStepsContent');
+  const chevron = document.getElementById('gdriveGuideChevron');
+  if (!content) return;
+  if (content.style.display === 'none' || !content.style.display) {
+    content.style.display = 'block';
+    if (chevron) chevron.className = 'fa-solid fa-chevron-up';
+  } else {
+    content.style.display = 'none';
+    if (chevron) chevron.className = 'fa-solid fa-chevron-down';
+  }
+};
+
+window.copyAppsScriptCode = function() {
+  navigator.clipboard.writeText(APPS_SCRIPT_SOURCE_CODE).then(() => {
+    const btn = document.getElementById('btnCopyScriptCode');
+    if (btn) {
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-check" style="color:#34d399;"></i> <span>Kode Tersalin!</span>';
+      setTimeout(() => { btn.innerHTML = orig; }, 2500);
+    }
+  }).catch(() => {
+    prompt('Salin skrip Google Apps Script berikut:', APPS_SCRIPT_SOURCE_CODE);
+  });
+};
+
+window.saveGDriveConfig = function() {
+  const input = document.getElementById('inputGDriveScriptUrl');
+  const url = (input ? input.value : '').trim();
+  if (!url) {
+    if (confirm('Kosongkan URL Auto-Upload Google Drive?')) {
+      setGDriveWebhookUrl('');
+      alert('Konfigurasi auto-upload dihapus.');
+      closeGDriveConfigModal();
+    }
+    return;
+  }
+  setGDriveWebhookUrl(url);
+  alert('URL Webhook Google Apps Script berhasil disimpan!');
+  closeGDriveConfigModal();
+};
+
+window.saveGDriveConfigFromDb = function() {
+  const input = document.getElementById('inputGDriveScriptUrlDb');
+  const url = (input ? input.value : '').trim();
+  setGDriveWebhookUrl(url);
+  alert('URL Webhook Auto-Upload Google Drive berhasil disimpan!');
+};
+
+window.testGDriveWebhook = async function() {
+  const input = document.getElementById('inputGDriveScriptUrl');
+  const statusEl = document.getElementById('gdriveTestStatus');
+  const url = (input ? input.value : '').trim();
+  if (!url) {
+    alert('Harap masukkan URL Web App Google Apps Script terlebih dahulu!');
+    return;
+  }
+
+  if (statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.style.color = '#38bdf8';
+    statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menguji koneksi ke Web App...';
+  }
+
+  try {
+    const res = await fetch(url, { method: 'GET', mode: 'cors' });
+    if (res.ok) {
+      const data = await res.json();
+      if (statusEl) {
+        statusEl.style.color = '#34d399';
+        statusEl.innerHTML = `<i class="fa-solid fa-check-circle"></i> Koneksi Berhasil! Terhubung ke Folder: ${data.targetFolderId || '1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc'}`;
+      }
+    } else {
+      if (statusEl) {
+        statusEl.style.color = '#f87171';
+        statusEl.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> Respon HTTP ${res.status}. Pastikan deployment "Who has access: Anyone".`;
+      }
+    }
+  } catch (err) {
+    if (statusEl) {
+      statusEl.style.color = '#fbbf24';
+      statusEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Tes selesai (${err.message}). Jika disetel Anyone, Web App siap menerima POST upload.`;
+    }
+  }
+};
+
+window.testGDriveWebhookFromDb = async function() {
+  const input = document.getElementById('inputGDriveScriptUrlDb');
+  const statusEl = document.getElementById('gdriveTestStatusDb');
+  const url = (input ? input.value : '').trim();
+  if (!url) {
+    alert('Harap masukkan URL Web App Google Apps Script terlebih dahulu!');
+    return;
+  }
+
+  if (statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.style.color = '#38bdf8';
+    statusEl.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menguji koneksi ke Web App...';
+  }
+
+  try {
+    const res = await fetch(url, { method: 'GET', mode: 'cors' });
+    if (res.ok) {
+      const data = await res.json();
+      if (statusEl) {
+        statusEl.style.color = '#34d399';
+        statusEl.innerHTML = `<i class="fa-solid fa-check-circle"></i> Koneksi Berhasil! Folder Target: ${data.targetFolderId || '1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc'}`;
+      }
+    } else {
+      if (statusEl) {
+        statusEl.style.color = '#f87171';
+        statusEl.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> Respon HTTP ${res.status}. Pastikan deployment "Who has access: Anyone".`;
+      }
+    }
+  } catch (err) {
+    if (statusEl) {
+      statusEl.style.color = '#fbbf24';
+      statusEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Tes selesai (${err.message}). Webhook siap digunakan jika disetel Anyone.`;
+    }
+  }
+};
+
+function setupDropZoneListeners() {
+  const dropZone = document.getElementById('brosurDropZone');
+  if (!dropZone || dropZone.dataset.listenersAdded) return;
+  dropZone.dataset.listenersAdded = 'true';
+
+  ['dragenter', 'dragover'].forEach(eventName => {
+    dropZone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.add('dragover');
+    }, false);
+  });
+
+  ['dragleave', 'drop'].forEach(eventName => {
+    dropZone.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dropZone.classList.remove('dragover');
+    }, false);
+  });
+
+  dropZone.addEventListener('drop', (e) => {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    if (files && files.length > 0) {
+      const fileInput = document.getElementById('localBrosurFileInput');
+      if (fileInput) {
+        fileInput.files = files;
+      }
+      handleLocalFileSelect({ target: { files: files } });
+    }
+  }, false);
+}
+
 window.handleLocalFileSelect = function(event) {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
@@ -2185,7 +2493,8 @@ window.handleLocalFileSelect = function(event) {
     const sizeKB = Math.round(file.size / 1024);
     const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
     const sizeStr = sizeKB > 1024 ? `${sizeMB} MB` : `${sizeKB} KB`;
-    metaEl.textContent = `Ukuran: ${sizeStr} • Format: ${file.type || file.name.split('.').pop().toUpperCase()} • Target: Folder Google Drive`;
+    const autoStatus = getGDriveWebhookUrl() ? '⚡ Auto-Upload Aktif' : '⚠️ Webhook Belum Terhubung';
+    metaEl.textContent = `Ukuran: ${sizeStr} • Format: ${file.type || file.name.split('.').pop().toUpperCase()} • ${autoStatus}`;
   }
 };
 
@@ -2291,13 +2600,78 @@ window.resetBrosurForm = function() {
   updateGeneratedFileName();
 };
 
+async function uploadBrosurToGoogleDrive(file, generatedFileName) {
+  const gdriveWebhookUrl = getGDriveWebhookUrl();
+  if (!gdriveWebhookUrl) {
+    return { success: false, message: 'URL Webhook Google Apps Script belum dikonfigurasi.' };
+  }
+
+  // Baca file lokal menjadi Base64
+  const base64Data = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+
+  const payload = {
+    folderId: '1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc',
+    fileName: generatedFileName || file.name,
+    mimeType: file.type || 'application/pdf',
+    base64: base64Data
+  };
+
+  // Kirim tanpa custom header Content-Type agar browser tidak trigger preflight OPTIONS pada Google Apps Script
+  const response = await fetch(gdriveWebhookUrl, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status} saat menghubungi Webhook Google Drive`);
+  }
+
+  const result = await response.json();
+  return result;
+}
+
+window.promptActionSetup = function() {
+  closeGDrivePromptModal();
+  openGDriveConfigModal();
+};
+
+window.promptActionManual = function() {
+  closeGDrivePromptModal();
+  if (state.generatedSpecificFileName && !state.generatedSpecificFileName.includes('...')) {
+    navigator.clipboard.writeText(state.generatedSpecificFileName).catch(() => {});
+  }
+  // Buka folder Google Drive
+  window.open(GDRIVE_BROSUR_FOLDER_URL, '_blank', 'noopener,noreferrer');
+  
+  // Lanjutkan simpan payload
+  if (pendingBrosurPayload) {
+    const payload = { ...pendingBrosurPayload };
+    pendingBrosurPayload = null;
+    executeSaveBrosurToSupabase(payload);
+  }
+};
+
+window.promptActionSaveMetadataOnly = function() {
+  closeGDrivePromptModal();
+  if (pendingBrosurPayload) {
+    const payload = { ...pendingBrosurPayload };
+    pendingBrosurPayload = null;
+    executeSaveBrosurToSupabase(payload);
+  }
+};
+
 window.submitBrosurForm = async function(event) {
-  event.preventDefault();
+  if (event) event.preventDefault();
 
   const wilayah = document.getElementById('inputBrosurWilayah')?.value || '';
   const catagory = document.getElementById('inputBrosurCategory')?.value;
   const brosurname = document.getElementById('inputBrosurName')?.value;
-  const link = document.getElementById('inputBrosurLink')?.value.trim() || GDRIVE_BROSUR_FOLDER_URL;
+  let link = document.getElementById('inputBrosurLink')?.value.trim() || GDRIVE_BROSUR_FOLDER_URL;
   const catatan = document.getElementById('inputBrosurCatatan')?.value.trim() || '';
 
   if (!wilayah) {
@@ -2315,13 +2689,71 @@ window.submitBrosurForm = async function(event) {
     return;
   }
 
+  const selectedFile = state.selectedLocalBrosurFile;
+  const specificName = state.generatedSpecificFileName || (selectedFile ? selectedFile.name : '');
+  const gdriveWebhookUrl = getGDriveWebhookUrl();
+
+  // Jika file lokal dipilih tapi webhook belum dipasang, tampilkan modal interaktif untuk konfirmasi
+  if (selectedFile && !gdriveWebhookUrl) {
+    pendingBrosurPayload = { wilayah, catagory, brosurname, link, catatan, selectedFile, specificName };
+    openGDrivePromptModal(selectedFile.name);
+    return;
+  }
+
   const btnSubmit = document.getElementById('btnSubmitBrosur');
   if (btnSubmit) {
     btnSubmit.disabled = true;
+  }
+
+  // Jika webhook aktif dan file dipilih: upload file ke Google Drive terlebih dahulu!
+  if (selectedFile && gdriveWebhookUrl) {
+    if (btnSubmit) {
+      btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mengunggah file ke Google Drive (1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc)...';
+    }
+
+    try {
+      const uploadResult = await uploadBrosurToGoogleDrive(selectedFile, specificName);
+      if (uploadResult && uploadResult.success) {
+        // Ambil link view publik langsung dari file yang baru diunggah!
+        link = uploadResult.directLink || uploadResult.fileUrl || link;
+        const linkInput = document.getElementById('inputBrosurLink');
+        if (linkInput) linkInput.value = link;
+      } else {
+        const errMsg = uploadResult?.message || 'Koneksi ke Webhook Apps Script gagal';
+        const continueSave = confirm(`Peringatan: Gagal mengunggah file ke Google Drive (${errMsg}).\n\nApakah Anda tetap ingin menyimpan rekaman ke Supabase dengan link folder?`);
+        if (!continueSave) {
+          if (btnSubmit) {
+            btnSubmit.disabled = false;
+            btnSubmit.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> <span>Simpan ke LogBrosur (Supabase)</span>';
+          }
+          return;
+        }
+      }
+    } catch (uploadErr) {
+      console.error('Error auto-upload Google Drive:', uploadErr);
+      const continueSave = confirm(`Peringatan: Gagal mengunggah file ke Google Drive (${uploadErr.message}).\n\nApakah Anda tetap ingin menyimpan rekaman ke Supabase?`);
+      if (!continueSave) {
+        if (btnSubmit) {
+          btnSubmit.disabled = false;
+          btnSubmit.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> <span>Simpan ke LogBrosur (Supabase)</span>';
+        }
+        return;
+      }
+    }
+  }
+
+  if (btnSubmit) {
     btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan ke Supabase LogBrosur...';
   }
 
-  const fullCatatan = catatan + (state.generatedSpecificFileName ? ` [File: ${state.generatedSpecificFileName}]` : '');
+  await executeSaveBrosurToSupabase({ wilayah, catagory, brosurname, link, catatan, specificName });
+};
+
+async function executeSaveBrosurToSupabase(payload) {
+  const { wilayah, catagory, brosurname, link, catatan, specificName } = payload;
+  const btnSubmit = document.getElementById('btnSubmitBrosur');
+
+  const fullCatatan = catatan + (specificName ? ` [File: ${specificName}]` : '');
 
   // Sesuai skema tabel Supabase LogBrosur:
   // Kolom: catagory, brosurname, lokasibrosur, link, catatan (id dan created_at otomatis dibuat oleh Supabase)
@@ -2408,12 +2840,13 @@ window.submitBrosurForm = async function(event) {
   }
 
   const idMsg = savedItem.id ? `\n(ID Record Supabase: #${savedItem.id})` : '';
-  alert(`Brosur "${brosurname}" untuk wilayah ${wilayah} berhasil direkam ke database LogBrosur Supabase!${idMsg}`);
+  const uploadInfo = link !== GDRIVE_BROSUR_FOLDER_URL ? `\n\nLink File Langsung di Google Drive:\n${link}` : `\n\nFolder Google Drive: ${link}`;
+  alert(`Brosur "${brosurname}" untuk wilayah ${wilayah} berhasil direkam ke database LogBrosur Supabase!${idMsg}${uploadInfo}`);
 
   resetBrosurForm();
   renderBrosurTable();
   switchBrosurTab('list');
-};
+}
 
 function renderBrosurTable() {
   const tbody = document.getElementById('logBrosurTableBody');
