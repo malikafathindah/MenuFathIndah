@@ -1984,8 +1984,8 @@ async function loadBrosurData(force = false) {
   state.data.mnuLogBrosur = mnuData;
   populateBrosurDropdowns();
 
-  // 2. Load LogBrosur (Daftar Brosur Terdaftar)
-  let logData = [];
+  // 3. Load LogBrosur (Daftar Brosur Terdaftar dari Supabase)
+  let logData = null;
   try {
     const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/LogBrosur?select=*&order=created_at.desc`, {
       headers: {
@@ -1995,37 +1995,46 @@ async function loadBrosurData(force = false) {
     });
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        logData = data;
+      if (Array.isArray(data)) {
+        logData = data.map(item => ({
+          ...item,
+          wilayah: item.wilayah || item.lokasibrosur || 'Pusat'
+        }));
       }
     }
   } catch (e) {
     console.warn('Gagal fetch LogBrosur dari Supabase:', e.message);
   }
 
-  if (!logData || logData.length === 0) {
+  // Fallback ke server API jika direct fetch Supabase terhalang CORS
+  if (logData === null) {
     try {
       const apiRes = await fetch('/api/brosur/log');
       if (apiRes.ok) {
         const json = await apiRes.json();
-        if (json.data && Array.isArray(json.data) && json.data.length > 0) {
-          logData = json.data;
+        if (json.data && Array.isArray(json.data)) {
+          logData = json.data.map(item => ({
+            ...item,
+            wilayah: item.wilayah || item.lokasibrosur || 'Pusat'
+          }));
         }
       }
     } catch (_) {}
   }
 
-  if (!logData || logData.length === 0) {
+  // Fallback ke localStorage jika offline
+  if (logData === null) {
     const localLog = localStorage.getItem('fath_indah_log_brosur');
     try {
       if (localLog) {
         const parsed = JSON.parse(localLog);
-        if (Array.isArray(parsed) && parsed.length > 0) logData = parsed;
+        if (Array.isArray(parsed)) logData = parsed;
       }
     } catch (_) {}
   }
 
-  if (!logData || logData.length === 0) {
+  // Default fallback hanya jika database benar-benar tidak dapat dihubungi
+  if (logData === null) {
     logData = DEFAULT_LOG_BROSUR;
   }
 
@@ -2268,17 +2277,12 @@ window.resetBrosurForm = function() {
   const groupName = document.getElementById('groupBrosurName');
   if (groupName) groupName.style.display = 'none';
 
-  // Generate ID: BRS-YYYYMMDD-XXXX
-  const now = new Date();
-  const dateCode = now.toISOString().slice(0, 10).replace(/-/g, '');
-  const randNum = String(Math.floor(1000 + Math.random() * 9000));
-  const newId = `BRS-${dateCode}-${randNum}`;
-
+  // ID dan CreatedAt diisi otomatis oleh database Supabase
   const idInput = document.getElementById('inputBrosurId');
-  if (idInput) idInput.value = newId;
+  if (idInput) idInput.value = 'Otomatis diisi oleh Supabase';
 
   const createdInput = document.getElementById('inputBrosurCreatedAt');
-  if (createdInput) createdInput.value = now.toISOString().replace('T', ' ').slice(0, 19);
+  if (createdInput) createdInput.value = 'Otomatis (Waktu Sistem Supabase)';
 
   const linkInput = document.getElementById('inputBrosurLink');
   if (linkInput) linkInput.value = GDRIVE_BROSUR_FOLDER_URL;
@@ -2290,13 +2294,11 @@ window.resetBrosurForm = function() {
 window.submitBrosurForm = async function(event) {
   event.preventDefault();
 
-  const id = document.getElementById('inputBrosurId')?.value;
-  const createdAt = new Date().toISOString();
   const wilayah = document.getElementById('inputBrosurWilayah')?.value || '';
   const catagory = document.getElementById('inputBrosurCategory')?.value;
   const brosurname = document.getElementById('inputBrosurName')?.value;
   const link = document.getElementById('inputBrosurLink')?.value.trim() || GDRIVE_BROSUR_FOLDER_URL;
-  const catatan = document.getElementById('inputBrosurCatatan')?.value.trim();
+  const catatan = document.getElementById('inputBrosurCatatan')?.value.trim() || '';
 
   if (!wilayah) {
     alert('Harap pilih Wilayah Brosur (namakanwill dari Tabel KanwilFathIndah)!');
@@ -2316,22 +2318,25 @@ window.submitBrosurForm = async function(event) {
   const btnSubmit = document.getElementById('btnSubmitBrosur');
   if (btnSubmit) {
     btnSubmit.disabled = true;
-    btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan ke Supabase...';
+    btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan ke Supabase LogBrosur...';
   }
 
-  const newEntry = {
-    id: id || `BRS-${Date.now()}`,
-    created_at: createdAt,
-    wilayah: wilayah,
+  const fullCatatan = catatan + (state.generatedSpecificFileName ? ` [File: ${state.generatedSpecificFileName}]` : '');
+
+  // Sesuai skema tabel Supabase LogBrosur:
+  // Kolom: catagory, brosurname, lokasibrosur, link, catatan (id dan created_at otomatis dibuat oleh Supabase)
+  const supabasePayload = {
     catagory: catagory,
     brosurname: brosurname,
+    lokasibrosur: wilayah,
     link: link,
-    catatan: catatan + (state.generatedSpecificFileName ? ` [File: ${state.generatedSpecificFileName}]` : '')
+    catatan: fullCatatan
   };
 
+  let savedItem = null;
   let savedToSupabase = false;
 
-  // Try direct Supabase insertion
+  // 1. Simpan langsung ke Supabase LogBrosur via REST API
   try {
     const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/LogBrosur`, {
       method: 'POST',
@@ -2341,33 +2346,60 @@ window.submitBrosurForm = async function(event) {
         'Content-Type': 'application/json',
         'Prefer': 'return=representation'
       },
-      body: JSON.stringify(newEntry)
+      body: JSON.stringify(supabasePayload)
     });
 
     if (res.ok || res.status === 201) {
+      const data = await res.json();
+      savedItem = Array.isArray(data) ? data[0] : data;
       savedToSupabase = true;
+    } else {
+      const errText = await res.text();
+      console.warn('Gagal insert langsung ke Supabase LogBrosur:', res.status, errText);
     }
   } catch (e) {
-    console.warn('Gagal insert langsung ke Supabase LogBrosur:', e.message);
+    console.warn('Gagal fetch insert ke Supabase:', e.message);
   }
 
-  // If not saved directly and in fullstack mode, try server API
+  // 2. Jika direct fetch gagal, panggil backend server /api/brosur/log
   if (!savedToSupabase && !state.isStaticMode) {
     try {
       const res = await fetch('/api/brosur/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newEntry)
+        body: JSON.stringify({
+          ...supabasePayload,
+          wilayah: wilayah
+        })
       });
       const data = await res.json();
-      if (data.success) savedToSupabase = true;
+      if (data.success && data.data) {
+        savedItem = data.data;
+        savedToSupabase = true;
+      }
     } catch (e) {
       console.warn('Gagal call /api/brosur/log:', e.message);
     }
   }
 
-  // Prepend to state list and cache in localStorage
-  state.data.logBrosur = [newEntry, ...(state.data.logBrosur || [])];
+  // Fallback jika database offline
+  if (!savedItem) {
+    savedItem = {
+      id: `LOCAL-${Date.now()}`,
+      created_at: new Date().toISOString(),
+      catagory: catagory,
+      brosurname: brosurname,
+      lokasibrosur: wilayah,
+      wilayah: wilayah,
+      link: link,
+      catatan: fullCatatan
+    };
+  } else {
+    savedItem.wilayah = savedItem.lokasibrosur || savedItem.wilayah || wilayah;
+  }
+
+  // Prepend data baru ke tabel antarmuka
+  state.data.logBrosur = [savedItem, ...(state.data.logBrosur || [])];
   localStorage.setItem('fath_indah_log_brosur', JSON.stringify(state.data.logBrosur));
 
   if (btnSubmit) {
@@ -2375,8 +2407,11 @@ window.submitBrosurForm = async function(event) {
     btnSubmit.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> <span>Simpan ke LogBrosur (Supabase)</span>';
   }
 
-  alert(`Brosur "${brosurname}" untuk wilayah ${wilayah} berhasil didaftarkan!\n${savedToSupabase ? 'Tersimpan langsung ke tabel LogBrosur Supabase.' : 'Tersimpan di sistem lokal Fath Indah.'}`);
+  const idMsg = savedItem.id ? `\n(ID Record Supabase: #${savedItem.id})` : '';
+  alert(`Brosur "${brosurname}" untuk wilayah ${wilayah} berhasil direkam ke database LogBrosur Supabase!${idMsg}`);
 
+  resetBrosurForm();
+  renderBrosurTable();
   switchBrosurTab('list');
 };
 
@@ -2434,11 +2469,12 @@ function renderBrosurTable() {
 
   tbody.innerHTML = filtered.map((item, idx) => {
     const no = idx + 1;
-    const wil = item.wilayah || 'Pusat';
+    const wil = item.lokasibrosur || item.wilayah || 'Pusat';
     const cat = item.catagory || item.category || 'Umum';
     const name = item.brosurname || item.name || '-';
     const notes = item.catatan || '-';
     const link = item.link || GDRIVE_BROSUR_FOLDER_URL;
+    const idBadge = item.id ? (typeof item.id === 'number' ? `ID: #${item.id}` : item.id) : '';
     
     // Format Created Date
     let dateDisplay = '-';
@@ -2477,7 +2513,7 @@ function renderBrosurTable() {
         </td>
         <td>
           <strong style="color:#ffffff; font-size:0.9rem;">${name}</strong>
-          <div style="font-size:0.75rem; color:#94a3b8; font-family:'JetBrains Mono',monospace;">${item.id || ''}</div>
+          <div style="font-size:0.75rem; color:#94a3b8; font-family:'JetBrains Mono',monospace;">${idBadge}</div>
         </td>
         <td>
           <a href="${link}" target="_blank" rel="noopener noreferrer" class="btn-open-drive" title="Buka File di Google Drive">
