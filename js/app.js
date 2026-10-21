@@ -1755,12 +1755,12 @@ const DEFAULT_CAT_PAKET = [
 
 // Master data fallback untuk KanwilFathIndah jika tabel di Supabase belum selesai sinkronisasi izin RLS
 const DEFAULT_KANWIL_FATH_INDAH = [
-  { id: 1, namakanwill: 'Pusat' },
-  { id: 2, namakanwill: 'Solo Raya' },
-  { id: 3, namakanwill: 'Samarinda' },
-  { id: 4, namakanwill: 'Surabaya' },
-  { id: 5, namakanwill: 'Pemalang' },
-  { id: 6, namakanwill: 'Pekalongan' }
+  { id: 1, namakanwil: 'Pusat', namakanwill: 'Pusat' },
+  { id: 2, namakanwil: 'Solo Raya', namakanwill: 'Solo Raya' },
+  { id: 3, namakanwil: 'Samarinda', namakanwill: 'Samarinda' },
+  { id: 4, namakanwil: 'Surabaya', namakanwill: 'Surabaya' },
+  { id: 5, namakanwil: 'Pemalang', namakanwill: 'Pemalang' },
+  { id: 6, namakanwil: 'Pekalongan', namakanwill: 'Pekalongan' }
 ];
 
 // Master data fallback untuk MnuLogBrosur jika tabel di Supabase belum selesai sinkronisasi izin RLS
@@ -1853,10 +1853,10 @@ window.switchBrosurTab = function(tabName) {
 };
 
 async function loadBrosurData(force = false) {
-  // 0. Load KanwilFathIndah (Master Wilayah Brosur dari tabel KanwilFathIndah header namakanwill)
+  // 0. Load KanwilFathIndah (Master Wilayah Brosur dari tabel KanwilFathIndah header namakanwil)
   let kanwilData = [];
   try {
-    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/KanwilFathIndah?select=*&order=namakanwill.asc`, {
+    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/KanwilFathIndah?select=*`, {
       headers: {
         'apikey': SUPABASE_CONFIG.anonKey,
         'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
@@ -2056,11 +2056,11 @@ async function loadBrosurData(force = false) {
 }
 
 function populateBrosurDropdowns() {
-  // 1. Wilayah Brosur: ONLY from KanwilFathIndah header namakanwill (Requirement #4)
+  // 1. Wilayah Brosur: ONLY from KanwilFathIndah header namakanwil (Requirement #1)
   const kanwilList = (state.data.kanwilFathIndah && state.data.kanwilFathIndah.length > 0)
     ? state.data.kanwilFathIndah
     : DEFAULT_KANWIL_FATH_INDAH;
-  const wilNames = [...new Set(kanwilList.map(k => (k.namakanwill || k.namakanwil || '').trim()).filter(Boolean))].sort();
+  const wilNames = [...new Set(kanwilList.map(k => (k.namakanwil || k.namakanwill || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id'));
 
   // Populate Table Filter Wilayah
   const wilFilter = document.getElementById('brosurWilayahFilter');
@@ -2552,6 +2552,8 @@ window.onJumlahHariChange = function() {
   if (select && groupCustom) {
     if (select.value === 'custom') {
       groupCustom.style.display = 'block';
+      const customInput = document.getElementById('inputBrosurCustomHari');
+      if (customInput) customInput.focus();
     } else {
       groupCustom.style.display = 'none';
       const customInput = document.getElementById('inputBrosurCustomHari');
@@ -2561,19 +2563,38 @@ window.onJumlahHariChange = function() {
   updateBrosurCompositeName();
 };
 
+// Helper format custom hari, contoh: "29 34" -> "29H 34H" (Requirement #2)
+function formatCustomHariBrosur(input) {
+  if (!input) return '';
+  const tokens = input.trim().split(/[\s,/-]+/).filter(Boolean);
+  if (tokens.length === 0) return '';
+  const formatted = tokens.map(t => {
+    const num = t.replace(/\D/g, '');
+    if (num) return `${num}H`;
+    return t.toUpperCase();
+  }).filter(Boolean);
+  return formatted.join(' ');
+}
+
 window.updateBrosurCompositeName = function() {
   const wilayah = (document.getElementById('inputBrosurWilayah')?.value || '').trim();
   const paket = (document.getElementById('inputBrosurNamaPaket')?.value || '').trim();
   const hariSelect = document.getElementById('inputBrosurJumlahHari')?.value || '';
-  let hari = hariSelect;
+  let partHari = '[Jumlah Hari]';
   if (hariSelect === 'custom') {
-    hari = (document.getElementById('inputBrosurCustomHari')?.value || '').trim();
+    const rawCustom = (document.getElementById('inputBrosurCustomHari')?.value || '').trim();
+    const formattedCustom = formatCustomHariBrosur(rawCustom);
+    if (formattedCustom) {
+      partHari = `[${formattedCustom}]`;
+    }
+  } else if (hariSelect) {
+    partHari = `[${hariSelect}D]`;
   }
   const tglBerangkat = document.getElementById('inputBrosurTglBerangkat')?.value || '';
 
   const displayBox = document.getElementById('generatedSpecificFileName');
 
-  if (!wilayah && !paket && !hari && !tglBerangkat) {
+  if (!wilayah && !paket && !hariSelect && !tglBerangkat) {
     if (displayBox) {
       displayBox.textContent = '[Wilayah] [Nama Paket] [Jumlah Hari] [Tanggal Berangkat]';
       displayBox.style.color = 'var(--text-muted)';
@@ -2584,7 +2605,6 @@ window.updateBrosurCompositeName = function() {
 
   const partWilayah = wilayah ? `[${wilayah}]` : '[Wilayah]';
   const partPaket = paket ? `[${paket}]` : '[Nama Paket]';
-  const partHari = hari ? `[${hari}D]` : '[Jumlah Hari]';
 
   let partTgl = '[Tanggal Berangkat]';
   if (tglBerangkat) {
@@ -2599,7 +2619,7 @@ window.updateBrosurCompositeName = function() {
     }
   }
 
-  // Requirement #2: [Wilayah] [Nama Paket] [Jumlah Hari +"D"] [dd mmm yyyy]
+  // Format: [Wilayah] [Nama Paket] [Jumlah Hari / 29H 34H] [dd mmm yyyy]
   const combinedName = `${partWilayah} ${partPaket} ${partHari} ${partTgl}`;
   state.generatedSpecificFileName = combinedName;
   if (displayBox) {
@@ -2750,20 +2770,25 @@ window.submitBrosurForm = async function(event) {
   const catatan = (document.getElementById('inputBrosurCatatan')?.value || '').trim();
 
   // Requirement #2: 3 Bagian + [Wilayah] digabung menjadi namapaket
-  // Format: [Wilayah] [Nama Paket] [Jumlah Hari +"D"] [dd mmm yyyy]
+  // Format: [Wilayah] [Nama Paket] [Jumlah Hari / 29H 34H] [dd mmm yyyy]
   const paket = (document.getElementById('inputBrosurNamaPaket')?.value || '').trim();
   const hariSelect = document.getElementById('inputBrosurJumlahHari')?.value || '';
-  let hari = hariSelect;
+  let partHari = '';
   if (hariSelect === 'custom') {
-    hari = (document.getElementById('inputBrosurCustomHari')?.value || '').trim();
+    const rawCustom = (document.getElementById('inputBrosurCustomHari')?.value || '').trim();
+    const formattedCustom = formatCustomHariBrosur(rawCustom);
+    if (formattedCustom) {
+      partHari = `[${formattedCustom}]`;
+    }
+  } else if (hariSelect) {
+    partHari = `[${hariSelect}D]`;
   }
   const tglBerangkat = document.getElementById('inputBrosurTglBerangkat')?.value || '';
 
   let generatedNamaPaket = '';
-  if (wilayah || paket || hari || tglBerangkat) {
+  if (wilayah || paket || partHari || tglBerangkat) {
     const partWilayah = wilayah ? `[${wilayah}]` : '';
     const partPaket = paket ? `[${paket}]` : '';
-    const partHari = hari ? `[${hari}D]` : '';
     let partTgl = '';
     if (tglBerangkat) {
       const parts = tglBerangkat.split('-');
