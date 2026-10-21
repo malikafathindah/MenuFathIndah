@@ -1756,11 +1756,15 @@ const DEFAULT_CAT_PAKET = [
 // Master data fallback untuk KanwilFathIndah jika tabel di Supabase belum selesai sinkronisasi izin RLS
 const DEFAULT_KANWIL_FATH_INDAH = [
   { id: 1, namakanwil: 'Pusat', namakanwill: 'Pusat' },
-  { id: 2, namakanwil: 'Solo Raya', namakanwill: 'Solo Raya' },
-  { id: 3, namakanwil: 'Samarinda', namakanwill: 'Samarinda' },
-  { id: 4, namakanwil: 'Surabaya', namakanwill: 'Surabaya' },
-  { id: 5, namakanwil: 'Pemalang', namakanwill: 'Pemalang' },
-  { id: 6, namakanwil: 'Pekalongan', namakanwill: 'Pekalongan' }
+  { id: 2, namakanwil: 'Jabodetabek', namakanwill: 'Jabodetabek' },
+  { id: 3, namakanwil: 'Solo Raya', namakanwill: 'Solo Raya' },
+  { id: 4, namakanwil: 'Samarinda', namakanwill: 'Samarinda' },
+  { id: 5, namakanwil: 'Surabaya', namakanwill: 'Surabaya' },
+  { id: 6, namakanwil: 'Pemalang', namakanwill: 'Pemalang' },
+  { id: 7, namakanwil: 'Pekalongan', namakanwill: 'Pekalongan' },
+  { id: 8, namakanwil: 'Jawa Barat', namakanwill: 'Jawa Barat' },
+  { id: 9, namakanwil: 'Jawa Tengah', namakanwill: 'Jawa Tengah' },
+  { id: 10, namakanwil: 'Jawa Timur', namakanwill: 'Jawa Timur' }
 ];
 
 // Master data fallback untuk MnuLogBrosur jika tabel di Supabase belum selesai sinkronisasi izin RLS
@@ -1856,7 +1860,7 @@ async function loadBrosurData(force = false) {
   // 0. Load KanwilFathIndah (Master Wilayah Brosur dari tabel KanwilFathIndah header namakanwil)
   let kanwilData = [];
   try {
-    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/KanwilFathIndah?select=*`, {
+    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/KanwilFathIndah?select=namakanwil`, {
       headers: {
         'apikey': SUPABASE_CONFIG.anonKey,
         'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
@@ -1866,6 +1870,19 @@ async function loadBrosurData(force = false) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
         kanwilData = data;
+      }
+    } else {
+      const resAll = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/KanwilFathIndah?select=*`, {
+        headers: {
+          'apikey': SUPABASE_CONFIG.anonKey,
+          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+        }
+      });
+      if (resAll.ok) {
+        const dataAll = await resAll.json();
+        if (Array.isArray(dataAll) && dataAll.length > 0) {
+          kanwilData = dataAll;
+        }
       }
     }
   } catch (e) {
@@ -2060,7 +2077,25 @@ function populateBrosurDropdowns() {
   const kanwilList = (state.data.kanwilFathIndah && state.data.kanwilFathIndah.length > 0)
     ? state.data.kanwilFathIndah
     : DEFAULT_KANWIL_FATH_INDAH;
-  const wilNames = [...new Set(kanwilList.map(k => (k.namakanwil || k.namakanwill || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'id'));
+
+  const listNames = kanwilList.map(k => (k.namakanwil || k.namakanwill || '').trim()).filter(Boolean);
+
+  // Ambil juga wilayah yang sudah tercatat pada riwayat LogBrosur (seperti Jabodetabek, dll)
+  const logWilayah = (state.data.logBrosur || []).map(l => {
+    if (l.wilayah) return l.wilayah.trim();
+    if (l.lokasibrosur) return l.lokasibrosur.trim();
+    if (l.namapaket && l.namapaket.startsWith('[')) {
+      const m = l.namapaket.match(/^\[([^\]]+)\]/);
+      if (m) return m[1].trim();
+    }
+    return '';
+  }).filter(Boolean);
+
+  const defaultNames = DEFAULT_KANWIL_FATH_INDAH.map(k => k.namakanwil);
+
+  const wilNames = [...new Set([...listNames, ...logWilayah, ...defaultNames, 'Jabodetabek'])]
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b, 'id'));
 
   // Populate Table Filter Wilayah
   const wilFilter = document.getElementById('brosurWilayahFilter');
