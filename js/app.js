@@ -6684,8 +6684,111 @@ window.editEmployeeBio = function(nik) {
 };
 
 // --------------------------------------------------------------------------
-// 13.2 FORMULIR BIO KARYAWAN (mod_bio_karyawan)
+// 13.2 FORMULIR BIO KARYAWAN (mod_bio_karyawan) - 6 CLUSTERS TERPADU
 // --------------------------------------------------------------------------
+
+// Kamus Kodepos Cepat Indonesia untuk Instant Auto-Fill
+const INTERNAL_KODEPOS_DB = {
+  '10110': { kelurahan: 'Petojo Selatan', kecamatan: 'Gambir', kota: 'Kota Jakarta Pusat', provinsi: 'DKI Jakarta' },
+  '10120': { kelurahan: 'Gambir', kecamatan: 'Gambir', kota: 'Kota Jakarta Pusat', provinsi: 'DKI Jakarta' },
+  '12110': { kelurahan: 'Gunung', kecamatan: 'Kebayoran Baru', kota: 'Kota Jakarta Selatan', provinsi: 'DKI Jakarta' },
+  '15111': { kelurahan: 'Tangerang', kecamatan: 'Tangerang', kota: 'Kota Tangerang', provinsi: 'Banten' },
+  '16111': { kelurahan: 'Gudang', kecamatan: 'Bogor Tengah', kota: 'Kota Bogor', provinsi: 'Jawa Barat' },
+  '16411': { kelurahan: 'Depok', kecamatan: 'Pancasari', kota: 'Kota Depok', provinsi: 'Jawa Barat' },
+  '17111': { kelurahan: 'Bekasi Jaya', kecamatan: 'Bekasi Timur', kota: 'Kota Bekasi', provinsi: 'Jawa Barat' },
+  '17142': { kelurahan: 'Marga Mulya', kecamatan: 'Bekasi Utara', kota: 'Kota Bekasi', provinsi: 'Jawa Barat' },
+  '40111': { kelurahan: 'Braga', kecamatan: 'Sumur Bandung', kota: 'Kota Bandung', provinsi: 'Jawa Barat' },
+  '40132': { kelurahan: 'Lebak Siliwangi', kecamatan: 'Coblong', kota: 'Kota Bandung', provinsi: 'Jawa Barat' },
+  '50111': { kelurahan: 'Kauman', kecamatan: 'Semarang Tengah', kota: 'Kota Semarang', provinsi: 'Jawa Tengah' },
+  '53111': { kelurahan: 'Kranji', kecamatan: 'Purwokerto Timur', kota: 'Kabupaten Banyumas', provinsi: 'Jawa Tengah' },
+  '52311': { kelurahan: 'Kebondalem', kecamatan: 'Pemalang', kota: 'Kabupaten Pemalang', provinsi: 'Jawa Tengah' },
+  '57111': { kelurahan: 'Keprabon', kecamatan: 'Banjarsari', kota: 'Kota Surakarta', provinsi: 'Jawa Tengah' },
+  '57511': { kelurahan: 'Sukoharjo', kecamatan: 'Sukoharjo', kota: 'Kabupaten Sukoharjo', provinsi: 'Jawa Tengah' },
+  '55111': { kelurahan: 'Ngupasan', kecamatan: 'Gondomanan', kota: 'Kota Yogyakarta', provinsi: 'DI Yogyakarta' },
+  '60111': { kelurahan: 'Surabaya', kecamatan: 'Tegalsari', kota: 'Kota Surabaya', provinsi: 'Jawa Timur' },
+  '65111': { kelurahan: 'Klojen', kecamatan: 'Klojen', kota: 'Kota Malang', provinsi: 'Jawa Timur' },
+  '20111': { kelurahan: 'Kesawan', kecamatan: 'Medan Barat', kota: 'Kota Medan', provinsi: 'Sumatera Utara' },
+  '75111': { kelurahan: 'Pasar Pagi', kecamatan: 'Samarinda Kota', kota: 'Kota Samarinda', provinsi: 'Kalimantan Timur' },
+  '90111': { kelurahan: 'Pattunuang', kecamatan: 'Wajo', kota: 'Kota Makassar', provinsi: 'Sulawesi Selatan' },
+  '80111': { kelurahan: 'Dangin Puri', kecamatan: 'Denpasar Timur', kota: 'Kota Denpasar', provinsi: 'Bali' }
+};
+
+window.handleKodePosInput = function(val) {
+  const clean = String(val || '').trim();
+  if (clean.length === 5) {
+    window.lookupKodepos(clean);
+  } else {
+    const feedback = document.getElementById('kodeposFeedback');
+    if (feedback) feedback.innerHTML = '';
+  }
+};
+
+window.triggerKodePosLookup = function() {
+  const input = document.getElementById('bioKodePos');
+  const val = input ? input.value.trim() : '';
+  if (!val) {
+    alert('Masukkan 5 digit angka Kode Pos.');
+    if (input) input.focus();
+    return;
+  }
+  window.lookupKodepos(val);
+};
+
+window.lookupKodepos = async function(kodepos) {
+  const clean = String(kodepos || '').trim();
+  const feedback = document.getElementById('kodeposFeedback');
+  if (feedback) feedback.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan"></i> Mencari alamat...';
+
+  // 1. Cek kamus lokal
+  if (INTERNAL_KODEPOS_DB[clean]) {
+    const data = INTERNAL_KODEPOS_DB[clean];
+    applyKodeposData(data, clean, 'Database Internal');
+    return;
+  }
+
+  // 2. Cek API Public Kodepos
+  try {
+    const res = await fetch(`https://kodepos-266e6.firebaseapp.com/search?q=${clean}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.data && json.data.length > 0) {
+        const item = json.data[0];
+        const data = {
+          kelurahan: item.urban || item.kelurahan || '',
+          kecamatan: item.subdistrict || item.kecamatan || '',
+          kota: item.city || item.kabupaten || item.kota || '',
+          provinsi: item.province || item.provinsi || ''
+        };
+        applyKodeposData(data, clean, 'Online Kodepos API');
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn('External Kodepos API fetch failed:', err);
+  }
+
+  // Jika tidak ditemukan
+  if (feedback) {
+    feedback.innerHTML = `<span style="color:#fbbf24;"><i class="fa-solid fa-circle-exclamation"></i> Kodepos ${clean} tidak ditemukan di database otomatis. Silakan isi Kelurahan/Kecamatan/Kota secara manual.</span>`;
+  }
+};
+
+function applyKodeposData(data, kodepos, sourceName) {
+  const setEl = (id, val) => {
+    const el = document.getElementById(id);
+    if (el && val) el.value = val;
+  };
+
+  setEl('bioKelurahan', data.kelurahan);
+  setEl('bioKecamatan', data.kecamatan);
+  setEl('bioKota', data.kota);
+  setEl('bioProvinsi', data.provinsi);
+
+  const feedback = document.getElementById('kodeposFeedback');
+  if (feedback) {
+    feedback.innerHTML = `<span style="color:#34d399;"><i class="fa-solid fa-circle-check"></i> Alamat terdeteksi: <strong>${data.kelurahan}, ${data.kecamatan}, ${data.kota}, ${data.provinsi}</strong> (${sourceName})</span>`;
+  }
+}
 
 function initBioKaryawanView() {
   if (state.hr.selectedEmployeeNik) {
@@ -6704,6 +6807,8 @@ function resetBioKaryawanForm() {
     nikInput.removeAttribute('readonly');
     nikInput.style.opacity = '1';
   }
+  const feedback = document.getElementById('kodeposFeedback');
+  if (feedback) feedback.innerHTML = '';
 }
 
 function populateBioKaryawanFormWithNik(nik) {
@@ -6716,42 +6821,72 @@ function populateBioKaryawanFormWithNik(nik) {
     if (el) el.value = val !== undefined && val !== null ? val : '';
   };
 
-  // 1. Pokok Kepegawaian
+  // CLUSTER 1: Data Pribadi Karyawan
   setVal('bioNik', emp.nik);
-  setVal('bioNama', emp.nama_karyawan || emp.nama);
-  setVal('bioJenisKelamin', emp.jenis_kelamin || 'Laki-laki');
-  setVal('bioJabatan', emp.jabatan);
-  setVal('bioDivisi', emp.divisi || emp.departemen);
-  setVal('bioKantor', emp.kantor || emp.kanwil);
-  setVal('bioStatusEmp', emp.status_emp || 'PKWTT');
-  setVal('bioTanggalMasuk', emp.tanggal_masuk ? String(emp.tanggal_masuk).split('T')[0] : '');
-  setVal('bioStatus', emp.status || 'Aktif');
-
-  // 2. Data Pribadi & Alamat
-  setVal('bioTempatLahir', emp.tempat_lahir);
+  setVal('bioNama', emp.nama_karyawan || emp.nama || emp['Nama Karyawan']);
+  setVal('bioJenisKelamin', emp.jenis_kelamin || emp['Jenis Kelamin'] || 'Laki-laki');
+  setVal('bioGolDarah', emp.golongan_darah || emp['Golongan Darah'] || '-');
+  setVal('bioTempatLahir', emp.tempat_lahir || emp['Tempat Lahir']);
   setVal('bioTanggalLahir', emp.tanggal_lahir ? String(emp.tanggal_lahir).split('T')[0] : '');
   setVal('bioAgama', emp.agama || 'Islam');
-  setVal('bioStatusNikah', emp.status_nikah || 'Menikah');
-  setVal('bioPendidikan', emp.pendidikan_terakhir || 'S1');
-  setVal('bioHp', emp.nomor_hp);
-  setVal('bioEmail', emp.email !== '-' ? emp.email : '');
-  setVal('bioAlamat', emp.alamat);
-  setVal('bioKota', emp.kota_kabupaten || emp.kota);
-  setVal('bioProvinsi', emp.provinsi);
-  setVal('bioKodePos', emp.kode_pos);
+  setVal('bioStatusNikah', emp.status_nikah || emp.statusnikah || 'Menikah');
+  setVal('bioStatusEmp', emp.status_emp || emp.STATUSEMP || emp.statuskaryawan || 'PKWTT');
+  setVal('bioStatus', emp.status || emp.Status || 'Aktif');
+  setVal('bioDivisi', emp.divisi || emp.departemen || emp.dept || 'Top Manajemen');
+  setVal('bioJabatan', emp.jabatan || emp['Jabatan'] || 'Staff');
+  setVal('bioFungsional', emp.fungsional || emp['Funsional'] || '');
+  setVal('bioKantor', emp.kantor || emp.kanwil || 'Pusat');
+  setVal('bioTanggalMasuk', emp.tanggal_masuk ? String(emp.tanggal_masuk).split('T')[0] : (emp.tglmasuk ? String(emp.tglmasuk).split('T')[0] : ''));
 
-  // 3. Dokumen Legalitas & Kontak Darurat
-  setVal('bioNoKtp', emp.no_ktp);
-  setVal('bioNoKk', emp.no_kk);
-  setVal('bioNpwp', emp.npwp);
-  setVal('bioBpjsKes', emp.bpjs_kesehatan);
-  setVal('bioBpjsTk', emp.bpjs_ketenagakerjaan);
-  setVal('bioFotoUrl', emp.foto_url || emp.upload_foto);
+  // CLUSTER 2: Alamat Lengkap Karyawan
+  setVal('bioAlamat', emp.alamat || emp['Alamat Rumah Lengkap'] || emp.alamatktp);
+  setVal('bioKodePos', emp.kode_pos || emp['Kode Pos'] || emp.kodepos);
+  setVal('bioKelurahan', emp.kelurahan || emp['Kelurahan/Desa']);
+  setVal('bioKecamatan', emp.kecamatan || emp['Kecamatan']);
+  setVal('bioKota', emp.kota_kabupaten || emp['Kabupaten/Kota'] || emp.kota);
+  setVal('bioProvinsi', emp.provinsi || emp['Provinsi']);
+  setVal('bioHp', emp.nomor_hp || emp['Nomor Telephone/HP'] || emp.nomortelepon || emp.no_telepon || emp.nohp);
+  setVal('bioEmail', emp.email && emp.email !== '-' ? emp.email : '');
+
+  // CLUSTER 3: Riwayat Pendidikan Terakhir
+  setVal('bioPendidikan', emp.pendidikan_terakhir || emp['Pendidikan Terakhir'] || 'S1');
+  setVal('bioJurusan', emp.jurusan || emp['Jurusan Pendidikan Terakhir']);
+  setVal('bioLembagaPendidikan', emp.lembaga_pendidikan || emp['Nama Lembaga Pendidikan']);
+
+  // CLUSTER 4: Data Keluarga & Tanggungan
+  setVal('bioNamaIbuKandung', emp.nama_ibu_kandung || emp['Nama Ibu Kandung']);
+  setVal('bioNamaPasangan', emp.nama_pasangan || emp['Nama Suami/Istri']);
+  setVal('bioTglLahirPasangan', emp.tgl_lahir_pasangan ? String(emp.tgl_lahir_pasangan).split('T')[0] : (emp['Tanggal Lahir Suami/Istri'] ? String(emp['Tanggal Lahir Suami/Istri']).split('T')[0] : ''));
+  setVal('bioAnak1Nama', emp.anak_1_nama || emp['Nama Anak Kandung 1']);
+  setVal('bioAnak1TglLahir', emp.anak_1_tgl_lahir ? String(emp.anak_1_tgl_lahir).split('T')[0] : '');
+  setVal('bioAnak2Nama', emp.anak_2_nama || emp['Nama Anak Kandung 2']);
+  setVal('bioAnak2TglLahir', emp.anak_2_tgl_lahir ? String(emp.anak_2_tgl_lahir).split('T')[0] : '');
+  setVal('bioAnak3Nama', emp.anak_3_nama || emp['Nama Anak Kandung 3']);
+  setVal('bioAnak3TglLahir', emp.anak_3_tgl_lahir ? String(emp.anak_3_tgl_lahir).split('T')[0] : '');
+  setVal('bioAnak4Nama', emp.anak_4_nama || emp['Nama Anak Kandung 4']);
+  setVal('bioAnak4TglLahir', emp.anak_4_tgl_lahir ? String(emp.anak_4_tgl_lahir).split('T')[0] : '');
+
+  // CLUSTER 5: Dokumen Kependudukan & BPJS
+  setVal('bioNoKtp', emp.no_ktp || emp['Nomor Kartu Tanda Penduduk (KTP)'] || emp.noktp);
+  setVal('bioNoKk', emp.no_kk || emp['Nomor Kartu Keluarga (KK)']);
+  setVal('bioNpwp', emp.npwp || emp['NPWP']);
+  setVal('bioBpjsTk', emp.bpjs_ketenagakerjaan || emp['Nomor BP Ketenagakerjaan'] || emp.bpjstk);
+  setVal('bioBpjsKes', emp.bpjs_kesehatan || emp['Nomor BPJS Kesehatan'] || emp.bpjskes);
+  setVal('bioPenanggungBpjs', emp.penanggung_bpjs || emp['Penanggung BPJS Kesehatan'] || 'Perusahaan');
+  setVal('bioFotoUrl', emp.upload_foto || emp.foto_url || emp['UploadFoto']);
+  setVal('bioUploadKtp', emp.upload_ktp || emp['UploadKTP']);
+  setVal('bioUploadNpwp', emp.upload_npwp || emp['UploadNPWP']);
+  setVal('bioUploadKk', emp.upload_kk || emp['UploadKK']);
   setVal('bioDaruratNama', emp.kontak_darurat_nama || emp.nama_pasangan || emp.nama_ibu_kandung);
   setVal('bioDaruratHp', emp.kontak_darurat_hp || emp.nomor_hp);
   setVal('bioDaruratHub', emp.kontak_darurat_hubungan || 'Keluarga');
 
-  // Lock NIK when editing existing employee
+  // CLUSTER 6: Informasi Rekening Bank
+  setVal('bioBankAtasNama', emp.bank_atas_nama || emp['Nama Di Bank'] || emp.nama_karyawan || emp.nama);
+  setVal('bioNamaBank', emp.nama_bank || emp['Nama Bank'] || emp.bank || 'BSI');
+  setVal('bioNoRekening', emp.no_rekening || emp['No Rekening'] || emp.norekening);
+
+  // Lock NIK saat editing agar primary key tidak terduplikasi
   const nikInput = document.getElementById('bioNik');
   if (nikInput) {
     nikInput.setAttribute('readonly', 'readonly');
@@ -6771,45 +6906,83 @@ window.handleBioKaryawanSubmit = async function(event) {
   const nama = getVal('bioNama');
 
   if (!nik || !nama) {
-    alert('NIK dan Nama Lengkap Karyawan wajib diisi!');
+    alert('Nomor Induk Karyawan (NIK) dan Nama Karyawan wajib diisi!');
+    const targetEl = !nik ? document.getElementById('bioNik') : document.getElementById('bioNama');
+    if (targetEl) targetEl.focus();
     return;
   }
 
-  // Payload terstruktur sesuai kolom tabel Supabase "Bio_Karyawan" / "Bio Karyawan"
+  // Payload lengkap terpadu mencakup seluruh 6 Cluster
   const payload = {
+    // CLUSTER 1: Data Pribadi Karyawan
     nik: nik,
     nama_karyawan: nama,
     jenis_kelamin: getVal('bioJenisKelamin') || 'Laki-laki',
-    jabatan: getVal('bioJabatan') || 'Staff',
-    divisi: getVal('bioDivisi') || 'Top Manajemen',
-    kantor: getVal('bioKantor') || 'Pusat',
-    status_emp: getVal('bioStatusEmp') || 'PKWTT',
-    tanggal_masuk: getVal('bioTanggalMasuk') || null,
-    status: getVal('bioStatus') || 'Aktif',
-
+    golongan_darah: getVal('bioGolDarah') || '-',
     tempat_lahir: getVal('bioTempatLahir') || null,
     tanggal_lahir: getVal('bioTanggalLahir') || null,
     agama: getVal('bioAgama') || 'Islam',
     status_nikah: getVal('bioStatusNikah') || 'Menikah',
-    pendidikan_terakhir: getVal('bioPendidikan') || null,
-    nomor_hp: getVal('bioHp') || null,
-    email: getVal('bioEmail') || null,
+    status_emp: getVal('bioStatusEmp') || 'PKWTT',
+    status: getVal('bioStatus') || 'Aktif',
+    divisi: getVal('bioDivisi') || 'Top Manajemen',
+    jabatan: getVal('bioJabatan') || 'Staff',
+    fungsional: getVal('bioFungsional') || null,
+    kantor: getVal('bioKantor') || 'Pusat',
+    tanggal_masuk: getVal('bioTanggalMasuk') || null,
+
+    // CLUSTER 2: Alamat Lengkap Karyawan
     alamat: getVal('bioAlamat') || null,
+    kode_pos: getVal('bioKodePos') || null,
+    kelurahan: getVal('bioKelurahan') || null,
+    kecamatan: getVal('bioKecamatan') || null,
     kota_kabupaten: getVal('bioKota') || null,
     provinsi: getVal('bioProvinsi') || null,
-    kode_pos: getVal('bioKodePos') || null,
+    nomor_hp: getVal('bioHp') || null,
+    email: getVal('bioEmail') || null,
 
+    // CLUSTER 3: Riwayat Pendidikan Terakhir
+    pendidikan_terakhir: getVal('bioPendidikan') || 'S1',
+    jurusan: getVal('bioJurusan') || null,
+    lembaga_pendidikan: getVal('bioLembagaPendidikan') || null,
+
+    // CLUSTER 4: Data Keluarga & Tanggungan
+    nama_ibu_kandung: getVal('bioNamaIbuKandung') || null,
+    nama_pasangan: getVal('bioNamaPasangan') || null,
+    tgl_lahir_pasangan: getVal('bioTglLahirPasangan') || null,
+    anak_1_nama: getVal('bioAnak1Nama') || null,
+    anak_1_tgl_lahir: getVal('bioAnak1TglLahir') || null,
+    anak_2_nama: getVal('bioAnak2Nama') || null,
+    anak_2_tgl_lahir: getVal('bioAnak2TglLahir') || null,
+    anak_3_nama: getVal('bioAnak3Nama') || null,
+    anak_3_tgl_lahir: getVal('bioAnak3TglLahir') || null,
+    anak_4_nama: getVal('bioAnak4Nama') || null,
+    anak_4_tgl_lahir: getVal('bioAnak4TglLahir') || null,
+
+    // CLUSTER 5: Dokumen Kependudukan & BPJS
     no_ktp: getVal('bioNoKtp') || null,
     no_kk: getVal('bioNoKk') || null,
     npwp: getVal('bioNpwp') || null,
-    bpjs_kesehatan: getVal('bioBpjsKes') || null,
     bpjs_ketenagakerjaan: getVal('bioBpjsTk') || null,
+    bpjs_kesehatan: getVal('bioBpjsKes') || null,
+    penanggung_bpjs: getVal('bioPenanggungBpjs') || 'Perusahaan',
+    upload_foto: getVal('bioFotoUrl') || null,
     foto_url: getVal('bioFotoUrl') || null,
+    upload_ktp: getVal('bioUploadKtp') || null,
+    upload_npwp: getVal('bioUploadNpwp') || null,
+    upload_kk: getVal('bioUploadKk') || null,
     kontak_darurat_nama: getVal('bioDaruratNama') || null,
     kontak_darurat_hp: getVal('bioDaruratHp') || null,
-    kontak_darurat_hubungan: getVal('bioDaruratHub') || null,
+    kontak_darurat_hubungan: getVal('bioDaruratHub') || 'Keluarga',
 
-    created_at: new Date().toISOString()
+    // CLUSTER 6: Informasi Rekening Bank
+    bank_atas_nama: getVal('bioBankAtasNama') || nama,
+    nama_bank: getVal('bioNamaBank') || 'BSI',
+    no_rekening: getVal('bioNoRekening') || null,
+
+    // Sistem Metadata
+    tanggal_input: new Date().toISOString().split('T')[0],
+    updated_at: new Date().toISOString()
   };
 
   const btnSubmit = document.getElementById('btnBioSubmit');
@@ -6846,33 +7019,40 @@ window.handleBioKaryawanSubmit = async function(event) {
           break;
         }
       } catch (e) {
-        // coba endpoint berikutnya
+        // Coba endpoint alternatif berikutnya
       }
     }
 
     // 2. Fallback simpan via server backend /api/bio-karyawan
     if (!saved) {
-      const srvRes = await fetch('/api/bio-karyawan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const srvData = await srvRes.json();
-      if (srvData.success) {
-        saved = true;
+      try {
+        const srvRes = await fetch('/api/bio-karyawan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (srvRes.ok) {
+          const srvData = await srvRes.json();
+          if (srvData.success) {
+            saved = true;
+          }
+        }
+      } catch (srvErr) {
+        console.warn('Backend fallback save error:', srvErr);
       }
     }
 
     if (saved) {
-      alert(`✅ Berhasil! Biodata karyawan [${nik}] ${nama} telah disimpan ke database Supabase tabel Bio_Karyawan.`);
+      alert(`✅ Berhasil! Data Karyawan [${nik}] ${nama} telah berhasil disimpan ke database Bio_Karyawan dengan 6 Cluster Lengkap.`);
+      resetBioKaryawanForm();
       await loadDaftarKaryawanData(true);
       switchModule('mod_daftar_karyawan');
     } else {
-      alert(`⚠️ Gagal menyimpan ke Supabase. Pastikan tabel Bio_Karyawan sudah dibuat.`);
+      alert(`⚠️ Gagal menyimpan ke Supabase. Pastikan tabel Bio_Karyawan sudah tersedia atau jalankan script SQL bio_karyawan_supabase.sql.`);
     }
   } catch (err) {
     console.error('Error simpan biodata:', err);
-    alert(`⚠️ Terjadi kesalahan: ${err.message}`);
+    alert(`⚠️ Terjadi kesalahan saat menyimpan: ${err.message}`);
   } finally {
     if (btnSubmit) {
       btnSubmit.disabled = false;

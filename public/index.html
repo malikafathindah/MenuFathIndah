@@ -1144,16 +1144,25 @@
           </div>
         </div>
 
-        <!-- ================================================================
+                <!-- ================================================================
              MODULE 6B: FORM ENTRY KARYAWAN (mod_bio_karyawan)
              ================================================================ -->
         <div class="module-view" id="view-bio_karyawan">
+          <!-- 3D Header Bar & View Switcher Toolbar -->
           <div class="hr-banner">
             <div class="hr-banner-left">
-              <div class="hr-banner-icon" style="background:linear-gradient(135deg, #10b981, #06b6d4);"><i class="fa-solid fa-user-plus"></i></div>
+              <div class="hr-banner-icon" style="background:linear-gradient(135deg, #06b6d4, #2563eb);">
+                <i class="fa-solid fa-id-card"></i>
+              </div>
               <div>
-                <h3 class="hr-banner-title">Formulir Entry Biodata Karyawan Baru</h3>
-                <p class="hr-banner-subtitle">Input data lengkap kepegawaian & simpan ke database Supabase Bio_Karyawan</p>
+                <h3 class="hr-banner-title" style="display:flex; align-items:center; gap:8px;">
+                  <span>Form Data Karyawan</span>
+                  <span class="bio-badge-mod">mod_bio_karyawan</span>
+                </h3>
+                <p class="hr-banner-subtitle">
+                  <span class="bio-pulse-dot"></span>
+                  <span>Cluster 1: Data Pribadi | Cluster 2: Alamat Lengkap | Cluster 3: Pendidikan | Cluster 4: Keluarga | Cluster 5: Legalitas & BPJS | Cluster 6: Rekening Bank</span>
+                </p>
               </div>
             </div>
             <div class="hr-banner-right">
@@ -1165,20 +1174,26 @@
 
           <form id="formBioKaryawan" onsubmit="handleBioKaryawanSubmit(event)">
             <div class="bio-clusters-container">
-              <!-- Cluster 1: Pokok Kepegawaian -->
+              
+              <!-- CLUSTER 1: DATA PRIBADI KARYAWAN -->
               <div class="bio-cluster-card">
                 <div class="bio-cluster-header">
-                  <div class="bio-cluster-icon"><i class="fa-solid fa-briefcase"></i></div>
-                  <h4 class="bio-cluster-title">1. Informasi Pokok Kepegawaian</h4>
+                  <div class="bio-cluster-icon" style="background:rgba(6,182,212,0.15); color:#22d3ee;">
+                    <i class="fa-solid fa-user"></i>
+                  </div>
+                  <div>
+                    <h4 class="bio-cluster-title">1. Data Pribadi Karyawan</h4>
+                    <p class="bio-cluster-desc">Identitas personal, penempatan jabatan & status kepegawaian</p>
+                  </div>
                 </div>
                 <div class="bio-form-grid-3">
-                  <div class="form-group">
-                    <label class="form-label" for="bioNik">Nomor Induk Karyawan (NIK) <span class="required-star">*</span></label>
-                    <input type="text" id="bioNik" class="form-input" required placeholder="Contoh: 26-0901">
+                  <div class="form-group span-2">
+                    <label class="form-label" for="bioNama">Nama Karyawan (Sesuai KTP) <span class="required-star">*</span></label>
+                    <input type="text" id="bioNama" class="form-input" required placeholder="Nama lengkap karyawan">
                   </div>
                   <div class="form-group">
-                    <label class="form-label" for="bioNama">Nama Lengkap Karyawan <span class="required-star">*</span></label>
-                    <input type="text" id="bioNama" class="form-input" required placeholder="Nama lengkap sesuai KTP">
+                    <label class="form-label" for="bioNik">Nomor Induk Karyawan (NIK) <span class="required-star">*</span></label>
+                    <input type="text" id="bioNik" class="form-input" required placeholder="Contoh: 26-0901 atau NIK auto">
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="bioJenisKelamin">Jenis Kelamin <span class="required-star">*</span></label>
@@ -1188,65 +1203,18 @@
                     </select>
                   </div>
                   <div class="form-group">
-                    <label class="form-label" for="bioJabatan">Jabatan <span class="required-star">*</span></label>
-                    <input type="text" id="bioJabatan" class="form-input" required placeholder="Contoh: Manager, Officer, Staff">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="bioDivisi">Divisi / Departemen <span class="required-star">*</span></label>
-                    <select id="bioDivisi" class="form-input" required>
-                      <option value="Top Manajemen">Top Manajemen</option>
-                      <option value="HRD, LEGAL, IS & QA">HRD, LEGAL, IS & QA</option>
-                      <option value="SALES & MARKETING">SALES & MARKETING</option>
-                      <option value="FINANCE">FINANCE</option>
-                      <option value="OPERATION & PENGADAAN">OPERATION & PENGADAAN</option>
-                      <option value="Kanwil">Kanwil</option>
+                    <label class="form-label" for="bioGolDarah">Golongan Darah</label>
+                    <select id="bioGolDarah" class="form-input">
+                      <option value="-">-</option>
+                      <option value="A">A</option>
+                      <option value="B">B</option>
+                      <option value="AB">AB</option>
+                      <option value="O">O</option>
                     </select>
                   </div>
-                  <div class="form-group">
-                    <label class="form-label" for="bioKantor">Penempatan Kantor / Cabang <span class="required-star">*</span></label>
-                    <select id="bioKantor" class="form-input" required>
-                      <option value="Pusat">Pusat</option>
-                      <option value="Sumarrecon">Sumarrecon</option>
-                      <option value="Samarinda">Samarinda</option>
-                      <option value="Banyumas">Banyumas</option>
-                      <option value="Sukoharjo">Sukoharjo</option>
-                      <option value="Surabaya">Surabaya</option>
-                      <option value="Pemalang">Pemalang</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="bioStatusEmp">Status Kepegawaian <span class="required-star">*</span></label>
-                    <select id="bioStatusEmp" class="form-input" required>
-                      <option value="PKWTT">PKWTT (Tetap)</option>
-                      <option value="PKWT">PKWT (Kontrak)</option>
-                      <option value="Magang">Magang / Internship</option>
-                      <option value="Probation">Probation</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="bioTanggalMasuk">Tanggal Masuk Kerja</label>
-                    <input type="date" id="bioTanggalMasuk" class="form-input">
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label" for="bioStatus">Status Karyawan <span class="required-star">*</span></label>
-                    <select id="bioStatus" class="form-input" required>
-                      <option value="Aktif" selected>Aktif</option>
-                      <option value="Non Aktif">Non Aktif</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Cluster 2: Data Pribadi & Alamat -->
-              <div class="bio-cluster-card">
-                <div class="bio-cluster-header">
-                  <div class="bio-cluster-icon" style="background:rgba(245,158,11,0.15); color:#fbbf24;"><i class="fa-solid fa-address-card"></i></div>
-                  <h4 class="bio-cluster-title">2. Identitas Pribadi & Kontak</h4>
-                </div>
-                <div class="bio-form-grid-3">
                   <div class="form-group">
                     <label class="form-label" for="bioTempatLahir">Tempat Lahir</label>
-                    <input type="text" id="bioTempatLahir" class="form-input" placeholder="Kota kelahiran">
+                    <input type="text" id="bioTempatLahir" class="form-input" placeholder="Kota / tempat lahir">
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="bioTanggalLahir">Tanggal Lahir</label>
@@ -1273,89 +1241,339 @@
                     </select>
                   </div>
                   <div class="form-group">
-                    <label class="form-label" for="bioPendidikan">Pendidikan Terakhir</label>
-                    <select id="bioPendidikan" class="form-input">
-                      <option value="SMA/SMK">SMA / SMK</option>
-                      <option value="D3">Diploma (D3)</option>
-                      <option value="S1" selected>Sarjana (S1)</option>
-                      <option value="S2">Magister (S2)</option>
-                      <option value="Lainnya">Lainnya</option>
+                    <label class="form-label" for="bioStatusEmp">Status Kepegawaian (EMP) <span class="required-star">*</span></label>
+                    <select id="bioStatusEmp" class="form-input" required>
+                      <option value="PKWTT" selected>PKWTT (Tetap)</option>
+                      <option value="PKWT">PKWT (Kontrak)</option>
+                      <option value="Magang">Magang / Internship</option>
+                      <option value="Probation">Probation</option>
                     </select>
                   </div>
                   <div class="form-group">
-                    <label class="form-label" for="bioHp">Nomor Telepon / WhatsApp <span class="required-star">*</span></label>
-                    <input type="tel" id="bioHp" class="form-input" required placeholder="08xxxxxxxxxx">
-                  </div>
-                  <div class="form-group span-2">
-                    <label class="form-label" for="bioEmail">Alamat Email</label>
-                    <input type="email" id="bioEmail" class="form-input" placeholder="nama@email.com">
-                  </div>
-                  <div class="form-group span-3">
-                    <label class="form-label" for="bioAlamat">Alamat Tempat Tinggal Lengkap</label>
-                    <textarea id="bioAlamat" class="form-input" rows="2" placeholder="Nama jalan, RT/RW, nomor rumah..."></textarea>
+                    <label class="form-label" for="bioStatus">Status Karyawan <span class="required-star">*</span></label>
+                    <select id="bioStatus" class="form-input" required>
+                      <option value="Aktif" selected>Aktif</option>
+                      <option value="Non Aktif">Non Aktif</option>
+                    </select>
                   </div>
                   <div class="form-group">
-                    <label class="form-label" for="bioKota">Kota / Kabupaten</label>
-                    <input type="text" id="bioKota" class="form-input" placeholder="Kota domisili">
+                    <label class="form-label" for="bioDivisi">Divisi / Departemen <span class="required-star">*</span></label>
+                    <select id="bioDivisi" class="form-input" required>
+                      <option value="Top Manajemen">Top Manajemen</option>
+                      <option value="HRD, LEGAL, IS & QA">HRD, LEGAL, IS & QA</option>
+                      <option value="SALES & MARKETING">SALES & MARKETING</option>
+                      <option value="FINANCE">FINANCE</option>
+                      <option value="OPERATION & PENGADAAN">OPERATION & PENGADAAN</option>
+                      <option value="Kanwil">Kanwil</option>
+                      <option value="IT & Digital Media">IT & Digital Media</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioJabatan">Jabatan <span class="required-star">*</span></label>
+                    <input type="text" id="bioJabatan" class="form-input" required placeholder="Contoh: Manager, Officer, Staff">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioFungsional">Jabatan Fungsional</label>
+                    <input type="text" id="bioFungsional" class="form-input" placeholder="Posisi fungsional (opsional)">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioKantor">Penempatan Kantor / Cabang <span class="required-star">*</span></label>
+                    <select id="bioKantor" class="form-input" required>
+                      <option value="Pusat" selected>Pusat</option>
+                      <option value="Sumarrecon">Sumarrecon</option>
+                      <option value="Samarinda">Samarinda</option>
+                      <option value="Banyumas">Banyumas</option>
+                      <option value="Sukoharjo">Sukoharjo</option>
+                      <option value="Surabaya">Surabaya</option>
+                      <option value="Pemalang">Pemalang</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioTanggalMasuk">Tanggal Mulai Tugas / Masuk Kerja</label>
+                    <input type="date" id="bioTanggalMasuk" class="form-input">
+                  </div>
+                </div>
+              </div>
+
+              <!-- CLUSTER 2: ALAMAT LENGKAP KARYAWAN -->
+              <div class="bio-cluster-card">
+                <div class="bio-cluster-header">
+                  <div class="bio-cluster-icon" style="background:rgba(245,158,11,0.15); color:#fbbf24;">
+                    <i class="fa-solid fa-map-location-dot"></i>
+                  </div>
+                  <div>
+                    <h4 class="bio-cluster-title">2. Alamat Lengkap Karyawan</h4>
+                    <p class="bio-cluster-desc">Alamat tempat tinggal, kontak darurat & fitur pencarian Kodepos otomatis</p>
+                  </div>
+                </div>
+                <div class="bio-form-grid-3">
+                  <div class="form-group span-3">
+                    <label class="form-label" for="bioAlamat">Alamat Rumah Lengkap</label>
+                    <textarea id="bioAlamat" class="form-input" rows="2" placeholder="Nama Jalan, Blok, Nomor Rumah, RT/RW..."></textarea>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioKodePos">
+                      <span>Kode Pos</span>
+                      <span style="font-size:0.75rem; color:#38bdf8; margin-left:6px;"><i class="fa-solid fa-bolt"></i> Auto-Lookup</span>
+                    </label>
+                    <div style="display:flex; gap:6px;">
+                      <input type="text" id="bioKodePos" class="form-input" placeholder="5 Digit Kodepos" maxlength="5" oninput="handleKodePosInput(this.value)">
+                      <button type="button" class="btn-action-kodepos" onclick="triggerKodePosLookup()" title="Cari Alamat dari Kodepos">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                      </button>
+                    </div>
+                    <div id="kodeposFeedback" style="font-size:0.72rem; color:var(--text-muted); margin-top:3px; min-height:16px;"></div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioKelurahan">Kelurahan / Desa</label>
+                    <input type="text" id="bioKelurahan" class="form-input" placeholder="Kelurahan atau Desa">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioKecamatan">Kecamatan</label>
+                    <input type="text" id="bioKecamatan" class="form-input" placeholder="Kecamatan">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioKota">Kabupaten / Kota</label>
+                    <input type="text" id="bioKota" class="form-input" placeholder="Kabupaten / Kota domisili">
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="bioProvinsi">Provinsi</label>
                     <input type="text" id="bioProvinsi" class="form-input" placeholder="Provinsi domisili">
                   </div>
                   <div class="form-group">
-                    <label class="form-label" for="bioKodePos">Kode Pos</label>
-                    <input type="text" id="bioKodePos" class="form-input" placeholder="5 digit kode pos">
+                    <label class="form-label" for="bioHp">Nomor Telephone / HP (WhatsApp) <span class="required-star">*</span></label>
+                    <input type="tel" id="bioHp" class="form-input" required placeholder="08xxxxxxxxxx">
+                  </div>
+                  <div class="form-group span-2">
+                    <label class="form-label" for="bioEmail">Alamat Email</label>
+                    <input type="email" id="bioEmail" class="form-input" placeholder="nama@email.com">
                   </div>
                 </div>
               </div>
 
-              <!-- Cluster 3: Legalitas & Kontak Darurat -->
+              <!-- CLUSTER 3: RIWAYAT PENDIDIKAN TERAKHIR -->
               <div class="bio-cluster-card">
                 <div class="bio-cluster-header">
-                  <div class="bio-cluster-icon" style="background:rgba(168,85,247,0.15); color:#c084fc;"><i class="fa-solid fa-shield-halved"></i></div>
-                  <h4 class="bio-cluster-title">3. Dokumen Legalitas & Kontak Darurat</h4>
+                  <div class="bio-cluster-icon" style="background:rgba(59,130,246,0.15); color:#60a5fa;">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                  </div>
+                  <div>
+                    <h4 class="bio-cluster-title">3. Riwayat Pendidikan Terakhir</h4>
+                    <p class="bio-cluster-desc">Kualifikasi akademik formal & jurusan studi karyawan</p>
+                  </div>
                 </div>
                 <div class="bio-form-grid-3">
                   <div class="form-group">
-                    <label class="form-label" for="bioNoKtp">Nomor KTP (16 Digit)</label>
-                    <input type="text" id="bioNoKtp" class="form-input" placeholder="320xxxxxxxxxxxxx">
+                    <label class="form-label" for="bioPendidikan">Pendidikan Terakhir <span class="required-star">*</span></label>
+                    <select id="bioPendidikan" class="form-input" required>
+                      <option value="SMA/SMK">SMA / SMK / MA</option>
+                      <option value="D1/D2">Diploma 1/2 (D1/D2)</option>
+                      <option value="D3">Diploma 3 (D3)</option>
+                      <option value="S1" selected>Sarjana (S1 / D4)</option>
+                      <option value="S2">Magister (S2)</option>
+                      <option value="S3">Doktor (S3)</option>
+                      <option value="Lainnya">Lainnya</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioJurusan">Jurusan Pendidikan Terakhir</label>
+                    <input type="text" id="bioJurusan" class="form-input" placeholder="Contoh: Manajemen, Komunikasi, Akuntansi">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioLembagaPendidikan">Nama Lembaga Pendidikan / Universitas</label>
+                    <input type="text" id="bioLembagaPendidikan" class="form-input" placeholder="Nama Universitas / Institut / Sekolah">
+                  </div>
+                </div>
+              </div>
+
+              <!-- CLUSTER 4: DATA KELUARGA & TANGGUNGAN -->
+              <div class="bio-cluster-card">
+                <div class="bio-cluster-header">
+                  <div class="bio-cluster-icon" style="background:rgba(236,72,153,0.15); color:#f472b6;">
+                    <i class="fa-solid fa-people-roof"></i>
+                  </div>
+                  <div>
+                    <h4 class="bio-cluster-title">4. Data Keluarga & Tanggungan</h4>
+                    <p class="bio-cluster-desc">Data orang tua, pasangan hidup, dan anak kandung (tanggungan)</p>
+                  </div>
+                </div>
+                <div class="bio-form-grid-3">
+                  <div class="form-group">
+                    <label class="form-label" for="bioNamaIbuKandung">Nama Ibu Kandung</label>
+                    <input type="text" id="bioNamaIbuKandung" class="form-input" placeholder="Nama lengkap ibu kandung">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioNamaPasangan">Nama Suami / Istri</label>
+                    <input type="text" id="bioNamaPasangan" class="form-input" placeholder="Nama lengkap suami atau istri">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioTglLahirPasangan">Tanggal Lahir Suami / Istri</label>
+                    <input type="date" id="bioTglLahirPasangan" class="form-input">
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" for="bioAnak1Nama">Nama Anak Kandung 1</label>
+                    <input type="text" id="bioAnak1Nama" class="form-input" placeholder="Nama anak ke-1">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioAnak1TglLahir">Tanggal Lahir Anak 1</label>
+                    <input type="date" id="bioAnak1TglLahir" class="form-input">
+                  </div>
+                  <div class="form-group"></div>
+
+                  <div class="form-group">
+                    <label class="form-label" for="bioAnak2Nama">Nama Anak Kandung 2</label>
+                    <input type="text" id="bioAnak2Nama" class="form-input" placeholder="Nama anak ke-2">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioAnak2TglLahir">Tanggal Lahir Anak 2</label>
+                    <input type="date" id="bioAnak2TglLahir" class="form-input">
+                  </div>
+                  <div class="form-group"></div>
+
+                  <div class="form-group">
+                    <label class="form-label" for="bioAnak3Nama">Nama Anak Kandung 3</label>
+                    <input type="text" id="bioAnak3Nama" class="form-input" placeholder="Nama anak ke-3">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioAnak3TglLahir">Tanggal Lahir Anak 3</label>
+                    <input type="date" id="bioAnak3TglLahir" class="form-input">
+                  </div>
+                  <div class="form-group"></div>
+
+                  <div class="form-group">
+                    <label class="form-label" for="bioAnak4Nama">Nama Anak Kandung 4</label>
+                    <input type="text" id="bioAnak4Nama" class="form-input" placeholder="Nama anak ke-4">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioAnak4TglLahir">Tanggal Lahir Anak 4</label>
+                    <input type="date" id="bioAnak4TglLahir" class="form-input">
+                  </div>
+                  <div class="form-group"></div>
+                </div>
+              </div>
+
+              <!-- CLUSTER 5: DOKUMEN KEPENDUDUKAN & BPJS -->
+              <div class="bio-cluster-card">
+                <div class="bio-cluster-header">
+                  <div class="bio-cluster-icon" style="background:rgba(168,85,247,0.15); color:#c084fc;">
+                    <i class="fa-solid fa-shield-halved"></i>
+                  </div>
+                  <div>
+                    <h4 class="bio-cluster-title">5. Dokumen Kependudukan, BPJS & Kontak Darurat</h4>
+                    <p class="bio-cluster-desc">Nomor identitas kependudukan, jaminan sosial & berkas arsip</p>
+                  </div>
+                </div>
+                <div class="bio-form-grid-3">
+                  <div class="form-group">
+                    <label class="form-label" for="bioNoKtp">Nomor KTP (16 Digit) <span class="required-star">*</span></label>
+                    <input type="text" id="bioNoKtp" class="form-input" required placeholder="320xxxxxxxxxxxxx" maxlength="16">
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="bioNoKk">Nomor Kartu Keluarga (KK)</label>
-                    <input type="text" id="bioNoKk" class="form-input" placeholder="320xxxxxxxxxxxxx">
+                    <input type="text" id="bioNoKk" class="form-input" placeholder="320xxxxxxxxxxxxx" maxlength="16">
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="bioNpwp">Nomor NPWP</label>
-                    <input type="text" id="bioNpwp" class="form-input" placeholder="15 digit NPWP">
+                    <input type="text" id="bioNpwp" class="form-input" placeholder="Nomor NPWP (15/16 digit)">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioBpjsTk">Nomor BP Ketenagakerjaan</label>
+                    <input type="text" id="bioBpjsTk" class="form-input" placeholder="Nomor peserta BPJS TK">
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="bioBpjsKes">Nomor BPJS Kesehatan</label>
                     <input type="text" id="bioBpjsKes" class="form-input" placeholder="Nomor peserta BPJS Kesehatan">
                   </div>
                   <div class="form-group">
-                    <label class="form-label" for="bioBpjsTk">Nomor BPJS Ketenagakerjaan</label>
-                    <input type="text" id="bioBpjsTk" class="form-input" placeholder="Nomor peserta BPJS TK">
+                    <label class="form-label" for="bioPenanggungBpjs">Penanggung BPJS Kesehatan</label>
+                    <select id="bioPenanggungBpjs" class="form-input">
+                      <option value="Perusahaan" selected>Perusahaan</option>
+                      <option value="Mandiri">Mandiri / Pribadi</option>
+                      <option value="Keluarga/Pasangan">Keluarga / Pasangan</option>
+                    </select>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label" for="bioFotoUrl">URL Pas Foto Formal Karyawan</label>
+                    <input type="url" id="bioFotoUrl" class="form-input" placeholder="https://drive.google.com/... atau URL foto">
                   </div>
                   <div class="form-group">
-                    <label class="form-label" for="bioFotoUrl">URL Pas Foto Formal</label>
-                    <input type="url" id="bioFotoUrl" class="form-input" placeholder="https://drive.google.com/...">
+                    <label class="form-label" for="bioUploadKtp">URL Berkas Upload KTP</label>
+                    <input type="url" id="bioUploadKtp" class="form-input" placeholder="https://drive.google.com/...">
                   </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioUploadNpwp">URL Berkas Upload NPWP</label>
+                    <input type="url" id="bioUploadNpwp" class="form-input" placeholder="https://drive.google.com/...">
+                  </div>
+                  <div class="form-group span-3">
+                    <label class="form-label" for="bioUploadKk">URL Berkas Upload Kartu Keluarga</label>
+                    <input type="url" id="bioUploadKk" class="form-input" placeholder="https://drive.google.com/...">
+                  </div>
+
                   <div class="form-group">
                     <label class="form-label" for="bioDaruratNama">Nama Kontak Darurat</label>
-                    <input type="text" id="bioDaruratNama" class="form-input" placeholder="Nama keluarga/kerabat terdekat">
+                    <input type="text" id="bioDaruratNama" class="form-input" placeholder="Nama kerabat / keluarga terdekat">
                   </div>
                   <div class="form-group">
                     <label class="form-label" for="bioDaruratHp">Nomor Telepon Darurat</label>
                     <input type="tel" id="bioDaruratHp" class="form-input" placeholder="08xxxxxxxxxx">
                   </div>
                   <div class="form-group">
-                    <label class="form-label" for="bioDaruratHub">Hubungan Keluarga</label>
+                    <label class="form-label" for="bioDaruratHub">Hubungan Kontak Darurat</label>
                     <input type="text" id="bioDaruratHub" class="form-input" placeholder="Suami/Istri, Orang Tua, Saudara">
                   </div>
                 </div>
+              </div>
 
-                <div class="bio-form-actions">
-                  <button type="reset" class="btn-secondary">
+              <!-- CLUSTER 6: INFORMASI REKENING BANK -->
+              <div class="bio-cluster-card">
+                <div class="bio-cluster-header">
+                  <div class="bio-cluster-icon" style="background:rgba(16,185,129,0.15); color:#34d399;">
+                    <i class="fa-solid fa-building-columns"></i>
+                  </div>
+                  <div>
+                    <h4 class="bio-cluster-title">6. Informasi Rekening Bank</h4>
+                    <p class="bio-cluster-desc">Rekening pembayaran gaji, tunjangan & kompensasi karyawan</p>
+                  </div>
+                </div>
+                <div class="bio-form-grid-3">
+                  <div class="form-group span-2">
+                    <label class="form-label" for="bioBankAtasNama">Nama Di Bank (Sesuai Buku Tabungan)</label>
+                    <input type="text" id="bioBankAtasNama" class="form-input" placeholder="Nama pemilik rekening sesuai tabungan">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioNamaBank">Nama Bank</label>
+                    <select id="bioNamaBank" class="form-input">
+                      <option value="">-- Pilih Bank --</option>
+                      <option value="BCA">Bank Central Asia (BCA)</option>
+                      <option value="Mandiri">Bank Mandiri</option>
+                      <option value="BNI">Bank Negara Indonesia (BNI)</option>
+                      <option value="BRI">Bank Rakyat Indonesia (BRI)</option>
+                      <option value="BSI" selected>Bank Syariah Indonesia (BSI)</option>
+                      <option value="CIMB Niaga">CIMB Niaga</option>
+                      <option value="Danamon">Bank Danamon</option>
+                      <option value="Permata">Bank Permata</option>
+                      <option value="Bank Jateng">Bank Jateng</option>
+                      <option value="Bank Jabar">Bank BJB</option>
+                      <option value="Lainnya">Bank Lainnya</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioNoRekening">Nomor Rekening Bank</label>
+                    <input type="text" id="bioNoRekening" class="form-input font-mono" placeholder="Nomor rekening bank">
+                  </div>
+                </div>
+              </div>
+
+              <!-- SUBMIT / RESET ACTION BAR -->
+              <div class="bio-submit-bar">
+                <div class="bio-submit-info">
+                  <i class="fa-solid fa-circle-info"></i>
+                  <span>Timestamp diisi otomatis oleh sistem saat data disimpan. Data tersinkronisasi ke Supabase Bio_Karyawan & Google Sheets.</span>
+                </div>
+                <div class="bio-submit-buttons">
+                  <button type="reset" class="btn-secondary" onclick="resetBioKaryawanForm()">
                     <i class="fa-solid fa-rotate-left"></i> Reset Form
                   </button>
                   <button type="submit" class="btn-primary" id="btnBioSubmit">
@@ -1363,6 +1581,7 @@
                   </button>
                 </div>
               </div>
+
             </div>
           </form>
         </div>

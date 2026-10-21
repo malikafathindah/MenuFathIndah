@@ -404,6 +404,67 @@ app.post('/api/bio-karyawan', async (req, res) => {
   }
 });
 
+// 6a.0 KODEPOS LOOKUP API (mod_bio_karyawan)
+app.get('/api/kodepos', async (req, res) => {
+  const kodepos = String(req.query.q || req.query.kodepos || '').trim();
+  if (!kodepos) {
+    return res.status(400).json({ success: false, message: 'Parameter q (kodepos) wajib diisi.' });
+  }
+
+  const internalDb = {
+    '10110': { kelurahan: 'Petojo Selatan', kecamatan: 'Gambir', kota: 'Kota Jakarta Pusat', provinsi: 'DKI Jakarta' },
+    '10120': { kelurahan: 'Gambir', kecamatan: 'Gambir', kota: 'Kota Jakarta Pusat', provinsi: 'DKI Jakarta' },
+    '12110': { kelurahan: 'Gunung', kecamatan: 'Kebayoran Baru', kota: 'Kota Jakarta Selatan', provinsi: 'DKI Jakarta' },
+    '15111': { kelurahan: 'Tangerang', kecamatan: 'Tangerang', kota: 'Kota Tangerang', provinsi: 'Banten' },
+    '16111': { kelurahan: 'Gudang', kecamatan: 'Bogor Tengah', kota: 'Kota Bogor', provinsi: 'Jawa Barat' },
+    '16411': { kelurahan: 'Depok', kecamatan: 'Pancasari', kota: 'Kota Depok', provinsi: 'Jawa Barat' },
+    '17111': { kelurahan: 'Bekasi Jaya', kecamatan: 'Bekasi Timur', kota: 'Kota Bekasi', provinsi: 'Jawa Barat' },
+    '17142': { kelurahan: 'Marga Mulya', kecamatan: 'Bekasi Utara', kota: 'Kota Bekasi', provinsi: 'Jawa Barat' },
+    '40111': { kelurahan: 'Braga', kecamatan: 'Sumur Bandung', kota: 'Kota Bandung', provinsi: 'Jawa Barat' },
+    '40132': { kelurahan: 'Lebak Siliwangi', kecamatan: 'Coblong', kota: 'Kota Bandung', provinsi: 'Jawa Barat' },
+    '50111': { kelurahan: 'Kauman', kecamatan: 'Semarang Tengah', kota: 'Kota Semarang', provinsi: 'Jawa Tengah' },
+    '53111': { kelurahan: 'Kranji', kecamatan: 'Purwokerto Timur', kota: 'Kabupaten Banyumas', provinsi: 'Jawa Tengah' },
+    '52311': { kelurahan: 'Kebondalem', kecamatan: 'Pemalang', kota: 'Kabupaten Pemalang', provinsi: 'Jawa Tengah' },
+    '57111': { kelurahan: 'Keprabon', kecamatan: 'Banjarsari', kota: 'Kota Surakarta', provinsi: 'Jawa Tengah' },
+    '57511': { kelurahan: 'Sukoharjo', kecamatan: 'Sukoharjo', kota: 'Kabupaten Sukoharjo', provinsi: 'Jawa Tengah' },
+    '55111': { kelurahan: 'Ngupasan', kecamatan: 'Gondomanan', kota: 'Kota Yogyakarta', provinsi: 'DI Yogyakarta' },
+    '60111': { kelurahan: 'Surabaya', kecamatan: 'Tegalsari', kota: 'Kota Surabaya', provinsi: 'Jawa Timur' },
+    '65111': { kelurahan: 'Klojen', kecamatan: 'Klojen', kota: 'Kota Malang', provinsi: 'Jawa Timur' },
+    '20111': { kelurahan: 'Kesawan', kecamatan: 'Medan Barat', kota: 'Kota Medan', provinsi: 'Sumatera Utara' },
+    '75111': { kelurahan: 'Pasar Pagi', kecamatan: 'Samarinda Kota', kota: 'Kota Samarinda', provinsi: 'Kalimantan Timur' },
+    '90111': { kelurahan: 'Pattunuang', kecamatan: 'Wajo', kota: 'Kota Makassar', provinsi: 'Sulawesi Selatan' },
+    '80111': { kelurahan: 'Dangin Puri', kecamatan: 'Denpasar Timur', kota: 'Kota Denpasar', provinsi: 'Bali' }
+  };
+
+  if (internalDb[kodepos]) {
+    return res.json({ success: true, source: 'internal', data: internalDb[kodepos] });
+  }
+
+  try {
+    const fetchRes = await fetch(`https://kodepos-266e6.firebaseapp.com/search?q=${kodepos}`);
+    if (fetchRes.ok) {
+      const json = await fetchRes.json();
+      if (json && json.data && json.data.length > 0) {
+        const item = json.data[0];
+        return res.json({
+          success: true,
+          source: 'api',
+          data: {
+            kelurahan: item.urban || item.kelurahan || '',
+            kecamatan: item.subdistrict || item.kecamatan || '',
+            kota: item.city || item.kabupaten || item.kota || '',
+            provinsi: item.province || item.provinsi || ''
+          }
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('External Kodepos API error:', err.message);
+  }
+
+  res.json({ success: false, message: `Kodepos ${kodepos} tidak ditemukan.` });
+});
+
 // 6a.1 DATA ABSENSI API (Supabase Tabel data_absensi)
 app.get('/api/data-absensi', async (req, res) => {
   try {
