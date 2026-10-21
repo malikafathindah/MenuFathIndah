@@ -4377,3 +4377,139 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover,
   color: #fb7185;
 }
 
+/* Cuti File Uploader & Google Drive Folder Styling */
+.btn-gdrive-folder-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.btn-gdrive-folder-pill:hover {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #7dd3fc;
+  transform: translateY(-1px);
+}
+
+.cuti-file-dropzone {
+  border: 1.5px dashed rgba(56, 189, 248, 0.35);
+  background: rgba(8, 14, 28, 0.6);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  position: relative;
+}
+
+.cuti-file-dropzone:hover {
+  border-color: #38bdf8;
+  background: rgba(15, 23, 42, 0.85);
+  box-shadow: 0 0 15px rgba(56, 189, 248, 0.12);
+}
+
+.cuti-dropzone-idle {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.cuti-dropzone-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  color: #38bdf8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+
+.cuti-dropzone-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.9);
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+}
+
+.cuti-selected-file-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.cuti-selected-file-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(56, 189, 248, 0.2);
+  color: #38bdf8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.cuti-selected-file-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+}
+
+.cuti-selected-file-meta {
+  font-size: 0.7rem;
+  color: #38bdf8;
+  font-family: monospace;
+}
+
+.btn-remove-file {
+  background: rgba(244, 63, 94, 0.15);
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  color: #fb7185;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+}
+
+.btn-remove-file:hover {
+  background: rgba(244, 63, 94, 0.3);
+  color: #fff;
+}
+
+.cuti-upload-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+

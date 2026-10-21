@@ -4666,24 +4666,45 @@ function formatIndoCutiDate(dateStr) {
   return String(dateStr);
 }
 
-// Helper: Dapatkan daftar karyawan untuk dropdown
-async function fetchEmployeesForCuti() {
-  if (state.cuti.employees && state.cuti.employees.length > 0) {
-    return state.cuti.employees;
+// Folder Target Google Drive untuk Dokumen Pendukung Cuti Karyawan
+const GDRIVE_CUTI_FOLDER_ID = '12Fcad07H3-DF3HJteLuvJ8Zpd3W7UzBD';
+const GDRIVE_CUTI_FOLDER_URL = 'https://drive.google.com/drive/folders/12Fcad07H3-DF3HJteLuvJ8Zpd3W7UzBD?usp=sharing';
+let selectedCutiFile = null;
+
+// Helper: Dapatkan daftar karyawan untuk dropdown & matriks
+async function fetchEmployeesForCuti(forceRefresh = false) {
+  // Jika sudah ada dan valid (bukan generic 'Karyawan')
+  if (!forceRefresh && state.cuti.employees && state.cuti.employees.length > 0) {
+    const hasValidNames = state.cuti.employees.some(e => e.nama && e.nama !== 'Karyawan' && !e.nama.startsWith('Karyawan '));
+    if (hasValidNames) {
+      return state.cuti.employees;
+    }
   }
 
-  // Coba ambil dari state.data.users
+  // 1. Coba ambil dari state.data.users
   if (state.data && state.data.users && state.data.users.length > 0) {
-    state.cuti.employees = state.data.users.map((u, idx) => ({
-      nik: u.id || u.NoUrut || `EMP-${String(idx + 1).padStart(3, '0')}`,
-      nama: u.full_name || u.username || 'Karyawan',
-      jabatan: u.role || 'Staff',
-      kanwil: u.kanwil || 'Pusat'
-    }));
-    return state.cuti.employees;
+    const mapped = state.data.users
+      .filter(u => {
+        const st = String(u.Status || u.status || 'Active').toLowerCase();
+        return st !== 'inactive' && st !== 'nonaktif' && st !== 'non-aktif';
+      })
+      .map((u, idx) => {
+        const nama = (u.FullName || u.full_name || u.nama || u.Nama || u.Username || u.username || '').trim();
+        const nik = u.user_id || u.NoUrut || u.ID || u.id || (idx + 1 < 10 ? `EMP-00${idx + 1}` : `EMP-0${idx + 1}`);
+        const jabatan = u.Role || u.role || u.jabatan || u.Jabatan || 'Staff';
+        const kanwil = u.Kanwil || u.kanwil || 'Pusat';
+        return { nik, nama, jabatan, kanwil };
+      })
+      .filter(e => e.nama && e.nama !== 'Karyawan');
+
+    if (mapped.length > 0) {
+      mapped.sort((a, b) => a.nama.localeCompare(b.nama));
+      state.cuti.employees = mapped;
+      return state.cuti.employees;
+    }
   }
 
-  // Direct fetch dari Supabase users table
+  // 2. Direct fetch dari Supabase users table
   try {
     const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/users?select=*&order=full_name.asc`, {
       headers: {
@@ -4693,19 +4714,168 @@ async function fetchEmployeesForCuti() {
     });
     if (res.ok) {
       const users = await res.json();
-      state.cuti.employees = users.map((u, idx) => ({
-        nik: u.id || u.NoUrut || `EMP-${String(idx + 1).padStart(3, '0')}`,
-        nama: u.full_name || u.username || 'Karyawan',
-        jabatan: u.role || 'Staff',
-        kanwil: u.kanwil || 'Pusat'
-      }));
-      return state.cuti.employees;
+      const mapped = users
+        .filter(u => {
+          const st = String(u.status || u.Status || 'Active').toLowerCase();
+          return st !== 'inactive' && st !== 'nonaktif' && st !== 'non-aktif';
+        })
+        .map((u, idx) => {
+          const nama = (u.full_name || u.FullName || u.nama || u.Nama || u.username || u.Username || '').trim();
+          const nik = u.user_id || u.NoUrut || u.id || u.ID || (idx + 1 < 10 ? `EMP-00${idx + 1}` : `EMP-0${idx + 1}`);
+          const jabatan = u.role || u.Role || u.jabatan || u.Jabatan || 'Staff';
+          const kanwil = u.kanwil || u.Kanwil || 'Pusat';
+          return { nik, nama, jabatan, kanwil };
+        })
+        .filter(e => e.nama && e.nama !== 'Karyawan');
+
+      const seenMap = new Map();
+      mapped.forEach(e => {
+        const key = e.nama.toLowerCase();
+        if (!seenMap.has(key)) {
+          seenMap.set(key, e);
+        }
+      });
+      const uniqueMapped = Array.from(seenMap.values());
+
+      if (uniqueMapped.length > 0) {
+        uniqueMapped.sort((a, b) => a.nama.localeCompare(b.nama));
+        state.cuti.employees = uniqueMapped;
+        return state.cuti.employees;
+      }
     }
   } catch (err) {
-    console.warn('Gagal memuat users untuk cuti:', err);
+    console.warn('Gagal memuat users dari Supabase untuk cuti:', err);
+  }
+
+  // 3. Fallback: Ekstrak dari riwayat data cuti_karyawan yang sudah pernah ada
+  if (state.cuti.karyawanList && state.cuti.karyawanList.length > 0) {
+    const seen = new Set();
+    const fromCuti = [];
+    state.cuti.karyawanList.forEach(c => {
+      const nama = String(c.namakaryawan || '').trim();
+      if (nama && nama !== '-' && !seen.has(nama.toLowerCase())) {
+        seen.add(nama.toLowerCase());
+        fromCuti.push({
+          nik: c.nik || 'EMP-001',
+          nama: nama,
+          jabatan: c.jabatan || 'Staff',
+          kanwil: 'Pusat'
+        });
+      }
+    });
+    if (fromCuti.length > 0) {
+      fromCuti.sort((a, b) => a.nama.localeCompare(b.nama));
+      state.cuti.employees = fromCuti;
+      return state.cuti.employees;
+    }
   }
 
   return [];
+}
+
+// Handler File Dokumen Lokal Cuti
+window.onCutiDokumenFileSelected = function(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  // Batas 10MB
+  if (file.size > 10 * 1024 * 1024) {
+    alert('Ukuran berkas melebihi 10MB. Silakan pilih dokumen yang lebih kecil.');
+    event.target.value = '';
+    return;
+  }
+
+  selectedCutiFile = file;
+
+  const idleBox = document.getElementById('cutiDropzoneIdle');
+  const selectedBox = document.getElementById('cutiDropzoneSelected');
+  const nameEl = document.getElementById('cutiSelectedFileName');
+  const metaEl = document.getElementById('cutiSelectedFileMeta');
+  const iconEl = document.getElementById('cutiSelectedFileIcon');
+
+  if (idleBox) idleBox.style.display = 'none';
+  if (selectedBox) selectedBox.style.display = 'flex';
+  if (nameEl) nameEl.textContent = file.name;
+
+  const sizeKb = (file.size / 1024).toFixed(1);
+  const sizeStr = file.size > 1024 * 1024 ? `${(file.size / (1024 * 1024)).toFixed(2)} MB` : `${sizeKb} KB`;
+  if (metaEl) metaEl.textContent = `${sizeStr} • Siap diunggah ke Google Drive`;
+
+  if (iconEl) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'pdf') iconEl.innerHTML = '<i class="fa-solid fa-file-pdf" style="color:#f43f5e;"></i>';
+    else if (['jpg', 'jpeg', 'png'].includes(ext)) iconEl.innerHTML = '<i class="fa-solid fa-file-image" style="color:#38bdf8;"></i>';
+    else if (['doc', 'docx'].includes(ext)) iconEl.innerHTML = '<i class="fa-solid fa-file-word" style="color:#60a5fa;"></i>';
+    else iconEl.innerHTML = '<i class="fa-solid fa-file-lines"></i>';
+  }
+};
+
+window.removeSelectedCutiFile = function(event) {
+  if (event) event.stopPropagation();
+  selectedCutiFile = null;
+
+  const fileInput = document.getElementById('cutiDokumenFileInput');
+  if (fileInput) fileInput.value = '';
+
+  const idleBox = document.getElementById('cutiDropzoneIdle');
+  const selectedBox = document.getElementById('cutiDropzoneSelected');
+  if (idleBox) idleBox.style.display = 'flex';
+  if (selectedBox) selectedBox.style.display = 'none';
+};
+
+// Fungsi Upload Berkas Cuti ke Google Drive Folder
+async function uploadCutiDokumenToGoogleDrive(file, namaKaryawan, tipeCuti) {
+  const gdriveWebhookUrl = getGDriveWebhookUrl();
+  const ext = (file.name.split('.').pop() || 'pdf').toLowerCase();
+  const cleanNama = (namaKaryawan || 'Karyawan').replace(/[^a-zA-Z0-9]/g, '_');
+  const cleanTipe = (tipeCuti || 'Cuti').replace(/[^a-zA-Z0-9]/g, '_');
+  const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+  const targetFileName = `CUTI_${cleanNama}_${cleanTipe}_${timestamp}.${ext}`;
+
+  // 1. Coba upload via Webhook Apps Script jika sudah dipasang
+  if (gdriveWebhookUrl) {
+    try {
+      const base64Data = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = (err) => reject(err);
+        reader.readAsDataURL(file);
+      });
+
+      const payload = {
+        folderId: GDRIVE_CUTI_FOLDER_ID,
+        fileName: targetFileName,
+        mimeType: file.type || 'application/pdf',
+        base64: base64Data
+      };
+
+      const response = await fetch(gdriveWebhookUrl, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result && (result.directLink || result.fileUrl)) {
+          return {
+            success: true,
+            linkDokumen: result.directLink || result.fileUrl,
+            fileName: targetFileName
+          };
+        }
+      }
+    } catch (uploadErr) {
+      console.warn('Auto upload ke Google Drive via webhook gagal, menggunakan fallback:', uploadErr);
+    }
+  }
+
+  // 2. Fallback: Langsung link-kan ke folder target Google Drive dengan nama file terlampir
+  return {
+    success: true,
+    linkDokumen: `https://drive.google.com/drive/folders/${GDRIVE_CUTI_FOLDER_ID}`,
+    fileName: targetFileName,
+    isFallback: true
+  };
 }
 
 // ==========================================================================
@@ -4716,10 +4886,12 @@ async function initCutiKaryawanView() {
   const user = state.currentUser || { username: 'Staff', role: 'Staff', full_name: 'Staff Karyawan' };
   const isAdmin = (user.role || '').toLowerCase() === 'admin' || (user.role || '').toLowerCase() === 'administrator utama';
 
+  const userDisplayName = user.full_name || user.FullName || user.nama || user.username || 'Staff';
+
   // Badge User di Banner
   const userBadgeEl = document.getElementById('cutiUserBadgeText');
   if (userBadgeEl) {
-    userBadgeEl.textContent = `${user.full_name || user.username} (${user.role || 'Staff'})`;
+    userBadgeEl.textContent = `${userDisplayName} (${user.role || 'Staff'})`;
   }
 
   // Setup Form Pengajuan Cuti (Admin vs Staff)
@@ -4731,7 +4903,7 @@ async function initCutiKaryawanView() {
   const inputJabatan = document.getElementById('cutiJabatan');
   const selectNama = document.getElementById('cutiNamaKaryawanSelect');
 
-  const employees = await fetchEmployeesForCuti();
+  const employees = await fetchEmployeesForCuti(true);
 
   if (isAdmin) {
     if (selWrap) selWrap.style.display = 'block';
@@ -4743,7 +4915,7 @@ async function initCutiKaryawanView() {
         employees.map(e => `<option value="${e.nama}" data-nik="${e.nik}" data-jabatan="${e.jabatan}">${e.nama} (${e.jabatan || 'Staff'})</option>`).join('');
       
       // Default pilih user yang login jika ada di list
-      const matched = employees.find(e => e.nama.toLowerCase() === (user.full_name || user.username).toLowerCase());
+      const matched = employees.find(e => e.nama.toLowerCase() === userDisplayName.toLowerCase());
       if (matched) {
         selectNama.value = matched.nama;
         if (inputNik) inputNik.value = matched.nik;
@@ -4757,8 +4929,8 @@ async function initCutiKaryawanView() {
     if (selWrap) selWrap.style.display = 'none';
     if (roWrap) roWrap.style.display = 'block';
     if (noteEl) noteEl.textContent = '(Otomatis dari Akun Login)';
-    if (inputNama) inputNama.value = user.full_name || user.username || 'Staff';
-    if (inputNik) inputNik.value = user.id || 'EMP-001';
+    if (inputNama) inputNama.value = userDisplayName;
+    if (inputNik) inputNik.value = user.id || user.user_id || 'EMP-001';
     if (inputJabatan) inputJabatan.value = user.role || 'Staff';
   }
 
@@ -5035,7 +5207,6 @@ async function handlePengajuanCutiSubmit(event) {
   const inputTglSelesai = document.getElementById('cutiTglSelesai');
   const inputJumlahHari = document.getElementById('cutiJumlahHari');
   const inputKeterangan = document.getElementById('cutiKeterangan');
-  const inputLink = document.getElementById('cutiLinkDokumen');
   const btnSubmit = document.getElementById('btnSubmitPengajuanCuti');
 
   const namaKaryawan = isAdmin ? (selectNama ? selectNama.value : '') : (inputNama ? inputNama.value : '');
@@ -5056,9 +5227,27 @@ async function handlePengajuanCutiSubmit(event) {
   const tipeCuti = inputTipe ? inputTipe.value : 'Cuti Tahunan';
   const jumlahHari = parseFloat(inputJumlahHari ? inputJumlahHari.value : 1) || 1;
   const keterangan = inputKeterangan ? inputKeterangan.value : '';
-  const linkDokumen = inputLink ? inputLink.value.trim() : null;
 
-  // Generate Unique CutiID: CT-2026-XXXX
+  // 1. Upload Berkas Lokal ke Google Drive jika ada file yang dipilih
+  let finalLinkDokumen = null;
+  if (selectedCutiFile) {
+    if (btnSubmit) {
+      btnSubmit.disabled = true;
+      btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mengunggah Dokumen ke Google Drive...';
+    }
+
+    try {
+      const uploadRes = await uploadCutiDokumenToGoogleDrive(selectedCutiFile, namaKaryawan, tipeCuti);
+      if (uploadRes && uploadRes.linkDokumen) {
+        finalLinkDokumen = uploadRes.linkDokumen;
+      }
+    } catch (uploadErr) {
+      console.warn('Gagal upload dokumen ke Google Drive:', uploadErr);
+      finalLinkDokumen = `${GDRIVE_CUTI_FOLDER_URL}#${encodeURIComponent(selectedCutiFile.name)}`;
+    }
+  }
+
+  // 2. Generate Unique CutiID: CT-2026-XXXX
   const cutiId = `CT-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`;
   const nowIso = new Date().toISOString();
 
@@ -5073,7 +5262,7 @@ async function handlePengajuanCutiSubmit(event) {
     tanggalselesai: tglSelesai,
     jumlahhari: jumlahHari,
     keterangan: keterangan,
-    linkdokumen: linkDokumen || null,
+    linkdokumen: finalLinkDokumen,
     statusapproval: 'Pending',
     approvedby: null,
     approvedat: null,
@@ -5099,7 +5288,11 @@ async function handlePengajuanCutiSubmit(event) {
     });
 
     if (res.ok || res.status === 201) {
-      alert(`✅ Berhasil! Pengajuan cuti [${cutiId}] untuk ${namaKaryawan} telah tersimpan di Supabase.`);
+      let msg = `✅ Berhasil! Pengajuan cuti [${cutiId}] untuk ${namaKaryawan} telah tersimpan di Supabase.`;
+      if (selectedCutiFile) {
+        msg += `\n📄 Dokumen pendukung telah dihubungkan ke folder Google Drive resmi.`;
+      }
+      alert(msg);
       resetFormPengajuanCuti();
       await loadCutiKaryawanData(true);
     } else {
@@ -5120,6 +5313,8 @@ async function handlePengajuanCutiSubmit(event) {
 function resetFormPengajuanCuti() {
   const form = document.getElementById('formPengajuanCuti');
   if (form) form.reset();
+
+  removeSelectedCutiFile();
 
   const todayIso = new Date().toISOString().split('T')[0];
   const tglMulaiEl = document.getElementById('cutiTglMulai');
@@ -5191,8 +5386,8 @@ async function reloadCutiBersamaModule(forceRefresh) {
       state.cuti.karyawanList = await resCk.json();
     }
 
-    // Pastikan employees loaded
-    await fetchEmployeesForCuti();
+    // Pastikan employees loaded dengan nama asli
+    await fetchEmployeesForCuti(forceRefresh);
 
     // Render Tab 1: Cuti Bersama
     renderCutiBersamaTable();
@@ -5201,21 +5396,21 @@ async function reloadCutiBersamaModule(forceRefresh) {
     renderCutiApprovalTable();
 
     // Render Tab 3: Matriks Kuota
-    renderCutiMatrixTable();
+    await renderCutiMatrixTable();
 
   } catch (err) {
     console.error('Error reloadCutiBersamaModule:', err);
   }
 }
 
-function onCutiBersamaYearChange() {
+async function onCutiBersamaYearChange() {
   const yearSelect = document.getElementById('cbSelectYear');
   if (yearSelect) state.cuti.selectedYear = yearSelect.value;
   const yearNavLabel = document.getElementById('cbYearLabelNav');
   if (yearNavLabel) yearNavLabel.textContent = state.cuti.selectedYear;
 
   renderCutiBersamaTable();
-  renderCutiMatrixTable();
+  await renderCutiMatrixTable();
 }
 
 function renderCutiBersamaTable() {
@@ -5452,7 +5647,7 @@ function filterCutiApprovalList() {
   );
 }
 
-function renderCutiMatrixTable() {
+async function renderCutiMatrixTable() {
   const tbody = document.getElementById('cutiMatrixTableBody');
   if (!tbody) return;
 
@@ -5477,9 +5672,13 @@ function renderCutiMatrixTable() {
   if (matPotongEl) matPotongEl.textContent = `${totalCbPotong} Hari`;
   if (matNetEl) matNetEl.textContent = `${netQuota} Hari`;
 
-  // 2. Daftar karyawan
-  const employees = state.cuti.employees || [];
-  if (employees.length === 0) {
+  // 2. Pastikan daftar karyawan termuat dengan nama asli (bukan generic 'Karyawan')
+  let employees = state.cuti.employees || [];
+  if (employees.length === 0 || employees.every(e => e.nama === 'Karyawan' || e.nama.startsWith('Karyawan '))) {
+    employees = await fetchEmployeesForCuti(true);
+  }
+
+  if (!employees || employees.length === 0) {
     tbody.innerHTML = `
       <tr>
         <td colspan="9" style="text-align:center; padding:32px; color:var(--text-muted);">

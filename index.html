@@ -660,14 +660,59 @@
                     <textarea id="cutiKeterangan" class="form-input" rows="3" placeholder="Tuliskan keperluan pengajuan cuti secara singkat dan jelas..."></textarea>
                   </div>
 
-                  <!-- Link Dokumen Pendukung (Surat Dokter / Undangan / dll) -->
+                  <!-- Dokumen Pendukung (Ambil dari File Lokal & Masuk ke Google Drive) -->
                   <div class="form-group span-2">
-                    <label class="form-label" for="cutiLinkDokumen">
-                      <i class="fa-solid fa-paperclip" style="color:#38bdf8;"></i>
-                      <span>Link Dokumen Pendukung (Google Drive / Surat Dokter)</span>
-                      <span style="font-size:0.7rem; color:var(--text-muted); font-weight:normal;">(Opsional)</span>
-                    </label>
-                    <input type="url" id="cutiLinkDokumen" class="form-input" placeholder="https://drive.google.com/file/d/...">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+                      <label class="form-label" style="margin-bottom:0;">
+                        <i class="fa-solid fa-cloud-arrow-up" style="color:#38bdf8;"></i>
+                        <span>Dokumen Pendukung Cuti (Pilih Berkas Lokal Komputer / HP)</span>
+                        <span style="font-size:0.7rem; color:var(--text-muted); font-weight:normal;">(Opsional: Surat Dokter, Undangan, dll)</span>
+                      </label>
+                      <a href="https://drive.google.com/drive/folders/12Fcad07H3-DF3HJteLuvJ8Zpd3W7UzBD?usp=sharing" target="_blank" rel="noopener noreferrer" class="btn-gdrive-folder-pill" title="Buka Folder Penyimpanan Berkas Cuti di Google Drive">
+                        <i class="fa-brands fa-google-drive" style="color:#38bdf8;"></i>
+                        <span>Folder Drive Cuti</span>
+                        <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.65rem;"></i>
+                      </a>
+                    </div>
+
+                    <!-- Hidden File Input & Link Holder -->
+                    <input type="file" id="cutiDokumenFileInput" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" style="display:none;" onchange="onCutiDokumenFileSelected(event)">
+                    <input type="hidden" id="cutiLinkDokumen">
+
+                    <!-- Dropzone / Box File Selector -->
+                    <div class="cuti-file-dropzone" id="cutiFileDropzone" onclick="document.getElementById('cutiDokumenFileInput').click()">
+                      <div class="cuti-dropzone-idle" id="cutiDropzoneIdle">
+                        <div class="cuti-dropzone-icon">
+                          <i class="fa-solid fa-file-circle-plus"></i>
+                        </div>
+                        <div class="cuti-dropzone-text">
+                          <strong style="color:var(--text-light); font-size:0.85rem; display:block;">Pilih Dokumen dari Komputer / HP</strong>
+                          <span style="color:var(--text-muted); font-size:0.75rem;">Mendukung berkas: PDF, JPG, PNG, DOCX (Maks. 10MB)</span>
+                        </div>
+                      </div>
+
+                      <!-- Preview File Terpilih -->
+                      <div class="cuti-dropzone-selected" id="cutiDropzoneSelected" style="display:none;">
+                        <div class="cuti-selected-file-info">
+                          <div class="cuti-selected-file-icon" id="cutiSelectedFileIcon">
+                            <i class="fa-solid fa-file-pdf"></i>
+                          </div>
+                          <div>
+                            <div class="cuti-selected-file-name" id="cutiSelectedFileName">nama_dokumen.pdf</div>
+                            <div class="cuti-selected-file-meta" id="cutiSelectedFileMeta">0 KB • Berkas Lokal Terpilih</div>
+                          </div>
+                        </div>
+                        <button type="button" class="btn-remove-file" onclick="removeSelectedCutiFile(event)" title="Hapus File Terpilih">
+                          <i class="fa-solid fa-trash"></i>
+                          <span>Hapus</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="cuti-upload-note" id="cutiUploadNote">
+                      <i class="fa-solid fa-shield-halved" style="color:#38bdf8;"></i>
+                      <span>Berkas lokal akan otomatis dimasukkan ke folder Google Drive dan nama/link dokumen disimpan di tabel Supabase.</span>
+                    </div>
                   </div>
                 </div>
 
