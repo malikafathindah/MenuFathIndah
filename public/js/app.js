@@ -972,6 +972,12 @@ function switchModule(moduleName) {
   else if (moduleName === 'mod_cuti_bersama' || moduleName === 'cuti_bersama') viewId = 'cuti_bersama';
   else if (moduleName === 'mod_presensi') viewId = 'cuti_absensi';
   else if (moduleName === 'mod_input_brosur' || moduleName === 'launching_brosur' || moduleName === 'mod_view_brochure') viewId = 'launching_brosur';
+  else if (moduleName === 'mod_daftar_karyawan' || moduleName === 'daftar_karyawan') viewId = 'daftar_karyawan';
+  else if (moduleName === 'mod_bio_karyawan' || moduleName === 'bio_karyawan') viewId = 'bio_karyawan';
+  else if (moduleName === 'mod_detail_emp' || moduleName === 'detail_emp') viewId = 'detail_emp';
+  else if (moduleName === 'mod_emp_analytics' || moduleName === 'emp_analytics') viewId = 'emp_analytics';
+  else if (moduleName === 'mod_upload_dok' || moduleName === 'upload_dok') viewId = 'upload_dok';
+  else if (moduleName === 'mod_slip_gaji' || moduleName === 'slip_gaji') viewId = 'slip_gaji';
   else if (moduleName === 'mod_modules' || moduleName === 'settings') viewId = 'settings';
 
   // Highlight active nav item in sidebar
@@ -1013,6 +1019,12 @@ function switchModule(moduleName) {
     cuti_karyawan: { title: 'Pengajuan & Riwayat Cuti Karyawan', breadcrumb: 'SDM & Karyawan / Pengajuan Cuti Mandiri & Kuota' },
     cuti_bersama: { title: 'Cuti Bersama, Approval & Matriks Cuti', breadcrumb: 'SDM & Manajemen / Master Cuti Bersama & Persetujuan' },
     cuti_absensi: { title: 'Presensi & Cuti Karyawan', breadcrumb: 'SDM / Absensi & Pengajuan Cuti' },
+    daftar_karyawan: { title: 'Daftar Rekapitulasi Karyawan', breadcrumb: 'SDM & Karyawan / Master Data Karyawan Supabase' },
+    bio_karyawan: { title: 'Formulir Entry Karyawan Baru', breadcrumb: 'SDM & Karyawan / Entry Biodata & Dokumen Lengkap' },
+    detail_emp: { title: 'Dokumen Resmi Detail Kepegawaian', breadcrumb: 'SDM & Karyawan / Cetak Dokumen Biodata A4 Resmi' },
+    emp_analytics: { title: 'Analytics & Statistik Demografi SDM', breadcrumb: 'SDM & Manajemen / Eksekutif Dashboard Demografi' },
+    upload_dok: { title: 'Pusat Unggahan Dokumen Fisik Karyawan', breadcrumb: 'SDM & Personalia / Berkas KTP, KK, Ijazah ke Google Drive' },
+    slip_gaji: { title: 'Lihat Dokumen Slip Gaji Karyawan', breadcrumb: 'Keuangan & SDM / Pratinjau Slip Gaji Resmi' },
     settings: { title: 'Konfigurasi Database', breadcrumb: 'Sistem / Pengalihan Google Sheets & Supabase' }
   };
 
@@ -1034,6 +1046,12 @@ function switchModule(moduleName) {
   if (viewId === 'cuti_karyawan') initCutiKaryawanView();
   if (viewId === 'cuti_bersama') initCutiBersamaView();
   if (viewId === 'cuti_absensi') renderCutiAbsensi();
+  if (viewId === 'daftar_karyawan') initDaftarKaryawanView();
+  if (viewId === 'bio_karyawan') initBioKaryawanView();
+  if (viewId === 'detail_emp') initEmployeeDetailView();
+  if (viewId === 'emp_analytics') initEmployeeAnalyticsView();
+  if (viewId === 'upload_dok') initUploadDocView();
+  if (viewId === 'slip_gaji') initSlipGajiView();
   if (viewId === 'settings') renderSettings();
 }
 
@@ -6181,3 +6199,1424 @@ async function deleteCutiRequest(cutiId) {
   }
 }
 
+
+// ==========================================================================
+// SECTION 13: MODUL HR & PERSONALIA TERINTEGRASI SUPABASE
+// 1. mod_daftar_karyawan (Daftar Karyawan)
+// 2. mod_bio_karyawan (Form Biodata Karyawan)
+// 3. mod_data_attendance (Data Kehadiran / Log Absensi Presensi)
+// 4. mod_upload_dok (Arsip & Upload Dokumen Pegawai ke Google Drive)
+// 5. mod_detail_emp (Detail Karyawan & Cetak Presisi A4 Resmi Perusahaan)
+// 6. mod_emp_analytics (Dashboard Statistik & Analytics Kepegawaian)
+// 7. mod_slip_gaji (Lihat Slip Gaji & Viewer Dokumen Penggajian Drive)
+// ==========================================================================
+
+// State internal modul HR & Personalia
+if (!state.hr) {
+  state.hr = {
+    employees: [],
+    selectedEmployeeNik: null,
+    daftarFilter: { search: '', dept: 'ALL', status: 'ALL' },
+    slipGajiList: [],
+    slipGajiFilter: { search: '', periode: 'ALL' },
+    uploadDokList: [],
+    uploadDokFilter: { search: '', jenis: 'ALL' },
+    selectedUploadDokFile: null
+  };
+}
+
+// Master Default Kanwil & Departemen
+const HR_DEFAULT_DEPTS = [
+  'Operasional Umrah & Haji',
+  'Ticketing & Reservasi',
+  'Keuangan & Akuntansi',
+  'SDM & Legal (HRD)',
+  'Marketing & Promosi',
+  'IT & Digital Media',
+  'Pelayanan Jamaah & Perlengkapan'
+];
+
+// Helper format Rupiah
+function formatRupiah(amount) {
+  if (amount === undefined || amount === null || isNaN(amount)) return 'Rp 0';
+  return 'Rp ' + Number(amount).toLocaleString('id-ID');
+}
+
+// --------------------------------------------------------------------------
+// 13.1 DAFTAR KARYAWAN (mod_daftar_karyawan)
+// --------------------------------------------------------------------------
+
+async function initDaftarKaryawanView() {
+  await loadDaftarKaryawanData();
+}
+
+async function loadDaftarKaryawanData(forceRefresh = false) {
+  const tbody = document.getElementById('daftarKaryawanTableBody');
+  if (tbody) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="8" style="text-align:center; padding:32px; color:var(--text-muted);">
+          <i class="fa-solid fa-spinner fa-spin" style="color:#06b6d4; font-size:1.5rem;"></i>
+          <div style="margin-top:10px; font-size:0.85rem;">Memuat direktori data karyawan dari Supabase...</div>
+        </td>
+      </tr>
+    `;
+  }
+
+  let list = [];
+
+  // 1. Coba ambil dari Supabase REST API view "Bio Karyawan" atau tabel "Bio_Karyawan"
+  try {
+    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/Bio_Karyawan?select=*&order=nik.asc`, {
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+      }
+    });
+    if (res.ok) {
+      list = await res.json();
+    }
+  } catch (err) {
+    console.warn('Supabase fetch Bio_Karyawan error:', err);
+  }
+
+  // 2. Fallback jika perlu melewati Node backend
+  if (!list || list.length === 0) {
+    try {
+      const res = await fetch('/api/bio-karyawan');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data && Array.isArray(json.data) && json.data.length > 0) {
+          list = json.data;
+        }
+      }
+    } catch (_) {}
+  }
+
+  // 3. Fallback ke state cache employees yang sudah di-load
+  if (!list || list.length === 0) {
+    if (state.cuti && Array.isArray(state.cuti.employees) && state.cuti.employees.length > 0) {
+      list = state.cuti.employees.map(e => ({
+        nik: e.nik,
+        nama: e.nama,
+        jabatan: e.jabatan,
+        departemen: e.departemen || 'Operasional Umrah & Haji',
+        statuskaryawan: 'Tetap',
+        nomortelepon: '-',
+        tglmasuk: '2024-01-01'
+      }));
+    }
+  }
+
+  state.hr.employees = list || [];
+  renderDaftarKaryawanTable();
+  updateDaftarKaryawanStats();
+  populateDaftarKaryawanFilterDepts();
+}
+
+function updateDaftarKaryawanStats() {
+  const employees = state.hr.employees || [];
+  const total = employees.length;
+  const tetap = employees.filter(e => String(e.statuskaryawan || e.status_karyawan || '').toLowerCase().includes('tetap')).length;
+  const kontrak = employees.filter(e => String(e.statuskaryawan || e.status_karyawan || '').toLowerCase().includes('kontrak')).length;
+  const depts = new Set(employees.map(e => (e.departemen || e.dept || '').trim()).filter(Boolean)).size;
+
+  const elTotal = document.getElementById('statTotalKaryawanList');
+  const elTetap = document.getElementById('statKaryawanTetap');
+  const elKontrak = document.getElementById('statKaryawanKontrak');
+  const elDepts = document.getElementById('statTotalDept');
+
+  if (elTotal) elTotal.textContent = total;
+  if (elTetap) elTetap.textContent = tetap;
+  if (elKontrak) elKontrak.textContent = kontrak || (total - tetap);
+  if (elDepts) elDepts.textContent = depts || 4;
+}
+
+function populateDaftarKaryawanFilterDepts() {
+  const deptSelect = document.getElementById('filterDaftarKaryawanDept');
+  if (!deptSelect) return;
+
+  const employees = state.hr.employees || [];
+  const currentVal = deptSelect.value || 'ALL';
+  const depts = [...new Set(employees.map(e => (e.departemen || e.dept || '').trim()).filter(Boolean))].sort();
+
+  let html = '<option value="ALL">Semua Departemen</option>';
+  depts.forEach(d => {
+    html += `<option value="${d}" ${d === currentVal ? 'selected' : ''}>${d}</option>`;
+  });
+  deptSelect.innerHTML = html;
+}
+
+function renderDaftarKaryawanTable() {
+  const tbody = document.getElementById('daftarKaryawanTableBody');
+  if (!tbody) return;
+
+  const filter = state.hr.daftarFilter;
+  const employees = state.hr.employees || [];
+
+  const filtered = employees.filter(emp => {
+    const s = (filter.search || '').toLowerCase().trim();
+    const nama = String(emp.nama || emp.nama_lengkap || '').toLowerCase();
+    const nik = String(emp.nik || '').toLowerCase();
+    const jabatan = String(emp.jabatan || '').toLowerCase();
+    const matchSearch = !s || nama.includes(s) || nik.includes(s) || jabatan.includes(s);
+
+    const dept = (emp.departemen || emp.dept || '').trim();
+    const matchDept = filter.dept === 'ALL' || dept === filter.dept;
+
+    const st = String(emp.statuskaryawan || emp.status_karyawan || '').toLowerCase();
+    let matchStatus = true;
+    if (filter.status === 'Tetap') matchStatus = st.includes('tetap');
+    else if (filter.status === 'Kontrak') matchStatus = st.includes('kontrak');
+    else if (filter.status === 'Probation') matchStatus = st.includes('proba');
+
+    return matchSearch && matchDept && matchStatus;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="8" style="text-align:center; padding:32px; color:var(--text-muted);">
+          Tidak ada data karyawan yang cocok dengan filter pencarian.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((emp, idx) => {
+    const nik = emp.nik || `NIK-${idx + 1}`;
+    const nama = emp.nama || emp.nama_lengkap || 'Karyawan';
+    const jabatan = emp.jabatan || 'Staff';
+    const dept = emp.departemen || emp.dept || 'Operasional';
+    const status = emp.statuskaryawan || emp.status_karyawan || 'Tetap';
+    const telp = emp.nomortelepon || emp.no_telepon || emp.nohp || '-';
+    const email = emp.email || '-';
+    const tglMasuk = emp.tglmasuk || emp.tanggal_masuk || '-';
+
+    let statusBadgeCls = 'active';
+    if (status.toLowerCase().includes('kontrak')) statusBadgeCls = 'warning';
+    else if (status.toLowerCase().includes('proba')) statusBadgeCls = 'info';
+
+    return `
+      <tr>
+        <td style="text-align:center; font-family:monospace; color:var(--text-dim);">${idx + 1}</td>
+        <td>
+          <span style="font-family:monospace; font-weight:700; color:#38bdf8; background:rgba(56,189,248,0.1); padding:2px 6px; border-radius:4px;">
+            ${nik}
+          </span>
+        </td>
+        <td>
+          <div style="font-weight:700; color:var(--text-light); font-size:0.88rem;">${nama}</div>
+          <div style="font-size:0.72rem; color:var(--text-dim);">${email}</div>
+        </td>
+        <td>
+          <div style="color:var(--text-main); font-size:0.82rem; font-weight:600;">${jabatan}</div>
+          <div style="font-size:0.72rem; color:var(--text-muted);">${dept}</div>
+        </td>
+        <td style="text-align:center;">
+          <span class="status-pill ${statusBadgeCls}" style="font-size:0.72rem;">
+            ${status}
+          </span>
+        </td>
+        <td style="font-size:0.8rem; color:var(--text-light); font-family:monospace;">${telp}</td>
+        <td style="font-size:0.8rem; color:var(--text-muted);">${tglMasuk}</td>
+        <td style="text-align:center;">
+          <div style="display:inline-flex; gap:6px;">
+            <button type="button" class="btn-action view" onclick="viewEmployeeDetailFromList('${nik}')" title="Cetak / Pratinjau Profil Resmi A4">
+              <i class="fa-solid fa-print"></i>
+            </button>
+            <button type="button" class="btn-action edit" onclick="editEmployeeBio('${nik}')" title="Edit Biodata Lengkap">
+              <i class="fa-solid fa-pen-to-square"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+window.onDaftarKaryawanFilterChange = function() {
+  const searchInput = document.getElementById('searchDaftarKaryawan');
+  const deptSelect = document.getElementById('filterDaftarKaryawanDept');
+  const statusSelect = document.getElementById('filterDaftarKaryawanStatus');
+
+  state.hr.daftarFilter = {
+    search: searchInput ? searchInput.value : '',
+    dept: deptSelect ? deptSelect.value : 'ALL',
+    status: statusSelect ? statusSelect.value : 'ALL'
+  };
+
+  renderDaftarKaryawanTable();
+};
+
+window.exportDaftarKaryawanCSV = function() {
+  const employees = state.hr.employees || [];
+  if (employees.length === 0) {
+    alert('Tidak ada data karyawan untuk diexport.');
+    return;
+  }
+
+  const headers = ['NIK', 'Nama Lengkap', 'Jabatan', 'Departemen', 'Status Kepegawaian', 'No Telepon', 'Email', 'Tanggal Masuk', 'Kanwil / Penempatan'];
+  const rows = employees.map(e => [
+    `"${e.nik || ''}"`,
+    `"${(e.nama || e.nama_lengkap || '').replace(/"/g, '""')}"`,
+    `"${(e.jabatan || '').replace(/"/g, '""')}"`,
+    `"${(e.departemen || '').replace(/"/g, '""')}"`,
+    `"${(e.statuskaryawan || '').replace(/"/g, '""')}"`,
+    `"${(e.nomortelepon || '').replace(/"/g, '""')}"`,
+    `"${(e.email || '').replace(/"/g, '""')}"`,
+    `"${(e.tglmasuk || '').replace(/"/g, '""')}"`,
+    `"${(e.kanwil || '').replace(/"/g, '""')}"`
+  ]);
+
+  const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement('a');
+  link.setAttribute('href', encodedUri);
+  link.setAttribute('download', `Daftar_Karyawan_FathIndah_${new Date().toISOString().split('T')[0]}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+window.viewEmployeeDetailFromList = function(nik) {
+  state.hr.selectedEmployeeNik = nik;
+  switchModule('mod_detail_emp');
+  initEmployeeDetailView(nik);
+};
+
+window.editEmployeeBio = function(nik) {
+  state.hr.selectedEmployeeNik = nik;
+  switchModule('mod_bio_karyawan');
+  populateBioKaryawanFormWithNik(nik);
+};
+
+// --------------------------------------------------------------------------
+// 13.2 BIODATA KARYAWAN (mod_bio_karyawan)
+// --------------------------------------------------------------------------
+
+function initBioKaryawanView() {
+  resetBioKaryawanForm();
+  populateBioKaryawanDropdowns();
+}
+
+function resetBioKaryawanForm() {
+  const form = document.getElementById('formBioKaryawan');
+  if (form) form.reset();
+  const nikInput = document.getElementById('bioNik');
+  if (nikInput) {
+    nikInput.removeAttribute('readonly');
+    nikInput.style.opacity = '1';
+  }
+}
+
+function populateBioKaryawanDropdowns() {
+  // Departemen
+  const deptSelect = document.getElementById('bioDepartemen');
+  if (deptSelect && deptSelect.children.length <= 1) {
+    deptSelect.innerHTML = '<option value="">-- Pilih Departemen --</option>' +
+      HR_DEFAULT_DEPTS.map(d => `<option value="${d}">${d}</option>`).join('');
+  }
+
+  // Kanwil Penempatan
+  const kanwilSelect = document.getElementById('bioKanwil');
+  if (kanwilSelect && kanwilSelect.children.length <= 1) {
+    const kanwils = (state.data && state.data.kanwilFathIndah) || DEFAULT_KANWIL_FATH_INDAH;
+    const list = kanwils.map(k => (k.namakanwil || k.namakanwill || '').trim()).filter(Boolean);
+    const unique = [...new Set([...list, 'Pusat', 'Jabodetabek', 'Solo Raya', 'Samarinda'])].sort();
+    kanwilSelect.innerHTML = '<option value="">-- Pilih Wilayah / Kantor Cabang --</option>' +
+      unique.map(w => `<option value="${w}">${w}</option>`).join('');
+  }
+}
+
+function populateBioKaryawanFormWithNik(nik) {
+  const employees = state.hr.employees || [];
+  const emp = employees.find(e => String(e.nik || '').trim() === String(nik || '').trim());
+  if (!emp) return;
+
+  populateBioKaryawanDropdowns();
+
+  // Helper setter
+  const setVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val !== undefined && val !== null ? val : '';
+  };
+
+  setVal('bioNik', emp.nik);
+  setVal('bioNamaLengkap', emp.nama || emp.nama_lengkap);
+  setVal('bioJenisKelamin', emp.jeniskelamin || emp.jenis_kelamin || 'Laki-Laki');
+  setVal('bioTempatLahir', emp.tempatlahir || emp.tempat_lahir);
+  setVal('bioTglLahir', emp.tanggallahir ? emp.tanggallahir.split('T')[0] : '');
+  setVal('bioAgama', emp.agama || 'Islam');
+  setVal('bioStatusNikah', emp.statusnikah || emp.status_pernikahan || 'Belum Menikah');
+  setVal('bioNoKtp', emp.noktp || emp.no_ktp);
+  setVal('bioNpwp', emp.npwp);
+
+  setVal('bioNoTelepon', emp.nomortelepon || emp.no_telepon || emp.nohp);
+  setVal('bioEmail', emp.email);
+  setVal('bioAlamatKtp', emp.alamatktp || emp.alamat_ktp);
+  setVal('bioRtRw', emp.rtrw);
+  setVal('bioKelurahan', emp.kelurahan);
+  setVal('bioKecamatan', emp.kecamatan);
+  setVal('bioKota', emp.kota || emp.kabupaten_kota);
+  setVal('bioProvinsi', emp.provinsi);
+  setVal('bioKodePos', emp.kodepos || emp.kode_pos);
+  setVal('bioAlamatDomisili', emp.alamatdomisili || emp.alamat_domisili);
+
+  setVal('bioJabatan', emp.jabatan);
+  setVal('bioDepartemen', emp.departemen || emp.dept);
+  setVal('bioStatusKaryawan', emp.statuskaryawan || emp.status_karyawan || 'Tetap');
+  setVal('bioTglMasuk', emp.tglmasuk ? emp.tglmasuk.split('T')[0] : '');
+  setVal('bioKanwil', emp.kanwil || emp.lokasi_penempatan || 'Pusat');
+
+  setVal('bioGajiPokok', emp.gajipokok || emp.gaji_pokok || 0);
+  setVal('bioBank', emp.bank || 'BSI (Bank Syariah Indonesia)');
+  setVal('bioNoRekening', emp.norekening || emp.no_rekening);
+  setVal('bioBpjsKes', emp.bpjskes || emp.bpjs_kesehatan);
+  setVal('bioBpjsTk', emp.bpjstk || emp.bpjs_ketenagakerjaan);
+
+  const nikInput = document.getElementById('bioNik');
+  if (nikInput) {
+    nikInput.setAttribute('readonly', 'readonly');
+    nikInput.style.opacity = '0.75';
+  }
+}
+
+window.handleBioKaryawanSubmit = async function(event) {
+  if (event) event.preventDefault();
+
+  const getVal = (id) => {
+    const el = document.getElementById(id);
+    return el ? el.value.trim() : '';
+  };
+
+  const nik = getVal('bioNik');
+  const nama = getVal('bioNamaLengkap');
+
+  if (!nik || !nama) {
+    alert('NIK dan Nama Lengkap wajib diisi!');
+    return;
+  }
+
+  const payload = {
+    nik: nik,
+    nama: nama,
+    jeniskelamin: getVal('bioJenisKelamin') || 'Laki-Laki',
+    tempatlahir: getVal('bioTempatLahir'),
+    tanggallahir: getVal('bioTglLahir') || null,
+    agama: getVal('bioAgama') || 'Islam',
+    statusnikah: getVal('bioStatusNikah') || 'Belum Menikah',
+    noktp: getVal('bioNoKtp'),
+    npwp: getVal('bioNpwp'),
+
+    nomortelepon: getVal('bioNoTelepon'),
+    email: getVal('bioEmail'),
+    alamatktp: getVal('bioAlamatKtp'),
+    rtrw: getVal('bioRtRw'),
+    kelurahan: getVal('bioKelurahan'),
+    kecamatan: getVal('bioKecamatan'),
+    kota: getVal('bioKota'),
+    provinsi: getVal('bioProvinsi'),
+    kodepos: getVal('bioKodePos'),
+    alamatdomisili: getVal('bioAlamatDomisili'),
+
+    jabatan: getVal('bioJabatan') || 'Staff',
+    departemen: getVal('bioDepartemen') || 'Operasional',
+    statuskaryawan: getVal('bioStatusKaryawan') || 'Tetap',
+    tglmasuk: getVal('bioTglMasuk') || null,
+    kanwil: getVal('bioKanwil') || 'Pusat',
+
+    gajipokok: parseFloat(getVal('bioGajiPokok')) || 0,
+    bank: getVal('bioBank') || 'BSI',
+    norekening: getVal('bioNoRekening'),
+    bpjskes: getVal('bioBpjsKes'),
+    bpjstk: getVal('bioBpjsTk'),
+
+    updatedat: new Date().toISOString()
+  };
+
+  const btnSubmit = document.getElementById('btnSaveBioKaryawan');
+  if (btnSubmit) {
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan ke Supabase...';
+  }
+
+  try {
+    // 1. Coba REST API Supabase Upsert (on_conflict=nik)
+    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/Bio_Karyawan`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok || res.status === 201 || res.status === 204) {
+      alert(`✅ Biodata karyawan [${nik}] ${nama} berhasil disimpan ke Supabase!`);
+      await loadDaftarKaryawanData(true);
+      switchModule('mod_daftar_karyawan');
+    } else {
+      // 2. Fallback kirim via Node Server API
+      const srvRes = await fetch('/api/bio-karyawan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const srvData = await srvRes.json();
+      if (srvData.success) {
+        alert(`✅ Biodata karyawan [${nik}] ${nama} berhasil disimpan via server backend!`);
+        await loadDaftarKaryawanData(true);
+        switchModule('mod_daftar_karyawan');
+      } else {
+        alert(`⚠️ Gagal menyimpan data: ${srvData.message || (await res.text())}`);
+      }
+    }
+  } catch (err) {
+    console.error('Error simpan biodata:', err);
+    alert(`⚠️ Terjadi kesalahan: ${err.message}`);
+  } finally {
+    if (btnSubmit) {
+      btnSubmit.disabled = false;
+      btnSubmit.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan Data Karyawan';
+    }
+  }
+};
+
+// --------------------------------------------------------------------------
+// 13.3 DETAIL PEGAWAI & CETAK PRESISI A4 RESMI (mod_detail_emp)
+// --------------------------------------------------------------------------
+
+function initEmployeeDetailView(targetNik) {
+  populateEmployeeDetailSelect(targetNik);
+}
+
+function populateEmployeeDetailSelect(targetNik) {
+  const select = document.getElementById('selectDetailEmployee');
+  if (!select) return;
+
+  const employees = state.hr.employees || [];
+  if (employees.length === 0) {
+    select.innerHTML = '<option value="">-- Belum ada data karyawan --</option>';
+    return;
+  }
+
+  const selectedVal = targetNik || state.hr.selectedEmployeeNik || (employees[0] && employees[0].nik);
+
+  select.innerHTML = employees.map(e => {
+    const isSel = String(e.nik) === String(selectedVal);
+    return `<option value="${e.nik}" ${isSel ? 'selected' : ''}>${e.nik} - ${e.nama || e.nama_lengkap} (${e.jabatan || 'Staff'})</option>`;
+  }).join('');
+
+  onSelectEmployeeDetailChange();
+}
+
+window.onSelectEmployeeDetailChange = function() {
+  const select = document.getElementById('selectDetailEmployee');
+  if (!select) return;
+
+  const nik = select.value;
+  state.hr.selectedEmployeeNik = nik;
+  const employees = state.hr.employees || [];
+  const emp = employees.find(e => String(e.nik) === String(nik));
+
+  renderEmployeeDetailPaper(emp);
+};
+
+function renderEmployeeDetailPaper(emp) {
+  const container = document.getElementById('employeeDetailPaper');
+  if (!container) return;
+
+  if (!emp) {
+    container.innerHTML = `
+      <div style="text-align:center; padding:60px 20px; color:var(--text-muted);">
+        <i class="fa-solid fa-user-xmark" style="font-size:2.5rem; margin-bottom:12px; color:var(--text-dim);"></i>
+        <div>Silakan pilih karyawan di atas untuk mencetak lembar data resmi.</div>
+      </div>
+    `;
+    return;
+  }
+
+  const nik = emp.nik || '-';
+  const nama = emp.nama || emp.nama_lengkap || '-';
+  const gender = emp.jeniskelamin || emp.jenis_kelamin || 'Laki-Laki';
+  const ttl = `${emp.tempatlahir || '-'}, ${emp.tanggallahir ? emp.tanggallahir.split('T')[0] : '-'}`;
+  const agama = emp.agama || 'Islam';
+  const statusNikah = emp.statusnikah || emp.status_pernikahan || 'Belum Menikah';
+  const noKtp = emp.noktp || emp.no_ktp || '-';
+  const npwp = emp.npwp || '-';
+
+  const telp = emp.nomortelepon || emp.no_telepon || emp.nohp || '-';
+  const email = emp.email || '-';
+  const alamatKtp = emp.alamatktp || emp.alamat_ktp || '-';
+  const alamatDomisili = emp.alamatdomisili || emp.alamat_domisili || alamatKtp;
+
+  const jabatan = emp.jabatan || 'Staff';
+  const dept = emp.departemen || emp.dept || 'Operasional';
+  const statusKaryawan = emp.statuskaryawan || emp.status_karyawan || 'Tetap';
+  const tglMasuk = emp.tglmasuk || emp.tanggal_masuk || '-';
+  const kanwil = emp.kanwil || emp.lokasi_penempatan || 'Kantor Pusat Jakarta';
+
+  const bank = emp.bank || 'Bank Syariah Indonesia (BSI)';
+  const noRek = emp.norekening || emp.no_rekening || '-';
+  const bpjsKes = emp.bpjskes || '-';
+  const bpjsTk = emp.bpjstk || '-';
+
+  const currentDateIndo = new Intl.DateTimeFormat('id-ID', { dateStyle: 'long' }).format(new Date());
+
+  container.innerHTML = `
+    <!-- HEADER RESMI PERUSAHAAN (KOP SURAT) -->
+    <div class="de-header-official">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:20px;">
+        <div style="display:flex; align-items:center; gap:16px;">
+          <div style="width:64px; height:64px; border-radius:12px; background:#0f172a; border:2px solid #38bdf8; display:flex; align-items:center; justify-content:center; color:#38bdf8; font-size:2rem; font-weight:900;">
+            <i class="fa-solid fa-kaaba"></i>
+          </div>
+          <div>
+            <div style="font-size:1.35rem; font-weight:900; letter-spacing:0.5px; color:#0f172a; text-transform:uppercase;">
+              PT. FATH INDAH TRAVEL SERVICES
+            </div>
+            <div style="font-size:0.78rem; font-weight:700; color:#0284c7; letter-spacing:1px; text-transform:uppercase;">
+              Penyelenggara Ibadah Haji Khusus & Umrah Resmi Kemenag RI
+            </div>
+            <div style="font-size:0.7rem; color:#475569; margin-top:2px;">
+              Gedung Fath Indah, Jl. Warung Buncit Raya No. 45 Jakarta Selatan • Telp: (021) 7919-8888 • www.fathindah.co.id
+            </div>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <span style="border:1.5px solid #0284c7; padding:4px 12px; border-radius:6px; font-size:0.75rem; font-weight:800; color:#0284c7; text-transform:uppercase; font-family:monospace;">
+            FORM: HRD-EMP-01
+          </span>
+          <div style="font-size:0.68rem; color:#64748b; margin-top:4px;">Klasifikasi: Dokumen Rahasia Perusahaan</div>
+        </div>
+      </div>
+      <div style="border-bottom:3px double #0f172a; margin-top:12px; margin-bottom:16px;"></div>
+    </div>
+
+    <!-- JUDUL DOKUMEN -->
+    <div style="text-align:center; margin-bottom:20px;">
+      <h3 style="font-size:1.15rem; font-weight:900; color:#0f172a; text-transform:uppercase; text-decoration:underline; margin:0; letter-spacing:0.5px;">
+        LEMBAR DATA BIODATA RESMI KARYAWAN
+      </h3>
+      <div style="font-size:0.75rem; color:#64748b; margin-top:3px; font-family:monospace;">
+        Nomor Induk Karyawan (NIK): <strong>${nik}</strong>
+      </div>
+    </div>
+
+    <!-- SEKSI 1: DATA PRIBADI & FOTO -->
+    <div style="display:flex; gap:20px; margin-bottom:18px;">
+      <div style="flex:1;">
+        <div class="de-section-title">I. DATA PRIBADI PEGAWAI</div>
+        <table class="de-print-table">
+          <tr>
+            <td style="width:35%; font-weight:600;">Nomor Induk Karyawan (NIK)</td>
+            <td style="width:5%; text-align:center;">:</td>
+            <td style="width:60%; font-weight:700; color:#0284c7; font-family:monospace;">${nik}</td>
+          </tr>
+          <tr>
+            <td style="font-weight:600;">Nama Lengkap (sesuai KTP)</td>
+            <td style="text-align:center;">:</td>
+            <td style="font-weight:700; color:#0f172a;">${nama}</td>
+          </tr>
+          <tr>
+            <td style="font-weight:600;">Jenis Kelamin</td>
+            <td style="text-align:center;">:</td>
+            <td>${gender}</td>
+          </tr>
+          <tr>
+            <td style="font-weight:600;">Tempat, Tanggal Lahir</td>
+            <td style="text-align:center;">:</td>
+            <td>${ttl}</td>
+          </tr>
+          <tr>
+            <td style="font-weight:600;">Agama / Keyakinan</td>
+            <td style="text-align:center;">:</td>
+            <td>${agama}</td>
+          </tr>
+          <tr>
+            <td style="font-weight:600;">Status Pernikahan</td>
+            <td style="text-align:center;">:</td>
+            <td>${statusNikah}</td>
+          </tr>
+          <tr>
+            <td style="font-weight:600;">Nomor KTP / NIK Kependudukan</td>
+            <td style="text-align:center;">:</td>
+            <td style="font-family:monospace;">${noKtp}</td>
+          </tr>
+          <tr>
+            <td style="font-weight:600;">Nomor Pokok Wajib Pajak (NPWP)</td>
+            <td style="text-align:center;">:</td>
+            <td style="font-family:monospace;">${npwp}</td>
+          </tr>
+        </table>
+      </div>
+      <!-- PAS FOTO RESMI (3X4 RATIO) -->
+      <div style="width:130px; text-align:center;">
+        <div style="width:120px; height:150px; border:2px dashed #94a3b8; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#f8fafc; color:#64748b; font-size:0.7rem; margin:auto;">
+          <i class="fa-solid fa-user" style="font-size:2.5rem; color:#cbd5e1; margin-bottom:8px;"></i>
+          <span>Pas Foto 3x4</span>
+          <span style="font-size:0.6rem; color:#94a3b8;">PT Fath Indah</span>
+        </div>
+        <div style="font-size:0.65rem; color:#64748b; margin-top:6px; font-weight:600;">VERIFIED HRD</div>
+      </div>
+    </div>
+
+    <!-- SEKSI 2: KONTAK & ALAMAT DOMISILI -->
+    <div style="margin-bottom:18px;">
+      <div class="de-section-title">II. KONTAK DAN ALAMAT TEMPAT TINGGAL</div>
+      <table class="de-print-table">
+        <tr>
+          <td style="width:28%; font-weight:600;">Nomor Telepon / WhatsApp</td>
+          <td style="width:4%; text-align:center;">:</td>
+          <td style="width:68%; font-family:monospace;">${telp}</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">Alamat Surat Elektronik (Email)</td>
+          <td style="text-align:center;">:</td>
+          <td>${email}</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">Alamat Lengkap (KTP)</td>
+          <td style="text-align:center;">:</td>
+          <td>${alamatKtp}</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">Alamat Domisili Sekarang</td>
+          <td style="text-align:center;">:</td>
+          <td>${alamatDomisili}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- SEKSI 3: INFORMASI JABATAN & KEPEGAWAIAN -->
+    <div style="margin-bottom:18px;">
+      <div class="de-section-title">III. STATUS KEPEGAWAIAN DAN PENEMPATAN</div>
+      <table class="de-print-table">
+        <tr>
+          <td style="width:28%; font-weight:600;">Jabatan / Posisi Kerja</td>
+          <td style="width:4%; text-align:center;">:</td>
+          <td style="width:68%; font-weight:700; color:#0f172a;">${jabatan}</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">Departemen / Divisi</td>
+          <td style="text-align:center;">:</td>
+          <td>${dept}</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">Status Hubungan Kerja</td>
+          <td style="text-align:center;">:</td>
+          <td><strong style="color:#0284c7;">${statusKaryawan}</strong></td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">Tanggal Mulai Bergabung</td>
+          <td style="text-align:center;">:</td>
+          <td>${tglMasuk}</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">Wilayah / Unit Kerja</td>
+          <td style="text-align:center;">:</td>
+          <td>${kanwil}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- SEKSI 4: REKENING BANK & JAMINAN SOSIAL -->
+    <div style="margin-bottom:24px;">
+      <div class="de-section-title">IV. FASILITAS PENGGAJIAN DAN JAMINAN SOSIAL</div>
+      <table class="de-print-table">
+        <tr>
+          <td style="width:28%; font-weight:600;">Rekening Payroll / Bank</td>
+          <td style="width:4%; text-align:center;">:</td>
+          <td style="width:68%;">${bank} - No. Rek: <strong style="font-family:monospace;">${noRek}</strong> (a.n. ${nama})</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">BPJS Kesehatan</td>
+          <td style="text-align:center;">:</td>
+          <td style="font-family:monospace;">${bpjsKes}</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">BPJS Ketenagakerjaan</td>
+          <td style="text-align:center;">:</td>
+          <td style="font-family:monospace;">${bpjsTk}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- KOLOM TANDA TANGAN RESMI -->
+    <div style="margin-top:36px; page-break-inside:avoid;">
+      <div style="display:flex; justify-content:space-between; text-align:center; font-size:0.78rem; color:#0f172a;">
+        <div style="width:220px;">
+          <div>Karyawan Bersangkutan,</div>
+          <div style="height:65px;"></div>
+          <div style="font-weight:800; border-bottom:1px solid #0f172a; padding-bottom:2px;">( ${nama} )</div>
+          <div style="font-size:0.7rem; color:#64748b; margin-top:2px;">NIK: ${nik}</div>
+        </div>
+
+        <div style="width:220px;">
+          <div>Jakarta, ${currentDateIndo}</div>
+          <div style="font-weight:600;">Mengetahui, HRD & Legal Manager</div>
+          <div style="height:50px;"></div>
+          <div style="font-weight:800; border-bottom:1px solid #0f172a; padding-bottom:2px;">( Rahmat Hidayat, S.H. )</div>
+          <div style="font-size:0.7rem; color:#64748b; margin-top:2px;">Head of Human Capital PT Fath Indah</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+window.printEmployeeDetail = function() {
+  window.print();
+};
+
+// --------------------------------------------------------------------------
+// 13.4 ANALYTICS KARYAWAN (mod_emp_analytics)
+// --------------------------------------------------------------------------
+
+function initEmployeeAnalyticsView() {
+  loadEmployeeAnalyticsData();
+}
+
+function loadEmployeeAnalyticsData() {
+  const employees = state.hr.employees || [];
+  const container = document.getElementById('analyticsChartsGrid');
+  if (!container) return;
+
+  const total = employees.length || 1;
+
+  // 1. Departemen
+  const deptMap = {};
+  employees.forEach(e => {
+    const d = (e.departemen || e.dept || 'Lainnya').trim();
+    deptMap[d] = (deptMap[d] || 0) + 1;
+  });
+
+  // 2. Status Karyawan
+  let tetapCount = 0;
+  let kontrakCount = 0;
+  let probaCount = 0;
+  employees.forEach(e => {
+    const st = String(e.statuskaryawan || e.status_karyawan || '').toLowerCase();
+    if (st.includes('tetap')) tetapCount++;
+    else if (st.includes('kontrak')) kontrakCount++;
+    else probaCount++;
+  });
+
+  // 3. Gender
+  let priaCount = 0;
+  let wanitaCount = 0;
+  employees.forEach(e => {
+    const g = String(e.jeniskelamin || e.jenis_kelamin || '').toLowerCase();
+    if (g.includes('perempuan') || g.includes('wanita')) wanitaCount++;
+    else priaCount++;
+  });
+
+  // Render Charts HTML
+  container.innerHTML = `
+    <!-- CARD 1: DISTRIBUSI DEPARTEMEN -->
+    <div class="ea-chart-card">
+      <div class="ea-card-header">
+        <div class="ea-card-icon"><i class="fa-solid fa-sitemap"></i></div>
+        <div class="ea-card-title">Distribusi Karyawan Per Departemen</div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:12px; margin-top:14px;">
+        ${Object.entries(deptMap).map(([deptName, count]) => {
+          const pct = Math.round((count / total) * 100);
+          return `
+            <div>
+              <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:4px;">
+                <span style="color:var(--text-light); font-weight:600;">${deptName}</span>
+                <span style="color:#38bdf8; font-family:monospace; font-weight:700;">${count} Pegawai (${pct}%)</span>
+              </div>
+              <div class="ea-bar-track">
+                <div class="ea-bar-fill" style="width:${pct}%; background:linear-gradient(90deg, #0284c7, #38bdf8);"></div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- CARD 2: STATUS KEPEGAWAIAN -->
+    <div class="ea-chart-card">
+      <div class="ea-card-header">
+        <div class="ea-card-icon" style="color:#10b981; background:rgba(16,185,129,0.15);"><i class="fa-solid fa-user-check"></i></div>
+        <div class="ea-card-title">Komposisi Status Hubungan Kerja</div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:14px; margin-top:14px;">
+        <div>
+          <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:4px;">
+            <span style="color:var(--text-light); font-weight:600;">Karyawan Tetap (PKWTT)</span>
+            <span style="color:#10b981; font-family:monospace; font-weight:700;">${tetapCount} Pegawai (${Math.round((tetapCount/total)*100)}%)</span>
+          </div>
+          <div class="ea-bar-track">
+            <div class="ea-bar-fill" style="width:${Math.round((tetapCount/total)*100)}%; background:#10b981;"></div>
+          </div>
+        </div>
+
+        <div>
+          <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:4px;">
+            <span style="color:var(--text-light); font-weight:600;">Karyawan Kontrak (PKWT)</span>
+            <span style="color:#f59e0b; font-family:monospace; font-weight:700;">${kontrakCount} Pegawai (${Math.round((kontrakCount/total)*100)}%)</span>
+          </div>
+          <div class="ea-bar-track">
+            <div class="ea-bar-fill" style="width:${Math.round((kontrakCount/total)*100)}%; background:#f59e0b;"></div>
+          </div>
+        </div>
+
+        <div>
+          <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:4px;">
+            <span style="color:var(--text-light); font-weight:600;">Masa Percobaan / Probation</span>
+            <span style="color:#06b6d4; font-family:monospace; font-weight:700;">${probaCount} Pegawai (${Math.round((probaCount/total)*100)}%)</span>
+          </div>
+          <div class="ea-bar-track">
+            <div class="ea-bar-fill" style="width:${Math.round((probaCount/total)*100)}%; background:#06b6d4;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 3: RASIO GENDER -->
+    <div class="ea-chart-card">
+      <div class="ea-card-header">
+        <div class="ea-card-icon" style="color:#c084fc; background:rgba(192,132,252,0.15);"><i class="fa-solid fa-venus-mars"></i></div>
+        <div class="ea-card-title">Rasio Komposisi Gender</div>
+      </div>
+      <div style="display:flex; align-items:center; justify-content:space-around; margin-top:20px;">
+        <div style="text-align:center;">
+          <div style="width:68px; height:68px; border-radius:50%; background:rgba(56,189,248,0.15); border:3px solid #38bdf8; display:flex; align-items:center; justify-content:center; color:#38bdf8; font-size:1.8rem; margin:auto;">
+            <i class="fa-solid fa-mars"></i>
+          </div>
+          <div style="font-weight:800; font-size:1.2rem; color:var(--text-light); margin-top:8px;">${priaCount}</div>
+          <div style="font-size:0.75rem; color:var(--text-muted);">Pria (${Math.round((priaCount/total)*100)}%)</div>
+        </div>
+
+        <div style="text-align:center;">
+          <div style="width:68px; height:68px; border-radius:50%; background:rgba(244,114,182,0.15); border:3px solid #f472b6; display:flex; align-items:center; justify-content:center; color:#f472b6; font-size:1.8rem; margin:auto;">
+            <i class="fa-solid fa-venus"></i>
+          </div>
+          <div style="font-weight:800; font-size:1.2rem; color:var(--text-light); margin-top:8px;">${wanitaCount}</div>
+          <div style="font-size:0.75rem; color:var(--text-muted);">Wanita (${Math.round((wanitaCount/total)*100)}%)</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// --------------------------------------------------------------------------
+// 13.5 ARSIP & UPLOAD DOKUMEN PEGAWAI (mod_upload_dok)
+// --------------------------------------------------------------------------
+
+const GDRIVE_DOKUMEN_KARYAWAN_FOLDER = 'https://drive.google.com/drive/folders/12hJY5VGcTlgdSBHRqOxSLYg_zwB4C0gF';
+
+function initUploadDocView() {
+  populateUploadDokEmployeeSelect();
+  loadUploadDokData();
+  setupUploadDokDropzone();
+}
+
+function populateUploadDokEmployeeSelect() {
+  const select = document.getElementById('uploadDokNikSelect');
+  if (!select) return;
+
+  const employees = state.hr.employees || [];
+  select.innerHTML = '<option value="">-- Pilih Karyawan Pemilik Dokumen --</option>' +
+    employees.map(e => `<option value="${e.nik}">${e.nik} - ${e.nama || e.nama_lengkap} (${e.jabatan || 'Staff'})</option>`).join('');
+}
+
+window.onUploadDokEmployeeChange = function() {
+  const select = document.getElementById('uploadDokNikSelect');
+  const nameInput = document.getElementById('uploadDokNamaKaryawan');
+  if (!select || !nameInput) return;
+
+  const nik = select.value;
+  const emp = (state.hr.employees || []).find(e => String(e.nik) === String(nik));
+  if (emp) {
+    nameInput.value = emp.nama || emp.nama_lengkap || '';
+  } else {
+    nameInput.value = '';
+  }
+};
+
+function setupUploadDokDropzone() {
+  const fileInput = document.getElementById('fileUploadDokInput');
+  const dropzone = document.getElementById('uploadDokDropzone');
+  if (!dropzone || !fileInput) return;
+
+  dropzone.addEventListener('click', () => fileInput.click());
+
+  dropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = '#00e5ff';
+  });
+
+  dropzone.addEventListener('dragleave', () => {
+    dropzone.style.borderColor = 'rgba(255,255,255,0.15)';
+  });
+
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.style.borderColor = 'rgba(255,255,255,0.15)';
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      fileInput.files = e.dataTransfer.files;
+      onUploadDokFileSelected({ target: fileInput });
+    }
+  });
+}
+
+window.onUploadDokFileSelected = function(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+
+  state.hr.selectedUploadDokFile = file;
+
+  const preview = document.getElementById('uploadDokFilePreview');
+  const nameEl = document.getElementById('uploadDokFileName');
+  const sizeEl = document.getElementById('uploadDokFileSize');
+  const dropzone = document.getElementById('uploadDokDropzone');
+
+  if (preview && nameEl && sizeEl) {
+    nameEl.textContent = file.name;
+    sizeEl.textContent = `${(file.size / 1024).toFixed(1)} KB`;
+    preview.style.display = 'block';
+    if (dropzone) dropzone.style.display = 'none';
+  }
+};
+
+window.removeUploadDokFile = function(event) {
+  if (event) event.stopPropagation();
+  state.hr.selectedUploadDokFile = null;
+
+  const fileInput = document.getElementById('fileUploadDokInput');
+  const preview = document.getElementById('uploadDokFilePreview');
+  const dropzone = document.getElementById('uploadDokDropzone');
+
+  if (fileInput) fileInput.value = '';
+  if (preview) preview.style.display = 'none';
+  if (dropzone) dropzone.style.display = 'flex';
+};
+
+window.handleUploadDokSubmit = async function(event) {
+  if (event) event.preventDefault();
+
+  const nikSelect = document.getElementById('uploadDokNikSelect');
+  const namaInput = document.getElementById('uploadDokNamaKaryawan');
+  const jenisSelect = document.getElementById('uploadDokJenisDokumen');
+  const linkInput = document.getElementById('uploadDokDirectLink');
+  const fileInput = document.getElementById('fileUploadDokInput');
+  const btnSubmit = document.getElementById('btnSubmitUploadDok');
+
+  const nik = nikSelect ? nikSelect.value : '';
+  const nama = namaInput ? namaInput.value : '';
+  const jenis = jenisSelect ? jenisSelect.value : 'KTP';
+  const directLink = linkInput ? linkInput.value.trim() : '';
+  const file = state.hr.selectedUploadDokFile || (fileInput && fileInput.files && fileInput.files[0]);
+
+  if (!nik || !nama) {
+    alert('Harap pilih karyawan terlebih dahulu!');
+    return;
+  }
+
+  if (!file && !directLink) {
+    alert('Pilih file dokumen atau masukkan Link Google Drive langsung!');
+    return;
+  }
+
+  let finalLink = directLink || GDRIVE_DOKUMEN_KARYAWAN_FOLDER;
+  let finalFileName = file ? file.name : `${jenis}_${nik}.pdf`;
+
+  if (btnSubmit) {
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mengunggah Dokumen...';
+  }
+
+  // Jika ada file dan ada Webhook Apps Script yang dikonfigurasi, kirim langsung ke Google Drive
+  const webhookUrl = getGDriveWebhookUrl();
+  if (file && webhookUrl) {
+    try {
+      const base64 = await readFileAsBase64(file);
+      const scriptPayload = {
+        folderId: '12hJY5VGcTlgdSBHRqOxSLYg_zwB4C0gF',
+        fileName: `${jenis}_${nik}_${Date.now()}_${file.name}`,
+        mimeType: file.type || 'application/pdf',
+        base64: base64
+      };
+
+      const gRes = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(scriptPayload)
+      });
+
+      if (gRes.ok) {
+        const gData = await gRes.json();
+        if (gData.success && (gData.directLink || gData.fileUrl)) {
+          finalLink = gData.directLink || gData.fileUrl;
+          finalFileName = gData.fileName || finalFileName;
+        }
+      }
+    } catch (gErr) {
+      console.warn('Apps script upload warning:', gErr);
+    }
+  }
+
+  const record = {
+    nik: nik,
+    namakaryawan: nama,
+    jenisdokumen: jenis,
+    namafile: finalFileName,
+    linkdokumen: finalLink,
+    ukuranfile: file ? `${(file.size / 1024).toFixed(1)} KB` : 'Cloud Link',
+    keterangan: `Diunggah pada ${new Date().toLocaleString('id-ID')}`,
+    createdat: new Date().toISOString()
+  };
+
+  try {
+    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/upload_dok`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify(record)
+    });
+
+    if (res.ok || res.status === 201 || res.status === 204) {
+      alert(`✅ Dokumen [${jenis}] untuk karyawan ${nama} berhasil disimpan ke Supabase!`);
+      removeUploadDokFile();
+      if (linkInput) linkInput.value = '';
+      await loadUploadDokData();
+    } else {
+      // Fallback via server route
+      const srvRes = await fetch('/api/upload-dok', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(record)
+      });
+      const srvData = await srvRes.json();
+      if (srvData.success) {
+        alert(`✅ Dokumen tersimpan ke database via server!`);
+        removeUploadDokFile();
+        if (linkInput) linkInput.value = '';
+        await loadUploadDokData();
+      } else {
+        alert(`⚠️ Gagal menyimpan metadata dokumen: ${srvData.message || (await res.text())}`);
+      }
+    }
+  } catch (err) {
+    console.error('Error simpan upload dok:', err);
+    alert(`⚠️ Terjadi kesalahan: ${err.message}`);
+  } finally {
+    if (btnSubmit) {
+      btnSubmit.disabled = false;
+      btnSubmit.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> Simpan Dokumen ke Arsip';
+    }
+  }
+};
+
+async function loadUploadDokData() {
+  const tbody = document.getElementById('uploadDokTableBody');
+  if (tbody) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center; padding:32px; color:var(--text-muted);">
+          <i class="fa-solid fa-spinner fa-spin" style="color:#06b6d4; font-size:1.5rem;"></i>
+          <div style="margin-top:10px;">Memuat arsip berkas karyawan dari Supabase...</div>
+        </td>
+      </tr>
+    `;
+  }
+
+  let list = [];
+  try {
+    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/upload_dok?select=*&order=createdat.desc`, {
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+      }
+    });
+    if (res.ok) {
+      list = await res.json();
+    }
+  } catch (err) {
+    console.warn('Load upload_dok error:', err);
+  }
+
+  if (!list || list.length === 0) {
+    try {
+      const res = await fetch('/api/upload-dok');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data && Array.isArray(json.data)) list = json.data;
+      }
+    } catch (_) {}
+  }
+
+  state.hr.uploadDokList = list || [];
+  renderUploadDokTable();
+}
+
+function renderUploadDokTable() {
+  const tbody = document.getElementById('uploadDokTableBody');
+  if (!tbody) return;
+
+  const list = state.hr.uploadDokList || [];
+  if (list.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center; padding:32px; color:var(--text-muted);">
+          Belum ada arsip dokumen yang diunggah.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = list.map((doc, idx) => {
+    const tgl = doc.createdat ? formatIndoCutiDate(doc.createdat) : '-';
+    return `
+      <tr>
+        <td style="text-align:center; font-family:monospace; color:var(--text-dim);">${idx + 1}</td>
+        <td>
+          <span style="font-family:monospace; color:#38bdf8; font-weight:700;">${doc.nik || '-'}</span>
+          <div style="font-size:0.75rem; color:var(--text-light); font-weight:600;">${doc.namakaryawan || '-'}</div>
+        </td>
+        <td>
+          <span style="background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.3); color:#38bdf8; font-size:0.75rem; font-weight:700; padding:3px 8px; border-radius:6px;">
+            ${doc.jenisdokumen || 'Dokumen'}
+          </span>
+        </td>
+        <td>
+          <div style="color:var(--text-main); font-size:0.82rem; font-weight:600;">${doc.namafile || 'File'}</div>
+          <div style="font-size:0.7rem; color:var(--text-dim);">${doc.ukuranfile || '-'}</div>
+        </td>
+        <td style="font-size:0.8rem; color:var(--text-muted);">${tgl}</td>
+        <td style="text-align:center;">
+          <a href="${doc.linkdokumen || '#'}" target="_blank" rel="noopener noreferrer" class="btn-action view" style="text-decoration:none; display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:6px; font-size:0.75rem;">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+            <span>Buka Drive</span>
+          </a>
+        </td>
+        <td style="text-align:center;">
+          <button type="button" class="btn-action delete" onclick="deleteUploadDokRecord('${doc.id}')" title="Hapus Dokumen">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+window.deleteUploadDokRecord = async function(id) {
+  if (!confirm(`Hapus catatan dokumen ini dari database?`)) return;
+
+  try {
+    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/upload_dok?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+      }
+    });
+
+    if (res.ok || res.status === 204) {
+      alert('Dokumen berhasil dihapus dari Supabase!');
+      await loadUploadDokData();
+    } else {
+      alert('Gagal menghapus dokumen.');
+    }
+  } catch (err) {
+    alert(`Terjadi kesalahan: ${err.message}`);
+  }
+};
+
+// --------------------------------------------------------------------------
+// 13.6 LIHAT SLIP GAJI KARYAWAN (mod_slip_gaji)
+// --------------------------------------------------------------------------
+
+const GDRIVE_SLIP_GAJI_FOLDER = 'https://drive.google.com/drive/folders/1fXIwxUVijMdQ3urXKmqP1zDdI0e695Z-';
+
+function initSlipGajiView() {
+  loadSlipGajiData();
+}
+
+async function loadSlipGajiData() {
+  const container = document.getElementById('slipGajiCardsContainer');
+  if (container) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align:center; padding:40px; color:var(--text-muted);">
+        <i class="fa-solid fa-spinner fa-spin" style="color:#10b981; font-size:1.8rem;"></i>
+        <div style="margin-top:12px; font-size:0.88rem;">Menghubungkan ke folder Slip Gaji Supabase & Google Drive...</div>
+      </div>
+    `;
+  }
+
+  let list = [];
+  try {
+    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/slip_gaji?select=*&order=periode.desc,createdat.desc`, {
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+      }
+    });
+    if (res.ok) {
+      list = await res.json();
+    }
+  } catch (err) {
+    console.warn('Slip gaji fetch error:', err);
+  }
+
+  if (!list || list.length === 0) {
+    try {
+      const res = await fetch('/api/slip-gaji');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.data && Array.isArray(json.data)) list = json.data;
+      }
+    } catch (_) {}
+  }
+
+  // Jika tabel di Supabase belum ada data, siapkan sample terbit slip gaji terhubung ke Google Drive
+  if (!list || list.length === 0) {
+    const emps = state.hr.employees || [];
+    list = emps.slice(0, 10).map((e, idx) => ({
+      id: `SG-202610-${idx + 1}`,
+      nik: e.nik,
+      namakaryawan: e.nama || e.nama_lengkap,
+      departemen: e.departemen || 'Operasional Umrah & Haji',
+      jabatan: e.jabatan || 'Staff',
+      periode: 'Oktober 2026',
+      gajibersih: (e.gajipokok || 4500000) + 1200000,
+      linkdokumen: GDRIVE_SLIP_GAJI_FOLDER,
+      namafile: `Slip_Gaji_${e.nik}_Okt2026.pdf`,
+      statusterbit: 'Terbit'
+    }));
+  }
+
+  state.hr.slipGajiList = list;
+  renderSlipGajiCards();
+}
+
+function renderSlipGajiCards() {
+  const container = document.getElementById('slipGajiCardsContainer');
+  if (!container) return;
+
+  const filter = state.hr.slipGajiFilter;
+  const list = state.hr.slipGajiList || [];
+
+  const filtered = list.filter(item => {
+    const s = (filter.search || '').toLowerCase().trim();
+    const nama = String(item.namakaryawan || '').toLowerCase();
+    const nik = String(item.nik || '').toLowerCase();
+    const dept = String(item.departemen || '').toLowerCase();
+    const matchSearch = !s || nama.includes(s) || nik.includes(s) || dept.includes(s);
+
+    const matchPeriode = filter.periode === 'ALL' || String(item.periode || '').includes(filter.periode);
+    return matchSearch && matchPeriode;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1 / -1; text-align:center; padding:40px; color:var(--text-muted);">
+        <i class="fa-solid fa-folder-open" style="font-size:2rem; margin-bottom:10px; color:var(--text-dim);"></i>
+        <div>Tidak ada berkas Slip Gaji yang sesuai filter pencarian.</div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filtered.map(item => {
+    const link = item.linkdokumen || GDRIVE_SLIP_GAJI_FOLDER;
+    const gajiFormatted = formatRupiah(item.gajibersih);
+
+    return `
+      <div class="sg-card">
+        <div class="sg-card-top">
+          <div class="sg-pdf-icon">
+            <i class="fa-solid fa-file-pdf"></i>
+          </div>
+          <div>
+            <div class="sg-periode-badge">${item.periode || 'Oktober 2026'}</div>
+            <div class="sg-emp-name">${item.namakaryawan || 'Karyawan'}</div>
+            <div class="sg-emp-sub">${item.jabatan || 'Staff'} • ${item.nik || '-'}</div>
+          </div>
+        </div>
+
+        <div class="sg-card-body">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-size:0.75rem; color:var(--text-muted);">Departemen</span>
+            <span style="font-size:0.8rem; color:var(--text-light); font-weight:600;">${item.departemen || '-'}</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:0.75rem; color:var(--text-muted);">Take Home Pay</span>
+            <span style="font-size:0.88rem; color:#10b981; font-weight:800; font-family:monospace;">${gajiFormatted}</span>
+          </div>
+        </div>
+
+        <div class="sg-card-footer">
+          <button type="button" class="sg-btn-view" onclick="openSlipGajiModal('${link}', '${item.namakaryawan} - ${item.periode}')">
+            <i class="fa-solid fa-eye"></i> Pratinjau
+          </button>
+          <a href="${link}" target="_blank" rel="noopener noreferrer" class="sg-btn-drive" title="Buka di Google Drive">
+            <i class="fa-brands fa-google-drive"></i>
+          </a>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.onSlipGajiFilterChange = function() {
+  const searchInput = document.getElementById('searchSlipGaji');
+  const periodeSelect = document.getElementById('filterSlipGajiPeriode');
+
+  state.hr.slipGajiFilter = {
+    search: searchInput ? searchInput.value : '',
+    periode: periodeSelect ? periodeSelect.value : 'ALL'
+  };
+
+  renderSlipGajiCards();
+};
+
+window.openSlipGajiModal = function(url, title) {
+  const modal = document.getElementById('modalSlipGajiViewer');
+  const iframe = document.getElementById('slipGajiIframe');
+  const titleEl = document.getElementById('modalSlipGajiTitle');
+  const extBtn = document.getElementById('slipGajiExternalBtn');
+
+  if (!modal) return;
+
+  if (titleEl) titleEl.textContent = `Dokumen Slip Gaji: ${title || 'Resmi'}`;
+  if (extBtn) extBtn.href = url || GDRIVE_SLIP_GAJI_FOLDER;
+
+  if (iframe) {
+    // Jika link adalah google drive view, convert ke preview embed
+    let embedUrl = url;
+    if (url.includes('drive.google.com/file/d/')) {
+      embedUrl = url.replace(/\/view(\?.*)?$/, '/preview');
+    }
+    iframe.src = embedUrl;
+  }
+
+  modal.style.display = 'flex';
+};
+
+window.closeSlipGajiModal = function() {
+  const modal = document.getElementById('modalSlipGajiViewer');
+  const iframe = document.getElementById('slipGajiIframe');
+  if (modal) modal.style.display = 'none';
+  if (iframe) iframe.src = 'about:blank';
+};
+
+// Export global helper
+window.initDaftarKaryawanView = initDaftarKaryawanView;
+window.initBioKaryawanView = initBioKaryawanView;
+window.initEmployeeDetailView = initEmployeeDetailView;
+window.initEmployeeAnalyticsView = initEmployeeAnalyticsView;
+window.initUploadDocView = initUploadDocView;
+window.initSlipGajiView = initSlipGajiView;

@@ -144,6 +144,37 @@
           <i class="fa-solid fa-calendar-day nav-icon"></i>
           <span class="nav-label">Daftar & Matrix Cuti</span>
         </a>
+
+        <!-- Modul SDM & Karyawan Suite (Imported from prjnewmenu) -->
+        <a href="#daftar_karyawan" class="nav-item" data-module="mod_daftar_karyawan" data-tooltip="Daftar Karyawan">
+          <i class="fa-solid fa-users nav-icon"></i>
+          <span class="nav-label">Daftar Karyawan</span>
+        </a>
+
+        <a href="#bio_karyawan" class="nav-item" data-module="mod_bio_karyawan" data-tooltip="Form Entry Karyawan">
+          <i class="fa-solid fa-user-plus nav-icon"></i>
+          <span class="nav-label">Entry Karyawan</span>
+        </a>
+
+        <a href="#detail_emp" class="nav-item" data-module="mod_detail_emp" data-tooltip="Detail & Cetak Biodata Pegawai">
+          <i class="fa-solid fa-id-card-clip nav-icon"></i>
+          <span class="nav-label">Detail Pegawai</span>
+        </a>
+
+        <a href="#emp_analytics" class="nav-item" data-module="mod_emp_analytics" data-tooltip="Analytics & Demografi SDM">
+          <i class="fa-solid fa-chart-pie nav-icon"></i>
+          <span class="nav-label">Analytics SDM</span>
+        </a>
+
+        <a href="#upload_dok" class="nav-item" data-module="mod_upload_dok" data-tooltip="Upload Dokumen Karyawan">
+          <i class="fa-solid fa-cloud-arrow-up nav-icon"></i>
+          <span class="nav-label">Upload Dokumen</span>
+        </a>
+
+        <a href="#slip_gaji" class="nav-item" data-module="mod_slip_gaji" data-tooltip="Lihat Slip Gaji Karyawan">
+          <i class="fa-solid fa-file-invoice-dollar nav-icon"></i>
+          <span class="nav-label">Lihat Slip Gaji</span>
+        </a>
       </nav>
 
       <!-- Sidebar Footer -->
@@ -989,6 +1020,830 @@
             </div>
           </div>
         </div>
+
+        <!-- ================================================================
+             MODULE 6A: DAFTAR REKAPITULASI KARYAWAN (mod_daftar_karyawan)
+             ================================================================ -->
+        <div class="module-view" id="view-daftar_karyawan">
+          <div class="hr-banner">
+            <div class="hr-banner-left">
+              <div class="hr-banner-icon"><i class="fa-solid fa-users"></i></div>
+              <div>
+                <h3 class="hr-banner-title">Daftar Rekapitulasi Karyawan</h3>
+                <p class="hr-banner-subtitle">Master data kepegawaian PT. Fath Indah Travel Service terhubung database Supabase</p>
+              </div>
+            </div>
+            <div class="hr-banner-right">
+              <button type="button" class="btn-primary" onclick="switchModule('mod_bio_karyawan')">
+                <i class="fa-solid fa-user-plus"></i> Tambah Karyawan Baru
+              </button>
+            </div>
+          </div>
+
+          <!-- Quick Stats Grid -->
+          <div class="hr-stats-grid">
+            <div class="hr-stat-card">
+              <div class="hr-stat-icon cyan"><i class="fa-solid fa-users"></i></div>
+              <div>
+                <div class="hr-stat-val" id="dkStatTotal">0</div>
+                <div class="hr-stat-lbl">Total Karyawan</div>
+              </div>
+            </div>
+            <div class="hr-stat-card">
+              <div class="hr-stat-icon emerald"><i class="fa-solid fa-user-check"></i></div>
+              <div>
+                <div class="hr-stat-val" id="dkStatAktif">0</div>
+                <div class="hr-stat-lbl">Karyawan Aktif</div>
+              </div>
+            </div>
+            <div class="hr-stat-card">
+              <div class="hr-stat-icon amber"><i class="fa-solid fa-briefcase"></i></div>
+              <div>
+                <div class="hr-stat-val" id="dkStatPkwtt">0</div>
+                <div class="hr-stat-lbl">Status PKWTT</div>
+              </div>
+            </div>
+            <div class="hr-stat-card">
+              <div class="hr-stat-icon purple"><i class="fa-solid fa-file-contract"></i></div>
+              <div>
+                <div class="hr-stat-val" id="dkStatPkwt">0</div>
+                <div class="hr-stat-lbl">Status PKWT</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Toolbar Filter & Search -->
+          <div class="hr-toolbar">
+            <div class="hr-toolbar-left">
+              <div class="hr-search-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="dkSearchInput" class="form-input" placeholder="Cari Nama, NIK, Jabatan, Divisi..." oninput="onDaftarKaryawanFilterChange()">
+              </div>
+              <select id="dkFilterKantor" class="form-input" style="width:auto; height:36px;" onchange="onDaftarKaryawanFilterChange()">
+                <option value="ALL">Semua Kantor Cabang</option>
+                <option value="Pusat">Pusat</option>
+                <option value="Sumarrecon">Sumarrecon</option>
+                <option value="Samarinda">Samarinda</option>
+                <option value="Banyumas">Banyumas</option>
+                <option value="Sukoharjo">Sukoharjo</option>
+                <option value="Surabaya">Surabaya</option>
+                <option value="Pemalang">Pemalang</option>
+              </select>
+              <select id="dkFilterDivisi" class="form-input" style="width:auto; height:36px;" onchange="onDaftarKaryawanFilterChange()">
+                <option value="ALL">Semua Divisi</option>
+                <option value="Top Manajemen">Top Manajemen</option>
+                <option value="HRD, LEGAL, IS & QA">HRD, LEGAL, IS & QA</option>
+                <option value="SALES & MARKETING">SALES & MARKETING</option>
+                <option value="FINANCE">FINANCE</option>
+                <option value="OPERATION & PENGADAAN">OPERATION & PENGADAAN</option>
+                <option value="Kanwil">Kanwil</option>
+              </select>
+              <select id="dkFilterStatus" class="form-input" style="width:auto; height:36px;" onchange="onDaftarKaryawanFilterChange()">
+                <option value="ALL">Semua Status</option>
+                <option value="Aktif" selected>Aktif</option>
+                <option value="Non Aktif">Non Aktif</option>
+              </select>
+            </div>
+            <div class="hr-toolbar-right">
+              <button type="button" class="btn-secondary" onclick="exportDaftarKaryawanCSV()" title="Ekspor data CSV">
+                <i class="fa-solid fa-file-csv"></i> Ekspor CSV
+              </button>
+              <button type="button" class="btn-secondary" onclick="loadDaftarKaryawanData(true)" title="Segarkan Data">
+                <i class="fa-solid fa-rotate"></i> Refresh
+              </button>
+            </div>
+          </div>
+
+          <!-- Table Karyawan -->
+          <div class="content-card" style="padding:0; overflow:hidden;">
+            <div class="table-responsive">
+              <table class="table-brosur">
+                <thead>
+                  <tr>
+                    <th style="width:50px; text-align:center;">NO</th>
+                    <th style="width:110px;">NIK</th>
+                    <th>NAMA KARYAWAN</th>
+                    <th>JABATAN</th>
+                    <th>DIVISI</th>
+                    <th>KANTOR</th>
+                    <th style="width:90px; text-align:center;">EMP</th>
+                    <th>KONTAK (HP & EMAIL)</th>
+                    <th style="width:100px; text-align:center;">STATUS</th>
+                    <th style="width:120px; text-align:center;">AKSI</th>
+                  </tr>
+                </thead>
+                <tbody id="dkTableBody">
+                  <tr>
+                    <td colspan="10" style="text-align:center; padding:36px; color:var(--text-muted);">
+                      Memuat daftar karyawan...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 6B: FORM ENTRY KARYAWAN (mod_bio_karyawan)
+             ================================================================ -->
+        <div class="module-view" id="view-bio_karyawan">
+          <div class="hr-banner">
+            <div class="hr-banner-left">
+              <div class="hr-banner-icon" style="background:linear-gradient(135deg, #10b981, #06b6d4);"><i class="fa-solid fa-user-plus"></i></div>
+              <div>
+                <h3 class="hr-banner-title">Formulir Entry Biodata Karyawan Baru</h3>
+                <p class="hr-banner-subtitle">Input data lengkap kepegawaian & simpan ke database Supabase Bio_Karyawan</p>
+              </div>
+            </div>
+            <div class="hr-banner-right">
+              <button type="button" class="btn-secondary" onclick="switchModule('mod_daftar_karyawan')">
+                <i class="fa-solid fa-users"></i> Lihat Daftar Karyawan
+              </button>
+            </div>
+          </div>
+
+          <form id="formBioKaryawan" onsubmit="handleBioKaryawanSubmit(event)">
+            <div class="bio-clusters-container">
+              <!-- Cluster 1: Pokok Kepegawaian -->
+              <div class="bio-cluster-card">
+                <div class="bio-cluster-header">
+                  <div class="bio-cluster-icon"><i class="fa-solid fa-briefcase"></i></div>
+                  <h4 class="bio-cluster-title">1. Informasi Pokok Kepegawaian</h4>
+                </div>
+                <div class="bio-form-grid-3">
+                  <div class="form-group">
+                    <label class="form-label" for="bioNik">Nomor Induk Karyawan (NIK) <span class="required-star">*</span></label>
+                    <input type="text" id="bioNik" class="form-input" required placeholder="Contoh: 26-0901">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioNama">Nama Lengkap Karyawan <span class="required-star">*</span></label>
+                    <input type="text" id="bioNama" class="form-input" required placeholder="Nama lengkap sesuai KTP">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioJenisKelamin">Jenis Kelamin <span class="required-star">*</span></label>
+                    <select id="bioJenisKelamin" class="form-input" required>
+                      <option value="Laki-laki">Laki-laki</option>
+                      <option value="Perempuan">Perempuan</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioJabatan">Jabatan <span class="required-star">*</span></label>
+                    <input type="text" id="bioJabatan" class="form-input" required placeholder="Contoh: Manager, Officer, Staff">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioDivisi">Divisi / Departemen <span class="required-star">*</span></label>
+                    <select id="bioDivisi" class="form-input" required>
+                      <option value="Top Manajemen">Top Manajemen</option>
+                      <option value="HRD, LEGAL, IS & QA">HRD, LEGAL, IS & QA</option>
+                      <option value="SALES & MARKETING">SALES & MARKETING</option>
+                      <option value="FINANCE">FINANCE</option>
+                      <option value="OPERATION & PENGADAAN">OPERATION & PENGADAAN</option>
+                      <option value="Kanwil">Kanwil</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioKantor">Penempatan Kantor / Cabang <span class="required-star">*</span></label>
+                    <select id="bioKantor" class="form-input" required>
+                      <option value="Pusat">Pusat</option>
+                      <option value="Sumarrecon">Sumarrecon</option>
+                      <option value="Samarinda">Samarinda</option>
+                      <option value="Banyumas">Banyumas</option>
+                      <option value="Sukoharjo">Sukoharjo</option>
+                      <option value="Surabaya">Surabaya</option>
+                      <option value="Pemalang">Pemalang</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioStatusEmp">Status Kepegawaian <span class="required-star">*</span></label>
+                    <select id="bioStatusEmp" class="form-input" required>
+                      <option value="PKWTT">PKWTT (Tetap)</option>
+                      <option value="PKWT">PKWT (Kontrak)</option>
+                      <option value="Magang">Magang / Internship</option>
+                      <option value="Probation">Probation</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioTanggalMasuk">Tanggal Masuk Kerja</label>
+                    <input type="date" id="bioTanggalMasuk" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioStatus">Status Karyawan <span class="required-star">*</span></label>
+                    <select id="bioStatus" class="form-input" required>
+                      <option value="Aktif" selected>Aktif</option>
+                      <option value="Non Aktif">Non Aktif</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Cluster 2: Data Pribadi & Alamat -->
+              <div class="bio-cluster-card">
+                <div class="bio-cluster-header">
+                  <div class="bio-cluster-icon" style="background:rgba(245,158,11,0.15); color:#fbbf24;"><i class="fa-solid fa-address-card"></i></div>
+                  <h4 class="bio-cluster-title">2. Identitas Pribadi & Kontak</h4>
+                </div>
+                <div class="bio-form-grid-3">
+                  <div class="form-group">
+                    <label class="form-label" for="bioTempatLahir">Tempat Lahir</label>
+                    <input type="text" id="bioTempatLahir" class="form-input" placeholder="Kota kelahiran">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioTanggalLahir">Tanggal Lahir</label>
+                    <input type="date" id="bioTanggalLahir" class="form-input">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioAgama">Agama</label>
+                    <select id="bioAgama" class="form-input">
+                      <option value="Islam" selected>Islam</option>
+                      <option value="Kristen">Kristen</option>
+                      <option value="Katolik">Katolik</option>
+                      <option value="Hindu">Hindu</option>
+                      <option value="Buddha">Buddha</option>
+                      <option value="Konghucu">Konghucu</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioStatusNikah">Status Pernikahan</label>
+                    <select id="bioStatusNikah" class="form-input">
+                      <option value="Belum Menikah">Belum Menikah</option>
+                      <option value="Menikah" selected>Menikah</option>
+                      <option value="Cerai Hidup">Cerai Hidup</option>
+                      <option value="Cerai Mati">Cerai Mati</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioPendidikan">Pendidikan Terakhir</label>
+                    <select id="bioPendidikan" class="form-input">
+                      <option value="SMA/SMK">SMA / SMK</option>
+                      <option value="D3">Diploma (D3)</option>
+                      <option value="S1" selected>Sarjana (S1)</option>
+                      <option value="S2">Magister (S2)</option>
+                      <option value="Lainnya">Lainnya</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioHp">Nomor Telepon / WhatsApp <span class="required-star">*</span></label>
+                    <input type="tel" id="bioHp" class="form-input" required placeholder="08xxxxxxxxxx">
+                  </div>
+                  <div class="form-group span-2">
+                    <label class="form-label" for="bioEmail">Alamat Email</label>
+                    <input type="email" id="bioEmail" class="form-input" placeholder="nama@email.com">
+                  </div>
+                  <div class="form-group span-3">
+                    <label class="form-label" for="bioAlamat">Alamat Tempat Tinggal Lengkap</label>
+                    <textarea id="bioAlamat" class="form-input" rows="2" placeholder="Nama jalan, RT/RW, nomor rumah..."></textarea>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioKota">Kota / Kabupaten</label>
+                    <input type="text" id="bioKota" class="form-input" placeholder="Kota domisili">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioProvinsi">Provinsi</label>
+                    <input type="text" id="bioProvinsi" class="form-input" placeholder="Provinsi domisili">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioKodePos">Kode Pos</label>
+                    <input type="text" id="bioKodePos" class="form-input" placeholder="5 digit kode pos">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Cluster 3: Legalitas & Kontak Darurat -->
+              <div class="bio-cluster-card">
+                <div class="bio-cluster-header">
+                  <div class="bio-cluster-icon" style="background:rgba(168,85,247,0.15); color:#c084fc;"><i class="fa-solid fa-shield-halved"></i></div>
+                  <h4 class="bio-cluster-title">3. Dokumen Legalitas & Kontak Darurat</h4>
+                </div>
+                <div class="bio-form-grid-3">
+                  <div class="form-group">
+                    <label class="form-label" for="bioNoKtp">Nomor KTP (16 Digit)</label>
+                    <input type="text" id="bioNoKtp" class="form-input" placeholder="320xxxxxxxxxxxxx">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioNoKk">Nomor Kartu Keluarga (KK)</label>
+                    <input type="text" id="bioNoKk" class="form-input" placeholder="320xxxxxxxxxxxxx">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioNpwp">Nomor NPWP</label>
+                    <input type="text" id="bioNpwp" class="form-input" placeholder="15 digit NPWP">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioBpjsKes">Nomor BPJS Kesehatan</label>
+                    <input type="text" id="bioBpjsKes" class="form-input" placeholder="Nomor peserta BPJS Kesehatan">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioBpjsTk">Nomor BPJS Ketenagakerjaan</label>
+                    <input type="text" id="bioBpjsTk" class="form-input" placeholder="Nomor peserta BPJS TK">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioFotoUrl">URL Pas Foto Formal</label>
+                    <input type="url" id="bioFotoUrl" class="form-input" placeholder="https://drive.google.com/...">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioDaruratNama">Nama Kontak Darurat</label>
+                    <input type="text" id="bioDaruratNama" class="form-input" placeholder="Nama keluarga/kerabat terdekat">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioDaruratHp">Nomor Telepon Darurat</label>
+                    <input type="tel" id="bioDaruratHp" class="form-input" placeholder="08xxxxxxxxxx">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="bioDaruratHub">Hubungan Keluarga</label>
+                    <input type="text" id="bioDaruratHub" class="form-input" placeholder="Suami/Istri, Orang Tua, Saudara">
+                  </div>
+                </div>
+
+                <div class="bio-form-actions">
+                  <button type="reset" class="btn-secondary">
+                    <i class="fa-solid fa-rotate-left"></i> Reset Form
+                  </button>
+                  <button type="submit" class="btn-primary" id="btnBioSubmit">
+                    <i class="fa-solid fa-floppy-disk"></i> Simpan Data Karyawan
+                  </button>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <!-- ================================================================
+             MODULE 6C: DETAIL PEGAWAI / CETAK A4 (mod_detail_emp)
+             ================================================================ -->
+        <div class="module-view" id="view-detail_emp">
+          <!-- Toolbar Pemilih Pegawai & Cetak -->
+          <div class="hr-toolbar de-toolbar">
+            <div class="hr-toolbar-left">
+              <label for="deSelectEmployee" style="font-size:0.82rem; font-weight:700; color:var(--text-light);">Pilih Pegawai:</label>
+              <select id="deSelectEmployee" class="form-input" style="min-width:260px; height:36px; color:var(--gold-light); font-weight:700;" onchange="onSelectEmployeeDetailChange()">
+                <option value="">-- Pilih Karyawan --</option>
+              </select>
+            </div>
+            <div class="hr-toolbar-right">
+              <button type="button" class="btn-primary" onclick="printEmployeeDetail()" title="Cetak Dokumen Resmi A4">
+                <i class="fa-solid fa-print"></i> Cetak / Simpan PDF (A4)
+              </button>
+              <button type="button" class="btn-secondary" onclick="switchModule('mod_daftar_karyawan')">
+                <i class="fa-solid fa-arrow-left"></i> Kembali ke Daftar
+              </button>
+            </div>
+          </div>
+
+          <!-- Kertas Resmi Format A4 -->
+          <div class="de-paper-wrapper">
+            <div class="de-a4-sheet" id="dePrintPaper">
+              <!-- Official Kop Header -->
+              <div class="de-official-header">
+                <div class="de-header-brand">
+                  <img src="assets/logo.png" alt="PT Fath Indah" class="de-header-logo">
+                  <div>
+                    <h2 class="de-company-name">PT. FATH INDAH TRAVEL SERVICE</h2>
+                    <p class="de-company-sub">Penyelenggara Perjalanan Ibadah Umrah & Haji Khusus Terakreditasi</p>
+                    <p class="de-company-sub" style="font-size:0.7rem; color:#64748b;">Kantor Pusat: Graha Fath Indah, Jakarta Timur | Telp: (021) 8690-5000 | Email: sdm@fathindah.id</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Title Block -->
+              <div class="de-doc-title-block">
+                <h3 class="de-doc-main-title">BIODATA DAN DOKUMEN RESMI DETAIL KEPEGAWAIAN</h3>
+                <div class="de-doc-number">DOKUMEN SDM & PERSONALIA TERAKREDITASI • SISTEM DATABASE SUPABASE</div>
+              </div>
+
+              <!-- Profile Cluster -->
+              <div class="de-profile-cluster">
+                <div class="de-photo-frame" id="dePhotoBox">
+                  <i class="fa-solid fa-user" style="font-size:2.5rem; color:#cbd5e1;"></i>
+                  <span style="margin-top:6px;">Foto 3 x 4</span>
+                </div>
+                <div style="flex:1;">
+                  <table class="de-table-section" style="margin-bottom:0;">
+                    <tr>
+                      <td class="field-label">Nama Lengkap Karyawan</td>
+                      <td><strong id="deValNama" style="font-size:1.05rem; color:#0f172a;">-</strong></td>
+                    </tr>
+                    <tr>
+                      <td class="field-label">Nomor Induk Karyawan (NIK)</td>
+                      <td><strong id="deValNik" style="font-family:monospace; color:#0284c7; font-size:0.95rem;">-</strong></td>
+                    </tr>
+                    <tr>
+                      <td class="field-label">Jabatan Saat Ini</td>
+                      <td id="deValJabatan">-</td>
+                    </tr>
+                    <tr>
+                      <td class="field-label">Divisi / Penempatan Cabang</td>
+                      <td id="deValDivisiCabang">-</td>
+                    </tr>
+                    <tr>
+                      <td class="field-label">Status Hubungan Kerja</td>
+                      <td><span id="deValStatusEmp" style="font-weight:700;">PKWTT</span> (<span id="deValStatus">Aktif</span>)</td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Bagian A: Data Pribadi -->
+              <table class="de-table-section">
+                <thead>
+                  <tr>
+                    <th colspan="4" class="de-section-heading">A. Data Pribadi & Domisili</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="field-label">Tempat, Tanggal Lahir</td>
+                    <td id="deValTtl" colspan="3">-</td>
+                  </tr>
+                  <tr>
+                    <td class="field-label">Jenis Kelamin</td>
+                    <td id="deValJk">-</td>
+                    <td class="field-label">Agama</td>
+                    <td id="deValAgama">-</td>
+                  </tr>
+                  <tr>
+                    <td class="field-label">Status Pernikahan</td>
+                    <td id="deValStatusNikah">-</td>
+                    <td class="field-label">Pendidikan Terakhir</td>
+                    <td id="deValPendidikan">-</td>
+                  </tr>
+                  <tr>
+                    <td class="field-label">Alamat Rumah Tinggal</td>
+                    <td id="deValAlamat" colspan="3">-</td>
+                  </tr>
+                  <tr>
+                    <td class="field-label">Kota & Provinsi</td>
+                    <td id="deValKotaProv">-</td>
+                    <td class="field-label">Kode Pos</td>
+                    <td id="deValKodePos">-</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <!-- Bagian B: Legalitas Dokumen & Nomor Identitas -->
+              <table class="de-table-section">
+                <thead>
+                  <tr>
+                    <th colspan="4" class="de-section-heading">B. Dokumen Legalitas & Jaminan Sosial</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="field-label">Nomor KTP (NIK KTP)</td>
+                    <td id="deValKtp" style="font-family:monospace;">-</td>
+                    <td class="field-label">Nomor Kartu Keluarga (KK)</td>
+                    <td id="deValKk" style="font-family:monospace;">-</td>
+                  </tr>
+                  <tr>
+                    <td class="field-label">Nomor Pokok Wajib Pajak (NPWP)</td>
+                    <td id="deValNpwp" style="font-family:monospace;">-</td>
+                    <td class="field-label">Tanggal Mulai Bekerja</td>
+                    <td id="deValTglMasuk">-</td>
+                  </tr>
+                  <tr>
+                    <td class="field-label">BPJS Kesehatan</td>
+                    <td id="deValBpjsKes" style="font-family:monospace;">-</td>
+                    <td class="field-label">BPJS Ketenagakerjaan</td>
+                    <td id="deValBpjsTk" style="font-family:monospace;">-</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <!-- Bagian C: Kontak & Informasi Darurat -->
+              <table class="de-table-section">
+                <thead>
+                  <tr>
+                    <th colspan="4" class="de-section-heading">C. Kontak Personal & Hubungan Darurat</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="field-label">Nomor Telepon / WhatsApp</td>
+                    <td id="deValHp">-</td>
+                    <td class="field-label">Alamat Email Aktif</td>
+                    <td id="deValEmail">-</td>
+                  </tr>
+                  <tr>
+                    <td class="field-label">Kontak Darurat</td>
+                    <td id="deValDaruratNama" colspan="3">-</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <!-- Bagian D: Lembar Pengesahan -->
+              <div class="de-signatures-grid">
+                <div>
+                  <div>Karyawan Bersangkutan,</div>
+                  <div class="de-sign-space"></div>
+                  <div class="de-sign-name" id="deSignEmployeeName">(Nama Karyawan)</div>
+                  <div class="de-sign-role" id="deSignEmployeeNik">NIK: -</div>
+                </div>
+                <div>
+                  <div>Jakarta, <span id="deSignDate">-</span></div>
+                  <div>HRD / Manajemen Personalia,</div>
+                  <div class="de-sign-space"></div>
+                  <div class="de-sign-name">Miftahul Maulana</div>
+                  <div class="de-sign-role">HRD, Legal & IS Manager</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 6D: ANALYTICS KARYAWAN (mod_emp_analytics)
+             ================================================================ -->
+        <div class="module-view" id="view-emp_analytics">
+          <div class="hr-banner">
+            <div class="hr-banner-left">
+              <div class="hr-banner-icon" style="background:linear-gradient(135deg, #06b6d4, #3b82f6);"><i class="fa-solid fa-chart-pie"></i></div>
+              <div>
+                <h3 class="hr-banner-title">Analytics & Statistik Demografi SDM</h3>
+                <p class="hr-banner-subtitle">Ikhtisar demografi, sebaran kantor wilayah, status kepegawaian, dan komposisi gender</p>
+              </div>
+            </div>
+            <div class="hr-banner-right">
+              <button type="button" class="btn-secondary" onclick="loadEmployeeAnalyticsData(true)">
+                <i class="fa-solid fa-rotate"></i> Refresh Analytics
+              </button>
+            </div>
+          </div>
+
+          <!-- KPI Cards -->
+          <div class="hr-stats-grid">
+            <div class="hr-stat-card">
+              <div class="hr-stat-icon cyan"><i class="fa-solid fa-users"></i></div>
+              <div>
+                <div class="hr-stat-val" id="eaKpiTotal">0</div>
+                <div class="hr-stat-lbl">Total Sumber Daya Manusia</div>
+              </div>
+            </div>
+            <div class="hr-stat-card">
+              <div class="hr-stat-icon emerald"><i class="fa-solid fa-user-shield"></i></div>
+              <div>
+                <div class="hr-stat-val" id="eaKpiAktif">0</div>
+                <div class="hr-stat-lbl">Karyawan Aktif Bekerja</div>
+              </div>
+            </div>
+            <div class="hr-stat-card">
+              <div class="hr-stat-icon amber"><i class="fa-solid fa-venus-mars"></i></div>
+              <div>
+                <div class="hr-stat-val" id="eaKpiGenderRatio">0 / 0</div>
+                <div class="hr-stat-lbl">Rasio (Laki-laki / Perempuan)</div>
+              </div>
+            </div>
+            <div class="hr-stat-card">
+              <div class="hr-stat-icon purple"><i class="fa-solid fa-file-signature"></i></div>
+              <div>
+                <div class="hr-stat-val" id="eaKpiPkwttRatio">0%</div>
+                <div class="hr-stat-lbl">Tingkat Pegawai Tetap (PKWTT)</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2-Column Visual Charts / Bars -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px;">
+            <div class="ea-bars-card">
+              <div style="display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--border-subtle); padding-bottom:12px; margin-bottom:16px;">
+                <i class="fa-solid fa-building" style="color:#38bdf8;"></i>
+                <h4 style="margin:0; font-size:0.95rem; font-weight:700; color:var(--text-light);">Distribusi Wilayah & Penempatan Kantor</h4>
+              </div>
+              <div id="eaKantorBarsContainer">
+                <!-- Populated dynamically via JS -->
+              </div>
+            </div>
+
+            <div class="ea-bars-card">
+              <div style="display:flex; align-items:center; gap:10px; border-bottom:1px solid var(--border-subtle); padding-bottom:12px; margin-bottom:16px;">
+                <i class="fa-solid fa-sitemap" style="color:#34d399;"></i>
+                <h4 style="margin:0; font-size:0.95rem; font-weight:700; color:var(--text-light);">Distribusi Karyawan per Divisi</h4>
+              </div>
+              <div id="eaDivisiBarsContainer">
+                <!-- Populated dynamically via JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 6E: UPLOAD DOKUMEN KARYAWAN (mod_upload_dok)
+             ================================================================ -->
+        <div class="module-view" id="view-upload_dok">
+          <div class="hr-banner">
+            <div class="hr-banner-left">
+              <div class="hr-banner-icon" style="background:linear-gradient(135deg, #0ea5e9, #6366f1);"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+              <div>
+                <h3 class="hr-banner-title">Pusat Unggahan Dokumen Fisik Karyawan</h3>
+                <p class="hr-banner-subtitle">Penyimpanan dokumen fisik (KTP, KK, NPWP, BPJS, Ijazah, dll.) ke Google Drive & Supabase</p>
+              </div>
+            </div>
+            <div class="hr-banner-right">
+              <a href="https://drive.google.com/drive/folders/12hJY5VGcTlgdSBHRqOxSLYg_zwB4C0gF" target="_blank" rel="noopener noreferrer" class="btn-secondary" title="Buka Folder Google Drive Utama">
+                <i class="fa-solid fa-folder-open"></i> Buka Google Drive
+              </a>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:420px 1fr; gap:22px; align-items:start;">
+            <!-- Form Upload Berkas -->
+            <div class="content-card">
+              <div class="cuti-card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-file-arrow-up" style="color:#38bdf8;"></i>
+                  <span>Form Unggah Berkas Karyawan</span>
+                </div>
+              </div>
+
+              <form id="formUploadDok" onsubmit="handleUploadDokSubmit(event)">
+                <div class="form-group" style="margin-bottom:14px;">
+                  <label class="form-label" for="udSelectEmployee">Nama Karyawan <span class="required-star">*</span></label>
+                  <select id="udSelectEmployee" class="form-input" required onchange="onUploadDokEmployeeChange()">
+                    <option value="">-- Pilih Karyawan --</option>
+                  </select>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+                  <div class="form-group">
+                    <label class="form-label" for="udNikInput">NIK Karyawan</label>
+                    <input type="text" id="udNikInput" class="form-input readonly-input" readonly placeholder="NIK">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="udJabatanInput">Jabatan</label>
+                    <input type="text" id="udJabatanInput" class="form-input readonly-input" readonly placeholder="Jabatan">
+                  </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom:14px;">
+                  <label class="form-label" for="udJenisDok">Jenis Dokumen Fisik <span class="required-star">*</span></label>
+                  <select id="udJenisDok" class="form-input" required>
+                    <option value="KTP">Kartu Tanda Penduduk (KTP)</option>
+                    <option value="Kartu Keluarga (KK)">Kartu Keluarga (KK)</option>
+                    <option value="NPWP">NPWP</option>
+                    <option value="BPJS Kesehatan">BPJS Kesehatan</option>
+                    <option value="BPJS Ketenagakerjaan">BPJS Ketenagakerjaan</option>
+                    <option value="Ijazah Terakhir">Ijazah Terakhir</option>
+                    <option value="Transkrip Nilai">Transkrip Nilai</option>
+                    <option value="Sertifikat Keahlian / Pelatihan">Sertifikat Keahlian / Pelatihan</option>
+                    <option value="Foto Formal">Foto Formal Karyawan</option>
+                    <option value="Kontrak Kerja">Kontrak Kerja / SK Pengangkatan</option>
+                    <option value="Dokumen Lainnya">Dokumen Lainnya</option>
+                  </select>
+                </div>
+
+                <!-- Dropzone File Upload -->
+                <div class="form-group" style="margin-bottom:14px;">
+                  <label class="form-label">Berkas Dokumen (PDF, JPG, PNG) <span class="required-star">*</span></label>
+                  <div class="cuti-dropzone" id="udDropzone" onclick="document.getElementById('udFileInput').click()">
+                    <input type="file" id="udFileInput" style="display:none;" accept=".pdf,.jpg,.jpeg,.png" onchange="onUploadDokFileSelected(event)">
+                    <div class="cuti-dropzone-content" id="udDropzoneContent">
+                      <div class="cuti-dropzone-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                      <div class="cuti-dropzone-text"><strong>Klik untuk pilih berkas</strong> atau seret file ke sini</div>
+                      <div class="cuti-dropzone-hint">Maksimal 10 MB (Format PDF, PNG, JPG)</div>
+                    </div>
+                    <div class="cuti-selected-file" id="udSelectedFileBox" style="display:none;">
+                      <div class="cuti-selected-file-info">
+                        <div class="cuti-selected-file-icon"><i class="fa-solid fa-file-pdf"></i></div>
+                        <div>
+                          <div class="cuti-selected-file-name" id="udSelectedFileName">-</div>
+                          <div class="cuti-selected-file-meta" id="udSelectedFileMeta">0 KB</div>
+                        </div>
+                      </div>
+                      <button type="button" class="btn-remove-file" onclick="removeUploadDokFile(event)">
+                        <i class="fa-solid fa-xmark"></i> Batal
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom:18px;">
+                  <label class="form-label" for="udKeterangan">Keterangan Dokumen</label>
+                  <input type="text" id="udKeterangan" class="form-input" placeholder="Contoh: Dokumen asli scan warna">
+                </div>
+
+                <button type="submit" class="btn-primary" id="btnUploadDokSubmit" style="width:100%; justify-content:center; height:42px;">
+                  <i class="fa-solid fa-cloud-arrow-up"></i> Unggah Dokumen ke Drive & Database
+                </button>
+              </form>
+            </div>
+
+            <!-- Tabel Riwayat Dokumen Karyawan -->
+            <div class="content-card" style="padding:0; overflow:hidden;">
+              <div class="hr-toolbar" style="border:none; border-bottom:1px solid var(--border-subtle); border-radius:0; margin:0;">
+                <div class="hr-toolbar-left">
+                  <div class="hr-search-box">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="udSearchInput" class="form-input" placeholder="Cari nama karyawan / jenis dokumen..." oninput="onUploadDokFilterChange()">
+                  </div>
+                </div>
+                <div class="hr-toolbar-right">
+                  <button type="button" class="btn-secondary" onclick="loadUploadDokData(true)" title="Segarkan Data Dokumen">
+                    <i class="fa-solid fa-rotate"></i> Refresh
+                  </button>
+                </div>
+              </div>
+
+              <div class="table-responsive">
+                <table class="table-brosur">
+                  <thead>
+                    <tr>
+                      <th style="width:50px; text-align:center;">NO</th>
+                      <th>NAMA KARYAWAN</th>
+                      <th>JENIS DOKUMEN</th>
+                      <th>NAMA BERKAS</th>
+                      <th style="width:110px;">PENGUNGGAH</th>
+                      <th style="width:120px; text-align:center;">AKSI</th>
+                    </tr>
+                  </thead>
+                  <tbody id="udTableBody">
+                    <tr>
+                      <td colspan="6" style="text-align:center; padding:36px; color:var(--text-muted);">
+                        Memuat riwayat unggahan dokumen...
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 6F: LIHAT SLIP GAJI (mod_slip_gaji)
+             ================================================================ -->
+        <div class="module-view" id="view-slip_gaji">
+          <div class="hr-banner">
+            <div class="hr-banner-left">
+              <div class="hr-banner-icon" style="background:linear-gradient(135deg, #10b981, #14b8a6);"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+              <div>
+                <h3 class="hr-banner-title">Lihat Dokumen Slip Gaji Karyawan</h3>
+                <p class="hr-banner-subtitle">Pratinjau dokumen slip gaji bulanan resmi dari Google Drive & database Supabase</p>
+              </div>
+            </div>
+            <div class="hr-banner-right">
+              <button type="button" class="btn-secondary" onclick="loadSlipGajiData(true)">
+                <i class="fa-solid fa-rotate"></i> Refresh Slip Gaji
+              </button>
+            </div>
+          </div>
+
+          <!-- Toolbar Filter Slip Gaji -->
+          <div class="hr-toolbar">
+            <div class="hr-toolbar-left">
+              <label for="sgFilterBulan" style="font-size:0.78rem; color:var(--text-muted); font-weight:600;">Periode:</label>
+              <select id="sgFilterBulan" class="form-input" style="width:auto; height:36px;" onchange="onSlipGajiFilterChange()">
+                <option value="ALL">Semua Bulan</option>
+                <option value="Januari">Januari</option>
+                <option value="Februari">Februari</option>
+                <option value="Maret">Maret</option>
+                <option value="April">April</option>
+                <option value="Mei">Mei</option>
+                <option value="Juni">Juni</option>
+                <option value="Juli">Juli</option>
+                <option value="Agustus">Agustus</option>
+                <option value="September" selected>September</option>
+                <option value="Oktober">Oktober</option>
+                <option value="November">November</option>
+                <option value="Desember">Desember</option>
+              </select>
+              <select id="sgFilterTahun" class="form-input" style="width:auto; height:36px;" onchange="onSlipGajiFilterChange()">
+                <option value="2025">2025</option>
+                <option value="2026" selected>2026</option>
+                <option value="2027">2027</option>
+              </select>
+
+              <div class="hr-search-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="sgSearchInput" class="form-input" placeholder="Cari nama karyawan..." oninput="onSlipGajiFilterChange()">
+              </div>
+            </div>
+          </div>
+
+          <!-- Grid Kartu Dokumen Slip Gaji -->
+          <div class="sg-cards-grid" id="sgGridContainer">
+            <!-- Populated via JS -->
+            <div style="grid-column:1/-1; text-align:center; padding:40px; color:var(--text-muted);">
+              Memuat berkas slip gaji...
+            </div>
+          </div>
+        </div>
+
+        <!-- MODAL PREVIEW SLIP GAJI PDF -->
+        <div class="cuti-modal-overlay" id="sgModalPreview" style="display:none;" onclick="closeSlipGajiModal(event)">
+          <div class="cuti-modal-card" style="max-width:850px; width:95%; height:85vh; display:flex; flex-direction:column;" onclick="event.stopPropagation()">
+            <div class="cuti-modal-header" style="flex-shrink:0;">
+              <div class="cuti-modal-title">
+                <i class="fa-solid fa-file-pdf" style="color:#f43f5e;"></i>
+                <span id="sgModalFileName">Pratinjau Slip Gaji</span>
+              </div>
+              <button type="button" class="cuti-modal-close" onclick="closeSlipGajiModal()">
+                <i class="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+            <div style="flex:1; background:#0f172a; padding:10px; border-radius:0 0 12px 12px; overflow:hidden;">
+              <iframe id="sgModalIframe" src="" style="width:100%; height:100%; border:none; border-radius:8px; background:#fff;"></iframe>
+            </div>
+          </div>
+        </div>
+
 
         <!-- ================================================================
              MODULE 5B: REKAPITULASI ABSENSI BULANAN (MATRIX REKAP)

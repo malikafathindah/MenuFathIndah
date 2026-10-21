@@ -385,7 +385,7 @@ app.get('/api/cuti', async (req, res) => {
   }
 });
 
-// 6a. GET BIO KARYAWAN (Supabase Tabel Bio_Karyawan / Google Sheet "Bio Karyawan")
+// 6a. GET & POST BIO KARYAWAN (Supabase Tabel Bio_Karyawan / Google Sheet "Bio Karyawan")
 app.get('/api/bio-karyawan', async (req, res) => {
   try {
     const list = await supabase.getSupabaseBioKaryawan();
@@ -394,6 +394,74 @@ app.get('/api/bio-karyawan', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+app.post('/api/bio-karyawan', async (req, res) => {
+  try {
+    const result = await supabase.insertOrUpdateBioKaryawan(req.body);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 6a.1 DATA ABSENSI API (Supabase Tabel data_absensi)
+app.get('/api/data-absensi', async (req, res) => {
+  try {
+    const list = await supabase.getSupabaseDataAttendance();
+    res.json({ success: true, count: list.length, data: list });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/data-absensi', async (req, res) => {
+  try {
+    const result = await supabase.insertSupabaseDataAttendance(req.body);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 6a.2 UPLOAD DOKUMEN API (Supabase Tabel upload_dok)
+app.get('/api/upload-dok', async (req, res) => {
+  try {
+    const list = await supabase.getSupabaseUploadDok();
+    res.json({ success: true, count: list.length, data: list });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/upload-dok', async (req, res) => {
+  try {
+    const result = await supabase.insertSupabaseUploadDok(req.body);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/upload-dok/:id', async (req, res) => {
+  try {
+    await supabase.deleteSupabaseUploadDok(req.params.id);
+    res.json({ success: true, message: 'Dokumen berhasil dihapus' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 6a.3 SLIP GAJI API (Supabase Tabel slip_gaji)
+app.get('/api/slip-gaji', async (req, res) => {
+  try {
+    const nik = req.query.nik || '';
+    const list = await supabase.getSupabaseSlipGaji(nik);
+    res.json({ success: true, count: list.length, data: list });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 
 // 6b. BROSUR API (Supabase Tabel LogBrosur & MnuLogBrosur)
 app.get('/api/brosur/log', async (req, res) => {

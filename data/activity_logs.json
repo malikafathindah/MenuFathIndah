@@ -1,0 +1,101 @@
+[
+  {
+    "LogID": "LOG-EAKSQ1FE",
+    "Timestamp": "2026-10-20 16:07:17",
+    "Username": "admin",
+    "IP_Address": "127.0.0.1 (Localhost)",
+    "Maps_URL": "https://www.google.com/maps?q=-6.222054681059696,107.0133148341873",
+    "Location": "Rawa Bugel, Perwira, Harapan Mulya",
+    "Action": "LOGIN_SUCCESS (User ADMINISTRATOR UTAMA berhasil login pada 2026-10-20 16:07:17)",
+    "Module": "Auth",
+    "isNewSessionLog": true
+  },
+  {
+    "LogID": "LOG-LDLKPJ7Q",
+    "Timestamp": "2026-10-20 14:52:38",
+    "Username": "admin",
+    "IP_Address": "127.0.0.1 (Localhost)",
+    "Maps_URL": "https://www.google.com/maps?q=-6.222052503949194,107.01331362083468",
+    "Location": "Rawa Bugel, Perwira, Harapan Mulya",
+    "Action": "LOGIN_SUCCESS (User ADMINISTRATOR UTAMA berhasil login pada 2026-10-20 14:52:38)",
+    "Module": "Auth",
+    "isNewSessionLog": true
+  },
+  {
+    "LogID": "LOG-89UPKLYP",
+    "Timestamp": "2026-10-19 08:37:47",
+    "Username": "admin",
+    "IP_Address": "127.0.0.1 (Localhost)",
+    "Maps_URL": "https://www.google.com/maps?q=-6.247851975888017,106.98038206905541",
+    "Location": "Lagoon, Jakasampurna, Bekasi",
+    "Action": "LOGIN_SUCCESS (User Administrator Utama berhasil login pada 2026-10-19 08:37:47)",
+    "Module": "Auth",
+    "isNewSessionLog": true
+  },
+  {
+    "LogID": "LOG-E3345KRZ",
+    "Timestamp": "2026-10-18 20:32:30",
+    "Username": "Miftah",
+    "IP_Address": "127.0.0.1 (Localhost)",
+    "Maps_URL": "https://www.google.com/maps?q=-6.3230515024433585,106.75724409129273",
+    "Location": "RW 02, Pisangan, Ciputat Timur",
+    "Action": "LOGIN_SUCCESS (User Miftahul Maulana berhasil login pada 2026-10-18 20:32:30)",
+    "Module": "Auth",
+    "isNewSessionLog": true
+  },
+  {
+    "LogID": "LOG-A1L0IIEZ",
+    "Timestamp": "2026-10-18 09:02:22",
+    "Username": "Miftah",
+    "IP_Address": "127.0.0.1 (Localhost)",
+    "Maps_URL": "https://www.google.com/maps?q=-6.323029,106.75727297063519",
+    "Location": "RW 02, Pisangan, Ciputat Timur",
+    "Action": "LOGIN_SUCCESS (User Miftahul Maulana berhasil login pada 2026-10-18 09:02:22)",
+    "Module": "Auth",
+    "isNewSessionLog": true
+  },
+  {
+    "LogID": "LOG-U5581O7G",
+    "Timestamp": "2026-10-18 08:57:10",
+    "Username": "admin",
+    "IP_Address": "127.0.0.1 (Localhost)",
+    "Maps_URL": "https://www.google.com/maps?q=-6.323037709904473,106.75727271659173",
+    "Location": "RW 02, Pisangan, Ciputat Timur",
+    "Action": "LOGIN_SUCCESS (User Administrator Utama berhasil login pada 2026-10-18 08:57:10)",
+    "Module": "Auth",
+    "isNewSessionLog": true
+  },
+  {
+    "LogID": "LOG-VOY2Q1D1",
+    "Timestamp": "2026-10-18 08:56:09",
+    "Username": "Miftah",
+    "IP_Address": "127.0.0.1 (Localhost)",
+    "Maps_URL": "https://www.google.com/maps?q=-6.323037709904473,106.75727271659173",
+    "Location": "RW 02, Pisangan, Ciputat Timur",
+    "Action": "LOGIN_SUCCESS (User Miftahul Maulana berhasil login pada 2026-10-18 08:56:09)",
+    "Module": "Auth",
+    "isNewSessionLog": true
+  },
+  {
+    "LogID": "LOG-ZJD7K2L2",
+    "Timestamp": "2026-10-18 08:54:31",
+    "Username": "admin",
+    "IP_Address": "127.0.0.1 (Localhost)",
+    "Maps_URL": "https://www.google.com/maps?q=-6.2088,106.8456",
+    "Location": "Jakarta, Indonesia",
+    "Action": "LOGIN_FAILED (Password salah untuk admin)",
+    "Module": "Auth",
+    "isNewSessionLog": true
+  },
+  {
+    "LogID": "LOG-VR3RHHQ0",
+    "Timestamp": "2026-10-18 08:54:12",
+    "Username": "admin",
+    "IP_Address": "127.0.0.1 (Localhost)",
+    "Maps_URL": "https://www.google.com/maps?q=-6.2088,106.8456",
+    "Location": "Jakarta Pusat, Indonesia",
+    "Action": "LOGIN_SUCCESS (User Administrator Utama berhasil login pada 2026-10-18 08:54:12)",
+    "Module": "Auth",
+    "isNewSessionLog": true
+  }
+]
