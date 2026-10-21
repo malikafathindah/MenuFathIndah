@@ -3115,6 +3115,9 @@ function renderBrosurTable() {
           ${notes}
         </td>
         <td style="text-align:center; white-space:nowrap;">
+          <button type="button" class="btn-action-icon btn-action-wa" onclick="sendBrosurViaWhatsApp('${safeId}')" title="Send Via WA">
+            <i class="fa-brands fa-whatsapp"></i>
+          </button>
           <a href="${link}" target="_blank" rel="noopener noreferrer" class="btn-action-icon" title="Buka Berkas">
             <i class="fa-solid fa-arrow-up-right-from-square"></i>
           </a>
@@ -3129,6 +3132,46 @@ function renderBrosurTable() {
     `;
   }).join('');
 }
+
+window.sendBrosurViaWhatsApp = function(id) {
+  const list = state.data.logBrosur || [];
+  let item = list.find(x => String(x.id) === String(id));
+  if (!item && id && id.startsWith('LOCAL-')) {
+    const idx = parseInt(id.replace('LOCAL-', ''), 10);
+    if (!isNaN(idx) && list[idx]) item = list[idx];
+  }
+  if (!item) {
+    alert('Data brosur tidak ditemukan.');
+    return;
+  }
+
+  const name = item.brosurname || item.name || 'Brosur Paket';
+  const wil = item.lokasibrosur || item.wilayah || 'Pusat';
+  const cat = item.catagory || item.category || 'Umum';
+  const validUntilDisplay = formatDateDdMmmYy(item.validuntil);
+  const link = item.link || GDRIVE_BROSUR_FOLDER_URL;
+  const notes = (item.catatan || '').trim();
+  const paket = (item.namapaket || '').trim();
+
+  const lines = [
+    `*KATALOG BROSUR PT. FATH INDAH TRAVEL SERVICE*`,
+    `----------------------------------------------------`,
+    `📌 *Nama Brosur:* ${name}`,
+    paket ? `📦 *Rincian Paket:* ${paket}` : null,
+    `🏢 *Wilayah:* ${wil}`,
+    `🏷️ *Kategori:* ${cat}`,
+    validUntilDisplay && validUntilDisplay !== '-' ? `📅 *Masa Berlaku:* s/d ${validUntilDisplay}` : null,
+    notes ? `📝 *Keterangan:* ${notes}` : null,
+    `----------------------------------------------------`,
+    `📥 *Unduh / Buka Berkas Brosur:*`,
+    `${link}`,
+    `----------------------------------------------------`,
+    `_PT. Fath Indah Travel Service - Umrah & Hajj Service_`
+  ].filter(Boolean).join('\n');
+
+  const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(lines)}`;
+  window.open(waUrl, '_blank');
+};
 
 window.openUpdateStatusModal = function(id) {
   const modal = document.getElementById('updateStatusModal');
