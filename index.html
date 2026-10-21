@@ -901,6 +901,18 @@
                   <option value="ALL">Semua Status</option>
                 </select>
 
+                <!-- View Mode Switcher: Tabel vs Split Listing & Preview -->
+                <div class="brosur-view-toggle-group" role="group" aria-label="Mode Tampilan">
+                  <button type="button" class="btn-brosur-view active" id="btnViewModeTable" onclick="setBrosurViewMode('table')" title="Tampilan Tabel List">
+                    <i class="fa-solid fa-table-list"></i>
+                    <span>Tabel List</span>
+                  </button>
+                  <button type="button" class="btn-brosur-view" id="btnViewModeSplit" onclick="setBrosurViewMode('split')" title="Tampilan Listing & Pratinjau Dokumen Drive">
+                    <i class="fa-solid fa-table-columns"></i>
+                    <span>Listing & Preview Drive</span>
+                  </button>
+                </div>
+
                 <button type="button" class="btn-refresh-brosur" onclick="reloadBrosurData()" title="Segarkan Data">
                   <i class="fa-solid fa-rotate"></i>
                   <span>Refresh</span>
@@ -912,8 +924,8 @@
                 </button>
               </div>
 
-              <!-- Table Container -->
-              <div class="table-responsive brosur-table-container">
+              <!-- 1. TAMPILAN TABEL LIST (Default) -->
+              <div id="brosurTableViewContainer" class="table-responsive brosur-table-container">
                 <table class="table-brosur">
                   <thead>
                     <tr>
@@ -937,6 +949,83 @@
                     </tr>
                   </tbody>
                 </table>
+              </div>
+
+              <!-- 2. TAMPILAN LISTING & PREVIEW GOOGLE DRIVE (Split View Berdampingan) -->
+              <div id="brosurSplitViewContainer" class="brosur-split-container" style="display: none;">
+                <!-- Sisi Kiri: Listing Kebawah Info Dokumen -->
+                <div class="brosur-split-left" id="brosurSplitLeft">
+                  <div class="brosur-split-list-header">
+                    <div class="brosur-split-list-title">
+                      <i class="fa-solid fa-layer-group" style="color:var(--gold-light);"></i>
+                      <span>Daftar Dokumen Brosur</span>
+                      <span class="brosur-split-badge-count" id="brosurSplitCount">0 Berkas</span>
+                    </div>
+                    <div style="font-size:0.75rem; color:var(--text-dim);">Klik kartu untuk membuka pratinjau</div>
+                  </div>
+                  <div class="brosur-split-cards" id="brosurSplitCardsList">
+                    <!-- Populated via renderBrosurSplitView() -->
+                  </div>
+                </div>
+
+                <!-- Sisi Kanan (Tab Kanan): Tampilan Langsung Dokumen Google Drive -->
+                <div class="brosur-split-right" id="brosurSplitRight">
+                  <div class="brosur-preview-header">
+                    <div class="brosur-preview-title-area">
+                      <div class="brosur-preview-badge" id="brosurPreviewBadge">GOOGLE DRIVE LIVE PREVIEW</div>
+                      <h4 class="brosur-preview-doc-title" id="brosurPreviewTitle">Pilih Dokumen Brosur</h4>
+                      <div class="brosur-preview-meta" id="brosurPreviewMeta">-</div>
+                    </div>
+                    <div class="brosur-preview-actions">
+                      <button type="button" class="btn-preview-tool" onclick="reloadActiveDrivePreview()" title="Muat Ulang Tampilan">
+                        <i class="fa-solid fa-rotate-right"></i>
+                      </button>
+                      <button type="button" class="btn-preview-tool" onclick="copyActiveDriveLink()" title="Salin Tautan">
+                        <i class="fa-solid fa-link"></i>
+                      </button>
+                      <a href="#" target="_blank" rel="noopener noreferrer" class="btn-preview-open" id="btnPreviewOpenExternal" title="Buka Dokumen di Google Drive Tab Baru">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        <span>Buka Drive</span>
+                      </a>
+                    </div>
+                  </div>
+
+                  <!-- Tab Navigasi Panel Kanan -->
+                  <div class="brosur-preview-tabs-nav">
+                    <button type="button" class="brosur-preview-tab-btn active" id="btnPrevTabDoc" onclick="switchPreviewSubTab('doc')">
+                      <i class="fa-solid fa-file-pdf"></i>
+                      <span>Tampilan Dokumen Drive</span>
+                    </button>
+                    <button type="button" class="brosur-preview-tab-btn" id="btnPrevTabDetail" onclick="switchPreviewSubTab('detail')">
+                      <i class="fa-solid fa-circle-info"></i>
+                      <span>Info & Ringkasan Lengkap</span>
+                    </button>
+                  </div>
+
+                  <!-- Sub-Tab 1: Live Google Drive Document Iframe -->
+                  <div class="brosur-preview-content active" id="panePrevTabDoc">
+                    <div class="brosur-iframe-wrapper">
+                      <div class="brosur-iframe-loading" id="brosurIframeLoader">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size:1.8rem; color:var(--gold-light);"></i>
+                        <span>Menghubungkan ke Google Drive Viewer...</span>
+                      </div>
+                      <iframe id="brosurPreviewIframe" src="about:blank" allow="autoplay" allowfullscreen></iframe>
+                    </div>
+                    <div class="brosur-iframe-footer">
+                      <span><i class="fa-solid fa-shield-halved" style="color:#38bdf8; margin-right:5px;"></i> Google Drive Secure Viewer PT. Fath Indah</span>
+                      <a href="#" target="_blank" rel="noopener noreferrer" id="brosurIframeDirectFallback">
+                        Buka dokumen langsung di Google Drive <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.7rem;"></i>
+                      </a>
+                    </div>
+                  </div>
+
+                  <!-- Sub-Tab 2: Detail Metadata Lengkap & Aksi -->
+                  <div class="brosur-preview-content" id="panePrevTabDetail" style="padding:18px; overflow-y:auto;">
+                    <div id="brosurDetailBody">
+                      <!-- Render detail metadata & WhatsApp / Edit / Delete buttons -->
+                    </div>
+                  </div>
+                </div>
               </div>
 
             </div>

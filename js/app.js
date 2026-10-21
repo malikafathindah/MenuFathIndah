@@ -59,6 +59,8 @@ const state = {
     wilayah: 'ALL',
     status: 'Aktif'
   },
+  brosurViewMode: 'table',
+  activeBrosurId: null,
   selectedLocalBrosurFile: null
 };
 
@@ -1833,6 +1835,9 @@ function initLaunchingBrosurView() {
   loadBrosurData();
   updateGDriveStatusUI();
   setupDropZoneListeners();
+
+  const savedMode = localStorage.getItem('fath_brosur_view_mode') || 'table';
+  setBrosurViewMode(savedMode);
 }
 
 window.switchBrosurTab = function(tabName) {
@@ -1852,7 +1857,11 @@ window.switchBrosurTab = function(tabName) {
     btnList?.classList.add('active');
     paneInput?.classList.remove('active');
     paneList?.classList.add('active');
-    renderBrosurTable();
+    if (state.brosurViewMode === 'split') {
+      renderBrosurSplitView();
+    } else {
+      renderBrosurTable();
+    }
   }
 };
 
@@ -3033,10 +3042,7 @@ async function executeSaveBrosurToSupabase(payload) {
   switchBrosurTab('list');
 }
 
-function renderBrosurTable() {
-  const tbody = document.getElementById('logBrosurTableBody');
-  if (!tbody) return;
-
+function getFilteredBrosurList() {
   const list = state.data.logBrosur || [];
   const search = (state.brosurFilter.search || '').toLowerCase();
   const category = state.brosurFilter.category || 'ALL';
@@ -3044,8 +3050,7 @@ function renderBrosurTable() {
   const statusFilter = state.brosurFilter.status || 'Aktif';
   const todayStr = new Date().toISOString().slice(0, 10);
 
-  // Filter
-  const filtered = list.filter(item => {
+  return list.filter(item => {
     const wil = (item.wilayah || item.lokasibrosur || '').toLowerCase();
     const cat = (item.catagory || item.category || '').toLowerCase();
     const name = (item.brosurname || item.name || '').toLowerCase();
@@ -3076,11 +3081,39 @@ function renderBrosurTable() {
 
     return true;
   });
+}
 
-  // Update Stats
+function getGDriveEmbedUrl(url) {
+  if (!url) return 'about:blank';
+  url = url.trim();
+
+  // 1. Google Drive File: /file/d/{id}/...
+  const fileMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (fileMatch && fileMatch[1]) {
+    return `https://drive.google.com/file/d/${fileMatch[1]}/preview`;
+  }
+
+  // 2. Google Drive query param ?id={id}
+  const idMatch = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (idMatch && idMatch[1] && !url.includes('/folders/')) {
+    return `https://drive.google.com/file/d/${idMatch[1]}/preview`;
+  }
+
+  // 3. Google Drive Folder: /drive/folders/{id}
+  const folderMatch = url.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  if (folderMatch && folderMatch[1]) {
+    return `https://drive.google.com/embeddedfolderview?id=${folderMatch[1]}#list`;
+  }
+
+  return url;
+}
+
+function updateBrosurStats(list) {
   const elTotal = document.getElementById('brosurStatTotal');
   const elCat = document.getElementById('brosurStatCategory');
   const elActive = document.getElementById('brosurStatActive');
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   if (elTotal) elTotal.textContent = list.length;
   if (elCat) {
     const cats = new Set(list.map(x => x.catagory || x.category).filter(Boolean));
@@ -3094,29 +3127,187 @@ function renderBrosurTable() {
     }).length;
     elActive.textContent = activeCount;
   }
+}
+
+function renderBrosurTable() {
+  const tbody = document.getElementById('logBrosurTableBody');
+  const list = state.data.logBrosur || [];
+  const filtered = getFilteredBrosurList();
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  updateBrosurStats(list);
+
+  if (tbody) {
+    if (filtered.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="9" style="text-align:center; padding:36px; color:#64748b;">
+            <i class="fa-regular fa-folder-open" style="font-size:2rem; color:var(--gold-light); margin-bottom:10px;"></i>
+            <div>Tidak ada brosur yang sesuai filter. Klik <strong>Input Brosur Baru</strong> untuk mendaftarkan brosur.</div>
+          </td>
+        </tr>
+      `;
+    } else {
+      tbody.innerHTML = filtered.map((item, idx) => {
+        const no = idx + 1;
+        const wil = item.lokasibrosur || item.wilayah || 'Pusat';
+        const cat = item.catagory || item.category || 'Umum';
+        const name = item.brosurname || item.name || '-';
+        const notes = item.catatan || '-';
+        const link = item.link || GDRIVE_BROSUR_FOLDER_URL;
+
+        let rawTglUpload = item.tglupload || '';
+        if (!rawTglUpload && item.created_at) {
+          rawTglUpload = String(item.created_at).slice(0, 10);
+        }
+        const tglUploadDisplay = formatDateDdMmmYy(rawTglUpload);
+        const validUntilDisplay = formatDateDdMmmYy(item.validuntil);
+
+        let rawStatus = (item.status || 'Aktif').trim();
+        const isPastDate = item.validuntil && item.validuntil < todayStr;
+        const isExpired = rawStatus.toLowerCase() === 'expired' || isPastDate;
+        const statusLabel = isExpired ? 'Expired' : 'Aktif';
+        const statusPillClass = isExpired ? 'expired' : 'aktif';
+        const statusIcon = isExpired ? 'fa-clock-rotate-left' : 'fa-circle-check';
+
+        const catLower = cat.toLowerCase();
+        let badgeClass = 'default';
+        if (catLower.includes('umrah')) badgeClass = 'umrah';
+        else if (catLower.includes('haji')) badgeClass = 'haji';
+        else if (catLower.includes('wisata')) badgeClass = 'wisata';
+        else if (catLower.includes('promo')) badgeClass = 'promo';
+
+        const safeId = String(item.id || `LOCAL-${idx}`);
+
+        return `
+          <tr>
+            <td style="color:#64748b; font-weight:600;">${no}</td>
+            <td style="white-space:nowrap; font-size:0.82rem; color:#cbd5e1; font-family:'JetBrains Mono',monospace;">
+              <i class="fa-regular fa-calendar" style="color:var(--text-dim); margin-right:4px;"></i>${tglUploadDisplay}
+            </td>
+            <td style="white-space:nowrap; font-size:0.82rem; font-family:'JetBrains Mono',monospace; ${isPastDate ? 'color:#f87171;' : 'color:#38bdf8;'}">
+              <i class="fa-regular fa-calendar-check" style="margin-right:4px;"></i><strong>${validUntilDisplay}</strong>
+            </td>
+            <td>
+              <span style="color:#38bdf8; font-weight:600; font-size:0.82rem; display:inline-flex; align-items:center; gap:5px;">
+                <i class="fa-solid fa-location-dot"></i> ${wil}
+              </span>
+            </td>
+            <td>
+              <span class="brosur-cat-badge ${badgeClass}">${cat}</span>
+            </td>
+            <td>
+              <a href="${link}" target="_blank" rel="noopener noreferrer" style="color:#ffffff; font-size:0.9rem; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:color 0.2s;" onmouseover="this.style.color='#38bdf8'" onmouseout="this.style.color='#ffffff'" title="Klik untuk membuka berkas brosur">
+                <span>${name}</span>
+                <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.75rem; color:#38bdf8;"></i>
+              </a>
+              ${item.namapaket ? `<div style="font-size:0.78rem; color:#38bdf8; font-weight:600; margin-top:3px; font-family:'JetBrains Mono',monospace;"><i class="fa-solid fa-box-archive" style="font-size:0.72rem; margin-right:4px;"></i>${item.namapaket}</div>` : ''}
+            </td>
+            <td style="text-align:center;">
+              <span class="brosur-status-pill ${statusPillClass}">
+                <i class="fa-solid ${statusIcon}"></i> ${statusLabel}
+              </span>
+            </td>
+            <td style="font-size:0.84rem; color:#94a3b8; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${notes}">
+              ${notes}
+            </td>
+            <td style="text-align:center; white-space:nowrap;">
+              <button type="button" class="btn-action-icon btn-action-wa" onclick="sendBrosurViaWhatsApp('${safeId}')" title="Send Via WA">
+                <i class="fa-brands fa-whatsapp"></i>
+              </button>
+              <a href="${link}" target="_blank" rel="noopener noreferrer" class="btn-action-icon" title="Buka Berkas">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+              </a>
+              <button type="button" class="btn-action-icon btn-action-edit" onclick="openUpdateStatusModal('${safeId}')" title="Update Status Brosur">
+                <i class="fa-solid fa-pen-to-square"></i>
+              </button>
+              <button type="button" class="btn-action-icon btn-action-delete" onclick="deleteBrosurRecord('${safeId}')" title="Hapus Brosur">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
+
+  // Sinkronkan juga split view jika sedang aktif
+  if (state.brosurViewMode === 'split') {
+    renderBrosurSplitView();
+  }
+}
+
+// --------------------------------------------------------------------------
+// FITUR BARU: DUAL VIEW MODE (TABEL LIST vs LISTING KIRI & PREVIEW DRIVE KANAN)
+// --------------------------------------------------------------------------
+
+window.setBrosurViewMode = function(mode) {
+  state.brosurViewMode = mode || 'table';
+  try {
+    localStorage.setItem('fath_brosur_view_mode', state.brosurViewMode);
+  } catch (_) {}
+
+  const btnTable = document.getElementById('btnViewModeTable');
+  const btnSplit = document.getElementById('btnViewModeSplit');
+  const tableContainer = document.getElementById('brosurTableViewContainer');
+  const splitContainer = document.getElementById('brosurSplitViewContainer');
+
+  if (state.brosurViewMode === 'split') {
+    btnTable?.classList.remove('active');
+    btnSplit?.classList.add('active');
+    if (tableContainer) tableContainer.style.display = 'none';
+    if (splitContainer) splitContainer.style.display = 'grid';
+    renderBrosurSplitView();
+  } else {
+    btnSplit?.classList.remove('active');
+    btnTable?.classList.add('active');
+    if (splitContainer) splitContainer.style.display = 'none';
+    if (tableContainer) tableContainer.style.display = 'block';
+    renderBrosurTable();
+  }
+};
+
+function renderBrosurSplitView() {
+  const cardsContainer = document.getElementById('brosurSplitCardsList');
+  if (!cardsContainer) return;
+
+  const filtered = getFilteredBrosurList();
+  const countEl = document.getElementById('brosurSplitCount');
+  if (countEl) countEl.textContent = `${filtered.length} Berkas`;
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="9" style="text-align:center; padding:36px; color:#64748b;">
-          <i class="fa-regular fa-folder-open" style="font-size:2rem; color:var(--gold-light); margin-bottom:10px;"></i>
-          <div>Tidak ada brosur yang sesuai filter. Klik <strong>Input Brosur Baru</strong> untuk mendaftarkan brosur.</div>
-        </td>
-      </tr>
+    cardsContainer.innerHTML = `
+      <div style="text-align:center; padding:36px 16px; color:#64748b; background:rgba(0,0,0,0.2); border-radius:8px;">
+        <i class="fa-regular fa-folder-open" style="font-size:2rem; color:var(--gold-light); margin-bottom:10px;"></i>
+        <div style="font-size:0.86rem; color:#94a3b8;">Tidak ada dokumen brosur yang sesuai filter.</div>
+      </div>
     `;
+    resetActiveDrivePreviewEmpty();
     return;
   }
 
-  tbody.innerHTML = filtered.map((item, idx) => {
+  // Tentukan item mana yang aktif untuk preview
+  let activeItem = null;
+  if (state.activeBrosurId) {
+    activeItem = filtered.find(x => String(x.id || '') === String(state.activeBrosurId));
+  }
+  if (!activeItem) {
+    activeItem = filtered[0];
+    state.activeBrosurId = String(activeItem.id || 'LOCAL-0');
+  }
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  cardsContainer.innerHTML = filtered.map((item, idx) => {
+    const safeId = String(item.id || `LOCAL-${idx}`);
+    const isActive = String(safeId) === String(state.activeBrosurId);
     const no = idx + 1;
     const wil = item.lokasibrosur || item.wilayah || 'Pusat';
     const cat = item.catagory || item.category || 'Umum';
     const name = item.brosurname || item.name || '-';
     const notes = item.catatan || '-';
     const link = item.link || GDRIVE_BROSUR_FOLDER_URL;
-    const idBadge = item.id ? (typeof item.id === 'number' ? `ID: #${item.id}` : item.id) : '';
 
-    // Requirement #4: Tanggal Upload & Valid Until dibuat format dd mmm yy (Lampiran 3)
     let rawTglUpload = item.tglupload || '';
     if (!rawTglUpload && item.created_at) {
       rawTglUpload = String(item.created_at).slice(0, 10);
@@ -3124,7 +3315,6 @@ function renderBrosurTable() {
     const tglUploadDisplay = formatDateDdMmmYy(rawTglUpload);
     const validUntilDisplay = formatDateDdMmmYy(item.validuntil);
 
-    // Status Brosur (Aktif / Expired)
     let rawStatus = (item.status || 'Aktif').trim();
     const isPastDate = item.validuntil && item.validuntil < todayStr;
     const isExpired = rawStatus.toLowerCase() === 'expired' || isPastDate;
@@ -3132,7 +3322,6 @@ function renderBrosurTable() {
     const statusPillClass = isExpired ? 'expired' : 'aktif';
     const statusIcon = isExpired ? 'fa-clock-rotate-left' : 'fa-circle-check';
 
-    // Category Badge Class
     const catLower = cat.toLowerCase();
     let badgeClass = 'default';
     if (catLower.includes('umrah')) badgeClass = 'umrah';
@@ -3140,57 +3329,284 @@ function renderBrosurTable() {
     else if (catLower.includes('wisata')) badgeClass = 'wisata';
     else if (catLower.includes('promo')) badgeClass = 'promo';
 
-    const safeId = String(item.id || `LOCAL-${idx}`);
-
     return `
-      <tr>
-        <td style="color:#64748b; font-weight:600;">${no}</td>
-        <td style="white-space:nowrap; font-size:0.82rem; color:#cbd5e1; font-family:'JetBrains Mono',monospace;">
-          <i class="fa-regular fa-calendar" style="color:var(--text-dim); margin-right:4px;"></i>${tglUploadDisplay}
-        </td>
-        <td style="white-space:nowrap; font-size:0.82rem; font-family:'JetBrains Mono',monospace; ${isPastDate ? 'color:#f87171;' : 'color:#38bdf8;'}">
-          <i class="fa-regular fa-calendar-check" style="margin-right:4px;"></i><strong>${validUntilDisplay}</strong>
-        </td>
-        <td>
-          <span style="color:#38bdf8; font-weight:600; font-size:0.82rem; display:inline-flex; align-items:center; gap:5px;">
-            <i class="fa-solid fa-location-dot"></i> ${wil}
-          </span>
-        </td>
-        <td>
-          <span class="brosur-cat-badge ${badgeClass}">${cat}</span>
-        </td>
-        <td>
-          <a href="${link}" target="_blank" rel="noopener noreferrer" style="color:#ffffff; font-size:0.9rem; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:color 0.2s;" onmouseover="this.style.color='#38bdf8'" onmouseout="this.style.color='#ffffff'" title="Klik untuk membuka berkas brosur">
-            <span>${name}</span>
-            <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.75rem; color:#38bdf8;"></i>
-          </a>
-          ${item.namapaket ? `<div style="font-size:0.78rem; color:#38bdf8; font-weight:600; margin-top:3px; font-family:'JetBrains Mono',monospace;"><i class="fa-solid fa-box-archive" style="font-size:0.72rem; margin-right:4px;"></i>${item.namapaket}</div>` : ''}
-        </td>
-        <td style="text-align:center;">
-          <span class="brosur-status-pill ${statusPillClass}">
+      <div class="brosur-doc-card ${isActive ? 'active' : ''}" id="docCard-${safeId}" onclick="selectBrosurForPreview('${safeId}')">
+        <div class="brosur-doc-card-top">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="brosur-doc-card-no">#${no}</span>
+            <span class="brosur-cat-badge ${badgeClass}">${cat}</span>
+          </div>
+          <span class="brosur-status-pill ${statusPillClass}" style="font-size:0.68rem; padding:2px 8px;">
             <i class="fa-solid ${statusIcon}"></i> ${statusLabel}
           </span>
-        </td>
-        <td style="font-size:0.84rem; color:#94a3b8; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${notes}">
-          ${notes}
-        </td>
-        <td style="text-align:center; white-space:nowrap;">
-          <button type="button" class="btn-action-icon btn-action-wa" onclick="sendBrosurViaWhatsApp('${safeId}')" title="Send Via WA">
-            <i class="fa-brands fa-whatsapp"></i>
+        </div>
+
+        <div class="brosur-doc-card-title">
+          <i class="fa-solid fa-file-pdf" style="color:${isActive ? 'var(--gold-light)' : '#38bdf8'}; font-size:0.88rem;"></i>
+          <span>${name}</span>
+        </div>
+
+        ${item.namapaket ? `
+          <div class="brosur-doc-card-paket">
+            <i class="fa-solid fa-box-archive" style="font-size:0.75rem;"></i>
+            <span>${item.namapaket}</span>
+          </div>
+        ` : ''}
+
+        <div class="brosur-doc-card-meta">
+          <div class="brosur-doc-card-meta-item" title="Wilayah: ${wil}">
+            <i class="fa-solid fa-location-dot" style="color:#38bdf8;"></i>
+            <span>${wil}</span>
+          </div>
+          <div class="brosur-doc-card-meta-item" title="Valid Until: ${validUntilDisplay}">
+            <i class="fa-regular fa-calendar-check" style="${isPastDate ? 'color:#f87171;' : 'color:#34d399;'}"></i>
+            <span style="${isPastDate ? 'color:#f87171;' : ''}">${validUntilDisplay}</span>
+          </div>
+          <div class="brosur-doc-card-meta-item" title="Tanggal Upload: ${tglUploadDisplay}">
+            <i class="fa-regular fa-calendar" style="color:var(--text-dim);"></i>
+            <span>${tglUploadDisplay}</span>
+          </div>
+          <div class="brosur-doc-card-meta-item" title="Tautan Google Drive">
+            <i class="fa-brands fa-google-drive" style="color:#f59e0b;"></i>
+            <span>Google Drive</span>
+          </div>
+        </div>
+
+        ${notes && notes !== '-' ? `
+          <div class="brosur-doc-card-notes" title="${notes}">
+            <i class="fa-regular fa-note-sticky" style="margin-right:4px;"></i>${notes}
+          </div>
+        ` : ''}
+
+        <div class="brosur-doc-card-footer" onclick="event.stopPropagation()">
+          <button type="button" class="brosur-btn-view-indicator" onclick="selectBrosurForPreview('${safeId}')">
+            <i class="fa-solid ${isActive ? 'fa-eye' : 'fa-arrow-right'}"></i>
+            <span>${isActive ? 'Sedang Dilihat' : 'Lihat Dokumen'}</span>
           </button>
-          <a href="${link}" target="_blank" rel="noopener noreferrer" class="btn-action-icon" title="Buka Berkas">
-            <i class="fa-solid fa-arrow-up-right-from-square"></i>
-          </a>
-          <button type="button" class="btn-action-icon btn-action-edit" onclick="openUpdateStatusModal('${safeId}')" title="Update Status Brosur">
-            <i class="fa-solid fa-pen-to-square"></i>
-          </button>
-          <button type="button" class="btn-action-icon btn-action-delete" onclick="deleteBrosurRecord('${safeId}')" title="Hapus Brosur">
-            <i class="fa-solid fa-trash-can"></i>
-          </button>
-        </td>
-      </tr>
+          
+          <div style="display:flex; align-items:center; gap:5px;">
+            <button type="button" class="btn-action-icon btn-action-wa" onclick="sendBrosurViaWhatsApp('${safeId}')" title="Send Via WA">
+              <i class="fa-brands fa-whatsapp"></i>
+            </button>
+            <a href="${link}" target="_blank" rel="noopener noreferrer" class="btn-action-icon" title="Buka di Tab Baru">
+              <i class="fa-solid fa-arrow-up-right-from-square"></i>
+            </a>
+            <button type="button" class="btn-action-icon btn-action-edit" onclick="openUpdateStatusModal('${safeId}')" title="Update Status">
+              <i class="fa-solid fa-pen-to-square"></i>
+            </button>
+            <button type="button" class="btn-action-icon btn-action-delete" onclick="deleteBrosurRecord('${safeId}')" title="Hapus">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+        </div>
+      </div>
     `;
   }).join('');
+
+  if (activeItem) {
+    const activeSafeId = String(activeItem.id || 'LOCAL-0');
+    selectBrosurForPreview(activeSafeId);
+  }
+}
+
+window.selectBrosurForPreview = function(safeId) {
+  state.activeBrosurId = safeId;
+
+  // Update card active classes
+  document.querySelectorAll('.brosur-doc-card').forEach(el => el.classList.remove('active'));
+  const card = document.getElementById(`docCard-${safeId}`);
+  if (card) {
+    card.classList.add('active');
+  }
+
+  const list = state.data.logBrosur || [];
+  let item = list.find(x => String(x.id || '') === String(safeId));
+  if (!item && safeId && safeId.startsWith('LOCAL-')) {
+    const idx = parseInt(safeId.replace('LOCAL-', ''), 10);
+    if (!isNaN(idx) && list[idx]) item = list[idx];
+  }
+
+  if (!item) return;
+
+  const wil = item.lokasibrosur || item.wilayah || 'Pusat';
+  const cat = item.catagory || item.category || 'Umum';
+  const name = item.brosurname || item.name || 'Dokumen Brosur';
+  const link = item.link || GDRIVE_BROSUR_FOLDER_URL;
+  const paket = item.namapaket || '';
+  const validUntilDisplay = formatDateDdMmmYy(item.validuntil);
+  const notes = item.catatan || '-';
+
+  // Update header panel kanan
+  const titleEl = document.getElementById('brosurPreviewTitle');
+  const badgeEl = document.getElementById('brosurPreviewBadge');
+  const metaEl = document.getElementById('brosurPreviewMeta');
+  const openExternalBtn = document.getElementById('btnPreviewOpenExternal');
+  const fallbackLink = document.getElementById('brosurIframeDirectFallback');
+
+  if (titleEl) titleEl.textContent = name;
+  if (badgeEl) badgeEl.textContent = `${cat.toUpperCase()} • ${wil.toUpperCase()}`;
+  if (metaEl) {
+    metaEl.innerHTML = `${paket ? `<span style="color:#38bdf8; font-family:'JetBrains Mono',monospace; margin-right:8px;">${paket}</span>` : ''}<span>Masa Berlaku: ${validUntilDisplay}</span>`;
+  }
+  if (openExternalBtn) openExternalBtn.href = link;
+  if (fallbackLink) fallbackLink.href = link;
+
+  // Iframe update
+  const iframe = document.getElementById('brosurPreviewIframe');
+  const loader = document.getElementById('brosurIframeLoader');
+  const embedUrl = getGDriveEmbedUrl(link);
+
+  if (iframe) {
+    if (loader) {
+      loader.style.opacity = '1';
+      loader.style.display = 'flex';
+    }
+    iframe.onload = function() {
+      if (loader) {
+        loader.style.opacity = '0';
+        setTimeout(() => { loader.style.display = 'none'; }, 250);
+      }
+    };
+    iframe.src = embedUrl;
+  }
+
+  // Update Detail Pane content
+  const detailBody = document.getElementById('brosurDetailBody');
+  if (detailBody) {
+    let rawTglUpload = item.tglupload || '';
+    if (!rawTglUpload && item.created_at) {
+      rawTglUpload = String(item.created_at).slice(0, 10);
+    }
+    const tglUploadDisplay = formatDateDdMmmYy(rawTglUpload);
+
+    let rawStatus = (item.status || 'Aktif').trim();
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const isPastDate = item.validuntil && item.validuntil < todayStr;
+    const isExpired = rawStatus.toLowerCase() === 'expired' || isPastDate;
+    const statusLabel = isExpired ? 'Expired' : 'Aktif';
+    const statusPillClass = isExpired ? 'expired' : 'aktif';
+
+    detailBody.innerHTML = `
+      <div style="margin-bottom:18px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px;">
+          <h3 style="font-size:1.15rem; font-weight:800; color:#ffffff; margin:0;">${name}</h3>
+          <span class="brosur-status-pill ${statusPillClass}">${statusLabel}</span>
+        </div>
+        ${paket ? `<div style="color:#38bdf8; font-family:'JetBrains Mono',monospace; font-size:0.86rem; font-weight:600;"><i class="fa-solid fa-box-archive" style="margin-right:5px;"></i>${paket}</div>` : ''}
+      </div>
+
+      <div class="brosur-detail-grid">
+        <div class="brosur-detail-box">
+          <label>Wilayah / Kantor</label>
+          <div class="val" style="color:#38bdf8;"><i class="fa-solid fa-location-dot" style="margin-right:5px;"></i>${wil}</div>
+        </div>
+        <div class="brosur-detail-box">
+          <label>Kategori Paket</label>
+          <div class="val" style="color:var(--gold-light);"><i class="fa-solid fa-tags" style="margin-right:5px;"></i>${cat}</div>
+        </div>
+        <div class="brosur-detail-box">
+          <label>Tanggal Upload</label>
+          <div class="val" style="font-family:'JetBrains Mono',monospace;"><i class="fa-regular fa-calendar" style="margin-right:5px;"></i>${tglUploadDisplay}</div>
+        </div>
+        <div class="brosur-detail-box">
+          <label>Masa Berlaku (Valid Until)</label>
+          <div class="val" style="font-family:'JetBrains Mono',monospace; ${isPastDate ? 'color:#f87171;' : 'color:#34d399;'}"><i class="fa-regular fa-calendar-check" style="margin-right:5px;"></i>${validUntilDisplay}</div>
+        </div>
+      </div>
+
+      <div class="brosur-detail-box" style="margin-bottom:18px;">
+        <label>Catatan & Keterangan Brosur</label>
+        <div class="val" style="font-size:0.84rem; line-height:1.5; color:#cbd5e1; font-weight:normal;">${notes}</div>
+      </div>
+
+      <div class="brosur-detail-box" style="margin-bottom:20px;">
+        <label>Tautan Berkas Google Drive</label>
+        <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
+          <input type="text" readonly value="${link}" style="flex:1; background:rgba(0,0,0,0.3); border:1px solid var(--border-subtle); color:#38bdf8; padding:8px 12px; border-radius:4px; font-size:0.8rem; font-family:'JetBrains Mono',monospace;">
+          <button type="button" class="btn-preview-tool" onclick="navigator.clipboard.writeText('${link}'); alert('Tautan Google Drive berhasil disalin!')" title="Salin Tautan">
+            <i class="fa-regular fa-copy"></i>
+          </button>
+        </div>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding-top:14px; border-top:1px solid rgba(255,255,255,0.06);">
+        <button type="button" class="btn-add-brosur-shortcut" style="margin-left:0; background:#22c55e; color:#ffffff;" onclick="sendBrosurViaWhatsApp('${safeId}')">
+          <i class="fa-brands fa-whatsapp" style="font-size:1.1rem;"></i>
+          <span>Kirim Via WhatsApp</span>
+        </button>
+        <a href="${link}" target="_blank" rel="noopener noreferrer" class="btn-refresh-brosur" style="text-decoration:none; color:var(--text-main);">
+          <i class="fa-brands fa-google-drive" style="color:#f59e0b;"></i>
+          <span>Buka di Google Drive</span>
+        </a>
+        <button type="button" class="btn-refresh-brosur" onclick="openUpdateStatusModal('${safeId}')">
+          <i class="fa-solid fa-pen-to-square" style="color:#38bdf8;"></i>
+          <span>Ubah Status</span>
+        </button>
+      </div>
+    `;
+  }
+};
+
+window.switchPreviewSubTab = function(subTab) {
+  const btnDoc = document.getElementById('btnPrevTabDoc');
+  const btnDetail = document.getElementById('btnPrevTabDetail');
+  const paneDoc = document.getElementById('panePrevTabDoc');
+  const paneDetail = document.getElementById('panePrevTabDetail');
+
+  if (subTab === 'detail') {
+    btnDoc?.classList.remove('active');
+    btnDetail?.classList.add('active');
+    paneDoc?.classList.remove('active');
+    paneDetail?.classList.add('active');
+  } else {
+    btnDetail?.classList.remove('active');
+    btnDoc?.classList.add('active');
+    paneDetail?.classList.remove('active');
+    paneDoc?.classList.add('active');
+  }
+};
+
+window.reloadActiveDrivePreview = function() {
+  const iframe = document.getElementById('brosurPreviewIframe');
+  const loader = document.getElementById('brosurIframeLoader');
+  if (iframe && iframe.src && iframe.src !== 'about:blank') {
+    if (loader) {
+      loader.style.opacity = '1';
+      loader.style.display = 'flex';
+    }
+    const currentSrc = iframe.src;
+    iframe.src = 'about:blank';
+    setTimeout(() => {
+      iframe.src = currentSrc;
+    }, 100);
+  }
+};
+
+window.copyActiveDriveLink = function() {
+  const linkEl = document.getElementById('btnPreviewOpenExternal');
+  const link = linkEl?.href;
+  if (link && link !== '#' && !link.endsWith('#')) {
+    navigator.clipboard.writeText(link).then(() => {
+      alert('Tautan Google Drive berhasil disalin ke clipboard!');
+    }).catch(() => {
+      prompt('Salin tautan Google Drive:', link);
+    });
+  } else {
+    alert('Pilih dokumen terlebih dahulu.');
+  }
+};
+
+function resetActiveDrivePreviewEmpty() {
+  const titleEl = document.getElementById('brosurPreviewTitle');
+  const badgeEl = document.getElementById('brosurPreviewBadge');
+  const metaEl = document.getElementById('brosurPreviewMeta');
+  const iframe = document.getElementById('brosurPreviewIframe');
+  const loader = document.getElementById('brosurIframeLoader');
+  if (titleEl) titleEl.textContent = 'Tidak Ada Dokumen';
+  if (badgeEl) badgeEl.textContent = 'GOOGLE DRIVE VIEWER';
+  if (metaEl) metaEl.textContent = 'Sesuaikan pencarian atau filter di atas';
+  if (loader) loader.style.display = 'none';
+  if (iframe) iframe.src = 'about:blank';
 }
 
 window.sendBrosurViaWhatsApp = function(id) {
