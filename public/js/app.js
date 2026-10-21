@@ -1019,7 +1019,7 @@ function switchModule(moduleName) {
     cuti_karyawan: { title: 'Pengajuan & Riwayat Cuti Karyawan', breadcrumb: 'SDM & Karyawan / Pengajuan Cuti Mandiri & Kuota' },
     cuti_bersama: { title: 'Cuti Bersama, Approval & Matriks Cuti', breadcrumb: 'SDM & Manajemen / Master Cuti Bersama & Persetujuan' },
     cuti_absensi: { title: 'Presensi & Cuti Karyawan', breadcrumb: 'SDM / Absensi & Pengajuan Cuti' },
-    daftar_karyawan: { title: 'Daftar Rekapitulasi Karyawan', breadcrumb: 'SDM & Karyawan / Master Data Karyawan Supabase' },
+    daftar_karyawan: { title: 'Biodata Karyawan (Tabel Supabase: Bio_Karyawan)', breadcrumb: 'SDM & Karyawan / Master Direktori Bio_Karyawan' },
     bio_karyawan: { title: 'Formulir Entry Karyawan Baru', breadcrumb: 'SDM & Karyawan / Entry Biodata & Dokumen Lengkap' },
     detail_emp: { title: 'Dokumen Resmi Detail Kepegawaian', breadcrumb: 'SDM & Karyawan / Cetak Dokumen Biodata A4 Resmi' },
     emp_analytics: { title: 'Analytics & Statistik Demografi SDM', breadcrumb: 'SDM & Manajemen / Eksekutif Dashboard Demografi' },
@@ -6243,7 +6243,7 @@ function formatRupiah(amount) {
 }
 
 // --------------------------------------------------------------------------
-// 13.1 DAFTAR KARYAWAN (mod_daftar_karyawan)
+// 13.1 DAFTAR & BIODATA KARYAWAN (mod_daftar_karyawan) - SUPABASE Bio_Karyawan
 // --------------------------------------------------------------------------
 
 function normalizeEmployee(e) {
@@ -6333,13 +6333,14 @@ async function initDaftarKaryawanView() {
 }
 
 async function loadDaftarKaryawanData(forceRefresh = false) {
-  const tbody = document.getElementById('daftarKaryawanTableBody');
+  const tbody = document.getElementById('dkTableBody') || document.getElementById('daftarKaryawanTableBody');
   if (tbody) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="8" style="text-align:center; padding:32px; color:var(--text-muted);">
-          <i class="fa-solid fa-spinner fa-spin" style="color:#06b6d4; font-size:1.5rem;"></i>
-          <div style="margin-top:10px; font-size:0.85rem;">Memuat direktori data karyawan dari Supabase tabel Bio_Karyawan...</div>
+        <td colspan="10" style="text-align:center; padding:36px; color:var(--text-muted);">
+          <i class="fa-solid fa-spinner fa-spin" style="color:#06b6d4; font-size:1.6rem;"></i>
+          <div style="margin-top:12px; font-weight:600; font-size:0.9rem; color:var(--text-light);">Memuat data dari Supabase tabel Bio_Karyawan...</div>
+          <div style="font-size:0.75rem; color:var(--text-dim); margin-top:4px;">Menghubungkan master data kepegawaian & profil karyawan</div>
         </td>
       </tr>
     `;
@@ -6347,7 +6348,7 @@ async function loadDaftarKaryawanData(forceRefresh = false) {
 
   let list = [];
 
-  // 1. Prioritas Utama: Ambil langsung dari Supabase REST API (Tabel Bio_Karyawan / Bio Karyawan)
+  // 1. Ambil langsung dari Supabase REST API (Tabel Bio_Karyawan / Bio Karyawan)
   const candidateEndpoints = [
     `${SUPABASE_CONFIG.url}/rest/v1/Bio_Karyawan?select=*&order=nik.asc`,
     `${SUPABASE_CONFIG.url}/rest/v1/Bio%20Karyawan?select=*&order=nik.asc`,
@@ -6370,7 +6371,7 @@ async function loadDaftarKaryawanData(forceRefresh = false) {
         }
       }
     } catch (err) {
-      // lanjut ke endpoint kandidat berikutnya
+      // coba endpoint berikutnya
     }
   }
 
@@ -6387,15 +6388,15 @@ async function loadDaftarKaryawanData(forceRefresh = false) {
     } catch (_) {}
   }
 
-  // 3. Normalisasi semua records agar seluruh properti siap diakses
+  // 3. Normalisasi semua records
   const normalizedList = (list || []).map(normalizeEmployee).filter(Boolean);
   state.hr.employees = normalizedList;
 
   renderDaftarKaryawanTable();
   updateDaftarKaryawanStats();
-  populateDaftarKaryawanFilterDepts();
+  populateDaftarKaryawanFilterOptions();
 
-  // Sinkronkan juga ke state cuti agar dropdown Cuti Karyawan langsung lengkap
+  // Sinkronkan ke state cuti
   if (normalizedList.length > 0 && state.cuti) {
     state.cuti.employees = normalizedList.map(e => ({
       nik: e.nik,
@@ -6411,68 +6412,110 @@ async function loadDaftarKaryawanData(forceRefresh = false) {
 function updateDaftarKaryawanStats() {
   const employees = state.hr.employees || [];
   const total = employees.length;
-  const tetap = employees.filter(e => String(e.status_emp || '').toUpperCase().includes('PKWTT') || String(e.status_emp || '').toLowerCase().includes('tetap')).length;
-  const kontrak = employees.filter(e => String(e.status_emp || '').toUpperCase().includes('PKWT') || String(e.status_emp || '').toLowerCase().includes('kontrak')).length;
-  const depts = new Set(employees.map(e => (e.divisi || e.departemen || '').trim()).filter(Boolean)).size;
+  const aktif = employees.filter(e => String(e.status || '').toLowerCase() === 'aktif').length;
+  const pkwtt = employees.filter(e => String(e.status_emp || '').toUpperCase().includes('PKWTT') || String(e.status_emp || '').toLowerCase().includes('tetap')).length;
+  const pkwt = employees.filter(e => String(e.status_emp || '').toUpperCase().includes('PKWT') || String(e.status_emp || '').toLowerCase().includes('kontrak')).length;
 
-  const elTotal = document.getElementById('statTotalKaryawanList');
-  const elTetap = document.getElementById('statKaryawanTetap');
-  const elKontrak = document.getElementById('statKaryawanKontrak');
-  const elDepts = document.getElementById('statTotalDept');
+  const elTotal = document.getElementById('dkStatTotal') || document.getElementById('statTotalKaryawanList');
+  const elAktif = document.getElementById('dkStatAktif');
+  const elPkwtt = document.getElementById('dkStatPkwtt') || document.getElementById('statKaryawanTetap');
+  const elPkwt = document.getElementById('dkStatPkwt') || document.getElementById('statKaryawanKontrak');
 
   if (elTotal) elTotal.textContent = total;
-  if (elTetap) elTetap.textContent = tetap;
-  if (elKontrak) elKontrak.textContent = kontrak || (total - tetap);
-  if (elDepts) elDepts.textContent = depts || 6;
+  if (elAktif) elAktif.textContent = aktif || total;
+  if (elPkwtt) elPkwtt.textContent = pkwtt;
+  if (elPkwt) elPkwt.textContent = pkwt;
 }
 
-function populateDaftarKaryawanFilterDepts() {
-  const deptSelect = document.getElementById('filterDaftarKaryawanDept');
-  if (!deptSelect) return;
-
+function populateDaftarKaryawanFilterOptions() {
   const employees = state.hr.employees || [];
-  const currentVal = deptSelect.value || 'ALL';
-  const depts = [...new Set(employees.map(e => (e.divisi || e.departemen || '').trim()).filter(Boolean))].sort();
 
-  let html = '<option value="ALL">Semua Departemen / Divisi</option>';
-  depts.forEach(d => {
-    html += `<option value="${d}" ${d === currentVal ? 'selected' : ''}>${d}</option>`;
-  });
-  deptSelect.innerHTML = html;
+  // 1. Filter Kantor
+  const kantorSelect = document.getElementById('dkFilterKantor');
+  if (kantorSelect) {
+    const currentVal = (kantorSelect.value || 'ALL').trim().toLowerCase();
+    const distinctKantor = [...new Set(employees.map(e => (e.kantor || '').trim()).filter(Boolean))].sort();
+    if (distinctKantor.length > 0) {
+      let optHtml = '<option value="ALL">Semua Kantor Cabang</option>';
+      distinctKantor.forEach(k => {
+        const isSel = k.toLowerCase() === currentVal;
+        optHtml += `<option value="${k}" ${isSel ? 'selected' : ''}>${k}</option>`;
+      });
+      kantorSelect.innerHTML = optHtml;
+    }
+  }
+
+  // 2. Filter Divisi
+  const divisiSelect = document.getElementById('dkFilterDivisi') || document.getElementById('filterDaftarKaryawanDept');
+  if (divisiSelect) {
+    const currentVal = (divisiSelect.value || 'ALL').trim().toLowerCase();
+    const distinctDivisi = [...new Set(employees.map(e => (e.divisi || e.departemen || '').trim()).filter(Boolean))].sort();
+    if (distinctDivisi.length > 0) {
+      let optHtml = '<option value="ALL">Semua Divisi</option>';
+      distinctDivisi.forEach(d => {
+        const isSel = d.toLowerCase() === currentVal;
+        optHtml += `<option value="${d}" ${isSel ? 'selected' : ''}>${d}</option>`;
+      });
+      divisiSelect.innerHTML = optHtml;
+    }
+  }
 }
 
 function renderDaftarKaryawanTable() {
-  const tbody = document.getElementById('daftarKaryawanTableBody');
+  const tbody = document.getElementById('dkTableBody') || document.getElementById('daftarKaryawanTableBody');
   if (!tbody) return;
 
-  const filter = state.hr.daftarFilter;
+  const filter = state.hr.daftarFilter || {};
   const employees = state.hr.employees || [];
 
+  const searchKeyword = (filter.search || '').toLowerCase().trim();
+  const filterKantor = (filter.kantor || 'ALL').toLowerCase().trim();
+  const filterDivisi = (filter.divisi || filter.dept || 'ALL').toLowerCase().trim();
+  const filterStatus = (filter.status || 'ALL').toLowerCase().trim();
+
   const filtered = employees.filter(emp => {
-    const s = (filter.search || '').toLowerCase().trim();
-    const nama = String(emp.nama_karyawan || emp.nama || '').toLowerCase();
-    const nik = String(emp.nik || '').toLowerCase();
-    const jabatan = String(emp.jabatan || '').toLowerCase();
-    const kantor = String(emp.kantor || '').toLowerCase();
-    const matchSearch = !s || nama.includes(s) || nik.includes(s) || jabatan.includes(s) || kantor.includes(s);
+    // 1. Search keyword
+    if (searchKeyword) {
+      const matchSearch =
+        String(emp.nik || '').toLowerCase().includes(searchKeyword) ||
+        String(emp.nama_karyawan || emp.nama || '').toLowerCase().includes(searchKeyword) ||
+        String(emp.jabatan || '').toLowerCase().includes(searchKeyword) ||
+        String(emp.divisi || '').toLowerCase().includes(searchKeyword) ||
+        String(emp.kantor || '').toLowerCase().includes(searchKeyword) ||
+        String(emp.nomor_hp || '').toLowerCase().includes(searchKeyword) ||
+        String(emp.email || '').toLowerCase().includes(searchKeyword);
+      if (!matchSearch) return false;
+    }
 
-    const dept = (emp.divisi || emp.departemen || '').trim();
-    const matchDept = filter.dept === 'ALL' || dept === filter.dept;
+    // 2. Kantor filter
+    if (filterKantor !== 'all') {
+      const k = String(emp.kantor || '').toLowerCase().trim();
+      if (!k.includes(filterKantor) && filterKantor !== k) return false;
+    }
 
-    const st = String(emp.status_emp || emp.statuskaryawan || '').toUpperCase();
-    let matchStatus = true;
-    if (filter.status === 'Tetap') matchStatus = st.includes('PKWTT') || st.includes('TETAP');
-    else if (filter.status === 'Kontrak') matchStatus = st.includes('PKWT') || st.includes('KONTRAK');
-    else if (filter.status === 'Probation') matchStatus = st.includes('PROBA') || st.includes('MAGANG');
+    // 3. Divisi filter
+    if (filterDivisi !== 'all') {
+      const d = String(emp.divisi || emp.departemen || '').toLowerCase().trim();
+      if (!d.includes(filterDivisi) && filterDivisi !== d) return false;
+    }
 
-    return matchSearch && matchDept && matchStatus;
+    // 4. Status filter
+    if (filterStatus !== 'all') {
+      const s = String(emp.status || 'aktif').toLowerCase().trim();
+      if (filterStatus === 'aktif' && !s.includes('aktif')) return false;
+      if (filterStatus === 'non aktif' && s.includes('aktif') && !s.includes('non')) return false;
+    }
+
+    return true;
   });
 
   if (filtered.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="8" style="text-align:center; padding:32px; color:var(--text-muted);">
-          Tidak ada data karyawan yang cocok dengan filter pencarian.
+        <td colspan="10" style="text-align:center; padding:48px 20px; color:var(--text-muted);">
+          <div style="font-size:2.2rem; margin-bottom:12px; color:var(--text-dim);"><i class="fa-solid fa-users-slash"></i></div>
+          <div style="font-size:0.95rem; font-weight:700; color:var(--text-main);">Tidak ada data karyawan yang cocok</div>
+          <div style="font-size:0.8rem; margin-top:4px;">Coba ubah kata kunci pencarian atau sesuaikan filter kantor/divisi/status.</div>
         </td>
       </tr>
     `;
@@ -6483,46 +6526,96 @@ function renderDaftarKaryawanTable() {
     const nik = emp.nik || `NIK-${idx + 1}`;
     const nama = emp.nama_karyawan || emp.nama || 'Karyawan';
     const jabatan = emp.jabatan || 'Staff';
-    const dept = emp.divisi || emp.departemen || 'Operasional';
+    const divisi = emp.divisi || emp.departemen || 'Operasional';
+    const kantor = emp.kantor || 'Pusat';
     const statusEmp = emp.status_emp || 'PKWTT';
     const telp = emp.nomor_hp || '-';
     const email = emp.email || '-';
-    const tglMasuk = emp.tanggal_masuk ? String(emp.tanggal_masuk).split('T')[0] : '-';
-    const kantor = emp.kantor || 'Pusat';
+    const status = emp.status || 'Aktif';
 
-    let statusBadgeCls = 'active';
-    if (statusEmp.toUpperCase().includes('PKWT')) statusBadgeCls = 'warning';
-    else if (statusEmp.toUpperCase().includes('PROBA')) statusBadgeCls = 'info';
+    // Status EMP CSS tag
+    let statusEmpClass = 'status-pkwtt';
+    if (statusEmp.toUpperCase().includes('PKWT')) statusEmpClass = 'status-pkwt';
+    else if (statusEmp.toUpperCase().includes('PROBA') || statusEmp.toUpperCase().includes('MAGANG')) statusEmpClass = 'status-magang';
+
+    // Status keaktifan pill
+    const isAktif = status.toLowerCase() === 'aktif';
+    const statusPillClass = isAktif ? 'status-pill-aktif' : 'status-pill-nonaktif';
+
+    // Clean Phone WA
+    const rawDigits = telp.replace(/[^0-9]/g, '');
+    let waPhone = rawDigits;
+    if (waPhone.startsWith('0')) waPhone = '62' + waPhone.slice(1);
+
+    // Avatar Initials & Gradient
+    const nameWords = nama.split(' ').filter(Boolean);
+    const initials = (nameWords[0] ? nameWords[0][0] : '') + (nameWords[1] ? nameWords[1][0] : '');
+    const charCode = (nama.charCodeAt(0) || 65) + (nama.charCodeAt(nama.length - 1) || 65);
+    const hue = (charCode * 37) % 360;
+    const avatarGradient = `linear-gradient(135deg, hsl(${hue}, 70%, 45%), hsl(${(hue + 45) % 360}, 75%, 35%))`;
+
+    const fotoUrl = emp.foto_url || emp.upload_foto;
+    const hasPhoto = fotoUrl && (fotoUrl.startsWith('http') || fotoUrl.startsWith('data:'));
+
+    const avatarHtml = hasPhoto
+      ? `<img src="${fotoUrl}" class="dk-avatar-img" alt="${nama}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+         <div class="dk-avatar-circle" style="display:none; background:${avatarGradient};">${initials.toUpperCase() || 'K'}</div>`
+      : `<div class="dk-avatar-circle" style="background:${avatarGradient};">${initials.toUpperCase() || 'K'}</div>`;
+
+    const genderIcon = emp.jenis_kelamin === 'Perempuan' ? '<i class="fa-solid fa-venus" style="color:#f472b6;"></i>' : '<i class="fa-solid fa-mars" style="color:#38bdf8;"></i>';
+    const subText = `${genderIcon} ${emp.jenis_kelamin || 'Laki-laki'}${emp.tempat_lahir ? ' • ' + emp.tempat_lahir : ''}`;
 
     return `
       <tr>
-        <td style="text-align:center; font-family:monospace; color:var(--text-dim);">${idx + 1}</td>
+        <td style="text-align:center; font-family:monospace; color:var(--text-dim); font-size:0.8rem;">${idx + 1}</td>
         <td>
-          <span style="font-family:monospace; font-weight:700; color:#38bdf8; background:rgba(56,189,248,0.1); padding:2px 6px; border-radius:4px;">
-            ${nik}
-          </span>
+          <span class="dk-nik-badge">${nik}</span>
         </td>
         <td>
-          <div style="font-weight:700; color:var(--text-light); font-size:0.88rem;">${nama}</div>
-          <div style="font-size:0.72rem; color:var(--text-dim);">${email !== '-' ? email : ''}</div>
+          <div class="dk-name-cell">
+            ${avatarHtml}
+            <div class="dk-name-wrap">
+              <div class="dk-name-title">${nama}</div>
+              <div class="dk-name-sub">${subText}</div>
+            </div>
+          </div>
         </td>
         <td>
-          <div style="color:var(--text-main); font-size:0.82rem; font-weight:600;">${jabatan}</div>
-          <div style="font-size:0.72rem; color:var(--text-muted);">${dept} • <span style="color:#0284c7;">${kantor}</span></div>
+          <div class="dk-jabatan-title">${jabatan}</div>
+          <div class="dk-jabatan-sub"><i class="fa-solid fa-graduation-cap"></i> ${emp.pendidikan_terakhir || 'S1'}${emp.jurusan ? ' ' + emp.jurusan : ''}</div>
+        </td>
+        <td>
+          <span class="dk-divisi-badge">${divisi}</span>
+        </td>
+        <td>
+          <span class="dk-kantor-badge"><i class="fa-solid fa-location-dot"></i> ${kantor}</span>
         </td>
         <td style="text-align:center;">
-          <span class="status-pill ${statusBadgeCls}" style="font-size:0.72rem;">
-            ${statusEmp}
+          <span class="dk-emp-tag ${statusEmpClass}">${statusEmp}</span>
+        </td>
+        <td>
+          <div class="dk-kontak-wrap">
+            ${telp && telp !== '-'
+              ? `<a href="https://wa.me/${waPhone}" target="_blank" rel="noopener noreferrer" class="dk-phone-link" title="Kirim Pesan WhatsApp">
+                  <i class="fa-brands fa-whatsapp"></i> ${telp}
+                </a>`
+              : '<span style="color:var(--text-dim); font-size:0.75rem;">-</span>'}
+            ${email && email !== '-'
+              ? `<div class="dk-email-text" title="${email}"><i class="fa-regular fa-envelope"></i> ${email}</div>`
+              : ''}
+          </div>
+        </td>
+        <td style="text-align:center;">
+          <span class="status-pill ${statusPillClass}">
+            <i class="fa-solid fa-circle" style="font-size:6px; margin-right:4px;"></i>${status}
           </span>
         </td>
-        <td style="font-size:0.8rem; color:var(--text-light); font-family:monospace;">${telp}</td>
-        <td style="font-size:0.8rem; color:var(--text-muted);">${tglMasuk}</td>
         <td style="text-align:center;">
-          <div style="display:inline-flex; gap:6px;">
-            <button type="button" class="btn-action view" onclick="viewEmployeeDetailFromList('${nik}')" title="Cetak / Dokumen Resmi Detail A4">
+          <div class="dk-action-buttons">
+            <button type="button" class="btn-action-table view" onclick="viewEmployeeDetailFromList('${nik}')" title="Cetak / Pratinjau Dokumen Detail A4 Resmi">
               <i class="fa-solid fa-id-card-clip"></i>
             </button>
-            <button type="button" class="btn-action edit" onclick="editEmployeeBio('${nik}')" title="Buka di Formulir Bio Karyawan">
+            <button type="button" class="btn-action-table edit" onclick="editEmployeeBio('${nik}')" title="Edit Biodata di Formulir Entry">
               <i class="fa-solid fa-pen-to-square"></i>
             </button>
           </div>
@@ -6533,13 +6626,15 @@ function renderDaftarKaryawanTable() {
 }
 
 window.onDaftarKaryawanFilterChange = function() {
-  const searchInput = document.getElementById('searchDaftarKaryawan');
-  const deptSelect = document.getElementById('filterDaftarKaryawanDept');
-  const statusSelect = document.getElementById('filterDaftarKaryawanStatus');
+  const searchInput = document.getElementById('dkSearchInput') || document.getElementById('searchDaftarKaryawan');
+  const kantorSelect = document.getElementById('dkFilterKantor');
+  const divisiSelect = document.getElementById('dkFilterDivisi') || document.getElementById('filterDaftarKaryawanDept');
+  const statusSelect = document.getElementById('dkFilterStatus') || document.getElementById('filterDaftarKaryawanStatus');
 
   state.hr.daftarFilter = {
     search: searchInput ? searchInput.value : '',
-    dept: deptSelect ? deptSelect.value : 'ALL',
+    kantor: kantorSelect ? kantorSelect.value : 'ALL',
+    divisi: divisiSelect ? divisiSelect.value : 'ALL',
     status: statusSelect ? statusSelect.value : 'ALL'
   };
 
