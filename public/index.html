@@ -1,0 +1,2229 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PT. Fath Indah Travel Service - Portal Sistem Manajemen</title>
+
+  <!-- Modern Typography: Plus Jakarta Sans & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
+
+  <!-- FontAwesome 6 Free Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Custom Styling -->
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" type="image/png" href="assets/logo.png">
+</head>
+
+<body>
+
+  <!-- ======================================================================
+       1. LOGIN SCREEN
+       ====================================================================== -->
+  <div class="login-wrapper" id="loginWrapper">
+    <div class="login-card">
+
+      <!-- Brand Header -->
+      <div class="brand-badge-container">
+        <img src="assets/logo.png" alt="Logo PT. Fath Indah Travel Service" class="brand-logo-img">
+        <h1 class="brand-company-title">PT. Fath Indah Travel Service</h1>
+        <div class="brand-company-subtitle">Umrah & Hajj Management Portal</div>
+        <p class="brand-tagline">Silakan masuk untuk mengakses modul operasional</p>
+      </div>
+
+      <!-- Alert Box -->
+      <div class="alert-box" id="loginAlert"></div>
+
+      <!-- Login Form -->
+      <form id="loginForm" autocomplete="off">
+        <div class="form-group">
+          <label class="form-label" for="usernameInput">Username</label>
+          <div class="input-container">
+            <i class="fa-regular fa-user input-icon"></i>
+            <input type="text" id="usernameInput" class="form-input" placeholder="Masukkan username Anda" required
+              autofocus>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="passwordInput">Password</label>
+          <div class="input-container">
+            <i class="fa-solid fa-lock input-icon"></i>
+            <input type="password" id="passwordInput" class="form-input" placeholder="Masukkan password Anda" required>
+            <button type="button" class="toggle-password-btn" id="togglePasswordBtn" aria-label="Lihat Password">
+              <i class="fa-regular fa-eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Automatic Geolocation in Background (Hidden) -->
+        <div class="geo-info-banner" style="display: none;">
+          <span id="geoStatusText"></span>
+        </div>
+
+        <button type="submit" class="submit-btn" id="loginBtn">
+          <span>Masuk ke Sistem</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       2. AUTHENTICATED WORKSPACE APP LAYOUT
+       ====================================================================== -->
+  <div class="app-container" id="appContainer">
+
+    <!-- Mobile Sidebar Backdrop -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+    <!-- LEFT SIDEBAR (COLLAPSIBLE / BISA DISEMBUNYIKAN) -->
+    <aside class="sidebar" id="sidebar">
+
+      <!-- Sidebar Header with Brand -->
+      <div class="sidebar-header">
+        <a href="#" class="sidebar-brand" onclick="switchModule('dashboard'); return false;">
+          <img src="assets/logo.png" alt="Logo" class="sidebar-logo">
+          <div class="sidebar-brand-text">
+            <div class="sidebar-title">PT. FATH INDAH</div>
+            <div class="sidebar-sub">Travel Service</div>
+          </div>
+        </a>
+        <button type="button" class="close-mobile-sidebar-btn" id="closeMobileSidebarBtn" aria-label="Tutup Menu">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Navigation Menu (Populated Dynamically by Supabase Modules & User Role) -->
+      <nav class="sidebar-nav" id="sidebarNav">
+        <div class="nav-section-title">Menu Utama</div>
+
+        <a href="#dashboard" class="nav-item active" data-module="dashboard" data-tooltip="Dashboard">
+          <i class="fa-solid fa-chart-pie nav-icon"></i>
+          <span class="nav-label">Dashboard</span>
+        </a>
+
+        <a href="#jamaah" class="nav-item" data-module="jamaah" data-tooltip="Data Jamaah">
+          <i class="fa-solid fa-users nav-icon"></i>
+          <span class="nav-label">Data Jamaah</span>
+        </a>
+
+        <a href="#logs" class="nav-item" data-module="logs" data-tooltip="Log Aktivitas">
+          <i class="fa-solid fa-list-check nav-icon"></i>
+          <span class="nav-label">Log Aktivitas</span>
+        </a>
+
+        <a href="#rekap_absensi" class="nav-item" data-module="rekap_absensi" data-tooltip="Rekapitulasi Absensi">
+          <i class="fa-solid fa-calendar-check nav-icon"></i>
+          <span class="nav-label">Rekap Absensi</span>
+        </a>
+
+        <a href="#log_absensi" class="nav-item" data-module="mod_data_attendance" data-tooltip="Riwayat Log Absensi">
+          <i class="fa-solid fa-clipboard-user nav-icon"></i>
+          <span class="nav-label">Riwayat Log Absensi</span>
+        </a>
+
+        <a href="#launching_brosur" class="nav-item" data-module="mod_input_brosur" data-tooltip="Catalog Brosur">
+          <i class="fa-solid fa-bullhorn nav-icon"></i>
+          <span class="nav-label">Catalog Brosur</span>
+        </a>
+
+        <a href="#cuti_karyawan" class="nav-item" data-module="mod_cuti_karyawan" data-tooltip="Pengajuan Cuti">
+          <i class="fa-solid fa-calendar-minus nav-icon"></i>
+          <span class="nav-label">Pengajuan Cuti</span>
+        </a>
+
+        <a href="#cuti_bersama" class="nav-item" data-module="mod_cuti_bersama" data-tooltip="Cuti Bersama & Matrix">
+          <i class="fa-solid fa-calendar-day nav-icon"></i>
+          <span class="nav-label">Daftar & Matrix Cuti</span>
+        </a>
+      </nav>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <!-- Live Role Switcher (Preview) - KHUSUS HANYA UNTUK ROLE ADMIN -->
+        <div id="roleSwitcherContainer" style="margin-bottom: 8px; display: none;">
+          <div
+            style="font-size:0.68rem; color:var(--text-muted); margin-bottom:4px; display:flex; justify-content:space-between;">
+            <span>Ganti Role (Preview):</span>
+            <span id="activeRoleIndicator" style="color:var(--gold-light); font-weight:700;">Admin</span>
+          </div>
+          <select id="roleQuickSwitcher" class="form-input"
+            style="height:28px; font-size:0.75rem; padding:2px 8px; width:100%; background:rgba(0,0,0,0.5); border-color:rgba(212,175,55,0.3); color:var(--gold-light); border-radius:4px;">
+            <option value="Admin">Role: Admin (39 Menu)</option>
+            <option value="StaffHaji">Role: StaffHaji (13 Menu)</option>
+            <option value="StaffUmrah">Role: StaffUmrah (11 Menu)</option>
+            <option value="StaffKanwil">Role: StaffKanwil (13 Menu)</option>
+            <option value="Staff">Role: Staff (7 Menu)</option>
+            <option value="Manager">Role: Manager (3 Menu)</option>
+          </select>
+        </div>
+
+        <div class="user-quick-profile">
+          <div class="avatar-badge" id="userAvatarLetter">A</div>
+          <div class="user-quick-info">
+            <div class="user-quick-name" id="userDisplayName">Administrator</div>
+            <div class="user-quick-role" id="userDisplayRole">Admin • Pusat</div>
+          </div>
+        </div>
+
+        <button type="button" class="sidebar-collapse-btn" id="sidebarToggleBtn" title="Sembunyikan/Buka Menu">
+          <i class="fa-solid fa-angles-left"></i>
+          <span>Minimize Menu</span>
+        </button>
+      </div>
+
+    </aside>
+
+    <!-- MAIN WRAPPER (HEADER + DYNAMIC WORKSPACE) -->
+    <div class="main-wrapper">
+
+      <!-- TOP HEADER BAR -->
+      <header class="top-header">
+        <div class="header-left">
+          <button type="button" class="hamburger-btn" id="mobileHamburgerBtn" aria-label="Buka Menu">
+            <i class="fa-solid fa-bars"></i>
+          </button>
+
+          <div class="module-title-box">
+            <h2 class="module-title" id="moduleTitle">Dashboard Utama</h2>
+            <div class="module-breadcrumb" id="moduleBreadcrumb">Portal Eksekutif / Ikhtisar Sistem</div>
+          </div>
+        </div>
+
+        <div class="header-right">
+          <!-- Real-time Clock (WIB) -->
+          <div class="live-clock-pill" id="liveClock">
+            <i class="fa-regular fa-clock"></i> Memuat waktu...
+          </div>
+
+          <!-- Logout Button -->
+          <button type="button" class="logout-btn" id="logoutBtn" title="Keluar dari sesi">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            <span>Keluar</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- WORKSPACE AREA (SISA LAYAR UNTUK KERJA) -->
+      <main class="workspace" id="workspace">
+
+        <!-- ================================================================
+             MODULE 1: DASHBOARD OVERVIEW
+             ================================================================ -->
+        <div class="module-view active" id="view-dashboard">
+
+          <!-- Key Metrics -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-header">
+                <span class="stat-label">Total Data Jamaah</span>
+                <div class="stat-icon emerald"><i class="fa-solid fa-kaaba"></i></div>
+              </div>
+              <div class="stat-value" id="statJamaahCount">154+</div>
+              <div class="stat-subtext"><i class="fa-solid fa-circle-check"></i> Sumber: Supabase jamaah</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-header">
+                <span class="stat-label">Pengguna Terdaftar</span>
+                <div class="stat-icon gold"><i class="fa-solid fa-user-shield"></i></div>
+              </div>
+              <div class="stat-value" id="statUsersCount">42</div>
+              <div class="stat-subtext"><i class="fa-solid fa-database"></i> Sumber: Supabase users</div>
+            </div>
+
+            <div class="stat-card emerald">
+              <div class="stat-header">
+                <span class="stat-label">Total Log Aktivitas</span>
+                <div class="stat-icon blue"><i class="fa-solid fa-clock-rotate-left"></i></div>
+              </div>
+              <div class="stat-value" id="statLogsCount">325+</div>
+              <div class="stat-subtext"><i class="fa-solid fa-location-dot"></i> Sumber: Supabase activity_logs</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-header">
+                <span class="stat-label">Status Database</span>
+                <div class="stat-icon purple"><i class="fa-solid fa-server"></i></div>
+              </div>
+              <div class="stat-value" style="font-size:1.35rem; color:#34d399;">SUPABASE ACTIVE</div>
+              <div class="stat-subtext"><i class="fa-solid fa-shield-halved"></i> 100% Menggunakan Supabase SQL</div>
+            </div>
+          </div>
+
+          <!-- Modul & Menu Layanan Berdasarkan Role (Supabase Modules) -->
+          <div class="content-card">
+            <div class="card-header-actions" style="flex-wrap: wrap; gap: 12px;">
+              <div>
+                <div class="card-title">
+                  <i class="fa-solid fa-shapes" style="color:var(--gold-light);"></i>
+                  <span>Daftar Menu & Modul Operasional (Supabase)</span>
+                </div>
+                <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;" id="modulesRoleSubtitle">
+                  Menampilkan menu sesuai hak akses Role: <strong id="currentRoleBadge"
+                    style="color:var(--gold-light); font-weight:700;">Admin</strong> (Tabel Modules)
+                </div>
+              </div>
+              <div class="card-actions" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <input type="text" id="moduleSearchInput" class="form-input" placeholder="Cari nama menu..."
+                  style="height:36px; font-size:0.82rem; width:220px;">
+                <select id="moduleCategoryFilter" class="form-input"
+                  style="height:36px; font-size:0.82rem; width:auto; padding: 4px 12px;">
+                  <option value="ALL">Semua Kategori</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Modules Grid Container -->
+            <div class="modules-grid" id="modulesGridContainer">
+              <div style="grid-column: 1 / -1; text-align:center; padding: 30px; color:var(--text-muted);">
+                <i class="fa-solid fa-spinner fa-spin" style="font-size:1.5rem; color:var(--gold-light);"></i>
+                <div style="margin-top:8px;">Memuat modul dari Supabase...</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions & Recent Logins -->
+          <div class="content-card">
+            <div class="card-header-actions">
+              <div class="card-title">
+                <i class="fa-solid fa-history" style="color:var(--gold-light);"></i>
+                <span>Aktivitas Login Terkini (Tabel ActivityLogs)</span>
+              </div>
+              <div class="card-actions">
+                <button type="button" class="btn-secondary" onclick="switchModule('logs')">
+                  <i class="fa-solid fa-arrow-up-right-from-square"></i> Lihat Semua Log
+                </button>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Log ID</th>
+                    <th>Waktu (WIB)</th>
+                    <th>User</th>
+                    <th>Status</th>
+                    <th>Lokasi</th>
+                    <th>Peta Lokasi</th>
+                  </tr>
+                </thead>
+                <tbody id="recentLogsTableBody">
+                  <tr>
+                    <td colspan="6" style="text-align:center; padding:20px;">Memuat data...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Information Notice Card -->
+          <div class="content-card" style="border-left: 4px solid var(--gold-primary);">
+            <div style="display:flex; gap:16px; align-items:flex-start;">
+              <i class="fa-solid fa-circle-info" style="color:var(--gold-light); font-size:1.5rem; margin-top:2px;"></i>
+              <div>
+                <h4 style="color:#ffffff; margin-bottom:4px; font-weight:700;">Informasi Sistem & Otorisasi</h4>
+                <p style="color:var(--text-muted); font-size:0.88rem; line-height:1.6;">
+                  Sistem ini terintegrasi langsung dengan database Google Sheets PT. Fath Indah Travel Service tanpa
+                  menggunakan Google Apps Script.
+                  Setiap kali login berhasil, koordinat GPS dan tautan Google Maps secara otomatis dicatat ke dalam
+                  tabel <code>ActivityLogs</code>.
+                  Sistem juga dapat dialihkan sewaktu-waktu ke <strong>Supabase</strong> melalui menu <em>Konfigurasi
+                    DB</em>.
+                </p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ================================================================
+             MODULE 2: DATA JAMAAH (Metadata)
+             ================================================================ -->
+        <div class="module-view" id="view-jamaah">
+          <div class="content-card">
+            <div class="card-header-actions">
+              <div class="card-title">
+                <i class="fa-solid fa-kaaba" style="color:var(--gold-light);"></i>
+                <span>Daftar Jamaah Umrah & Haji</span>
+                <span class="badge badge-gold" id="totalJamaahBadge">154 Jamaah</span>
+              </div>
+
+              <div class="card-actions">
+                <div class="search-box">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" id="searchJamaahInput" placeholder="Cari nama, ID, referensi..."
+                    oninput="renderJamaahTable()">
+                </div>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID Jamaah</th>
+                    <th>Nama Lengkap</th>
+                    <th>Paket Umrah</th>
+                    <th>Kanwil / Asal</th>
+                    <th>Kontak HP</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="jamaahTableBody">
+                  <tr>
+                    <td colspan="6" style="text-align:center; padding:24px;">Memuat data jamaah...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 3: LOG AKTIVITAS (ActivityLogs)
+             ================================================================ -->
+        <div class="module-view" id="view-logs">
+          <div class="content-card">
+            <div class="card-header-actions">
+              <div class="card-title">
+                <i class="fa-solid fa-clipboard-list" style="color:var(--emerald-primary);"></i>
+                <span>Audit Trail & Activity Logs</span>
+                <span class="badge badge-success" id="totalLogsCountBadge">325+ Entri</span>
+              </div>
+
+              <div class="card-actions">
+                <div class="search-box">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" id="searchLogsInput" placeholder="Cari ID, user, aktivitas..."
+                    oninput="renderLogsTable()">
+                </div>
+
+                <select id="filterLogsModule" class="form-input" style="width:auto; padding:9px 16px;"
+                  onchange="renderLogsTable()">
+                  <option value="all">Semua Modul</option>
+                  <option value="Auth">Modul Auth</option>
+                  <option value="Cuti Karyawan">Cuti Karyawan</option>
+                  <option value="Jamaah">Jamaah</option>
+                </select>
+
+                <button type="button" class="btn-gold" onclick="exportLogsToCSV()">
+                  <i class="fa-solid fa-file-csv"></i> Ekspor CSV
+                </button>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Log ID</th>
+                    <th>Waktu (WIB)</th>
+                    <th>User & IP</th>
+                    <th>Modul</th>
+                    <th>Aksi & Detail</th>
+                    <th>Lokasi Geografis</th>
+                    <th>Google Maps</th>
+                  </tr>
+                </thead>
+                <tbody id="logsTableBody">
+                  <tr>
+                    <td colspan="7" style="text-align:center; padding:24px;">Memuat riwayat log...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 4: MANAJEMEN USERS (Users Sheet)
+             ================================================================ -->
+        <div class="module-view" id="view-users">
+          <div class="content-card">
+            <div class="card-header-actions">
+              <div class="card-title">
+                <i class="fa-solid fa-users-gear" style="color:var(--gold-light);"></i>
+                <span>Data Pengguna (Tabel Users)</span>
+                <span class="badge badge-gold" id="totalUsersBadge">42 Pengguna</span>
+              </div>
+
+              <div class="card-actions">
+                <div class="search-box">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" id="searchUsersInput" placeholder="Cari nama, username, role..."
+                    oninput="renderUsersTable()">
+                </div>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>User ID</th>
+                    <th>Nama & Username</th>
+                    <th>Role</th>
+                    <th>Kanwil</th>
+                    <th>Kantor</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                  <tr>
+                    <td colspan="6" style="text-align:center; padding:24px;">Memuat data pengguna...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 5: CUTI & ABSENSI
+             ================================================================ -->
+        <div class="module-view" id="view-cuti_absensi">
+          <div class="content-card">
+            <div class="card-title" style="margin-bottom:16px;">
+              <i class="fa-solid fa-fingerprint" style="color:var(--emerald-primary);"></i>
+              <span>Riwayat Presensi Karyawan (Tabel Absensi)</span>
+            </div>
+
+            <div class="table-responsive" style="margin-bottom:28px;">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Tanggal</th>
+                    <th>Nama Karyawan</th>
+                    <th>Tipe Absen</th>
+                    <th>Status</th>
+                    <th>Lokasi GPS</th>
+                  </tr>
+                </thead>
+                <tbody id="absensiTableBody">
+                  <tr>
+                    <td colspan="5" style="text-align:center; padding:20px;">Memuat data presensi...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="card-title" style="margin-bottom:16px;">
+              <i class="fa-solid fa-calendar-xmark" style="color:var(--gold-light);"></i>
+              <span>Pengajuan Cuti Karyawan (Tabel CutiKaryawan)</span>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>ID Cuti</th>
+                    <th>Nama Karyawan</th>
+                    <th>Tipe Cuti</th>
+                    <th>Periode</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="cutiTableBody">
+                  <tr>
+                    <td colspan="5" style="text-align:center; padding:20px;">Memuat data cuti...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 5E: PENGAJUAN & RIWAYAT CUTI KARYAWAN (mod_cuti_karyawan)
+             ================================================================ -->
+        <div class="module-view" id="view-cuti_karyawan">
+          <!-- Top Card / Header Banner -->
+          <div class="cuti-top-banner">
+            <div class="cuti-banner-left">
+              <div class="cuti-icon-badge">
+                <i class="fa-solid fa-calendar-minus"></i>
+              </div>
+              <div>
+                <h3 class="cuti-banner-title">Formulir Pengajuan Cuti Karyawan</h3>
+                <p class="cuti-banner-subtitle">Pengajuan permohonan cuti tahunan, sakit, melahirkan, dan keperluan penting karyawan</p>
+              </div>
+            </div>
+            <div class="cuti-banner-right">
+              <span class="cuti-user-badge">
+                <i class="fa-solid fa-circle-user" style="color:var(--gold-light);"></i>
+                <span id="cutiUserBadgeText">Staff</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Responsive 2-Column Grid Layout -->
+          <div class="cuti-grid-layout">
+            <!-- Sisi Kiri: Form Pengajuan Cuti -->
+            <div class="content-card cuti-form-card">
+              <div class="cuti-card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-file-signature" style="color:#38bdf8;"></i>
+                  <span>Form Pengajuan Permohonan Cuti</span>
+                </div>
+                <div class="cuti-card-header-note">
+                  Terhubung ke Database <strong style="color:#38bdf8;">Supabase</strong>
+                </div>
+              </div>
+
+              <form id="formPengajuanCuti" onsubmit="handlePengajuanCutiSubmit(event)">
+                <div class="form-grid-cuti">
+                  <!-- Nama Karyawan (Admin: Select Karyawan, Staff: Readonly) -->
+                  <div class="form-group span-2">
+                    <label class="form-label" for="cutiNamaKaryawanInput">
+                      <i class="fa-solid fa-user-lock" style="color:var(--gold-light); font-size:0.8rem;"></i>
+                      <span>Nama Karyawan</span>
+                      <span class="required-star">*</span>
+                      <span id="cutiNamaModeNote" class="cuti-label-hint">(Otomatis dari Akun Login)</span>
+                    </label>
+                    <div id="cutiNamaSelectWrapper" style="display:none;">
+                      <select id="cutiNamaKaryawanSelect" class="form-input" onchange="onAdminSelectCutiEmployee()">
+                        <option value="">-- Pilih Karyawan --</option>
+                      </select>
+                    </div>
+                    <div id="cutiNamaReadonlyWrapper" class="cuti-readonly-input-wrap">
+                      <input type="text" id="cutiNamaKaryawanInput" class="form-input readonly-input" readonly placeholder="Nama karyawan...">
+                      <span class="readonly-badge"><i class="fa-solid fa-lock"></i> Auto</span>
+                    </div>
+                  </div>
+
+                  <!-- NIK & Jabatan -->
+                  <div class="form-group">
+                    <label class="form-label" for="cutiNik">NIK / Nomor Karyawan</label>
+                    <input type="text" id="cutiNik" class="form-input readonly-input" readonly placeholder="NIK karyawan">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="cutiJabatan">Jabatan / Posisi</label>
+                    <input type="text" id="cutiJabatan" class="form-input readonly-input" readonly placeholder="Jabatan">
+                  </div>
+
+                  <!-- Jenis Cuti -->
+                  <div class="form-group span-2">
+                    <label class="form-label" for="cutiTipe">
+                      <span>Jenis Cuti</span>
+                      <span class="required-star">*</span>
+                    </label>
+                    <select id="cutiTipe" class="form-input" required>
+                      <option value="Cuti Tahunan">Cuti Tahunan (Mengurangi Kuota)</option>
+                      <option value="Cuti Sakit">Cuti Sakit (Disertai Surat Dokter)</option>
+                      <option value="Cuti Melahirkan">Cuti Melahirkan (3 Bulan)</option>
+                      <option value="Cuti Umrah">Cuti Umrah / Ibadah</option>
+                      <option value="Cuti Alasan Penting">Cuti Alasan Penting (Keluarga/Menikah)</option>
+                    </select>
+                  </div>
+
+                  <!-- Tanggal Mulai & Tanggal Selesai -->
+                  <div class="form-group">
+                    <label class="form-label" for="cutiTglMulai">
+                      <span>Tanggal Mulai Cuti</span>
+                      <span class="required-star">*</span>
+                    </label>
+                    <input type="date" id="cutiTglMulai" class="form-input" required onchange="calculateCutiDurationDays()">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="cutiTglSelesai">
+                      <span>Tanggal Selesai Cuti</span>
+                      <span class="required-star">*</span>
+                    </label>
+                    <input type="date" id="cutiTglSelesai" class="form-input" required onchange="calculateCutiDurationDays()">
+                  </div>
+
+                  <!-- Durasi Hari Kerja -->
+                  <div class="form-group span-2">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                      <label class="form-label" for="cutiJumlahHari" style="margin-bottom:0;">
+                        <span>Durasi Cuti (Hari Kerja)</span>
+                        <span class="required-star">*</span>
+                      </label>
+                      <span id="cutiDurasiText" class="cuti-durasi-pill">1 Hari</span>
+                    </div>
+                    <input type="number" id="cutiJumlahHari" class="form-input" min="1" max="90" value="1" required>
+                  </div>
+
+                  <!-- Keterangan & Alasan -->
+                  <div class="form-group span-2">
+                    <label class="form-label" for="cutiKeterangan">Alasan & Detail Keperluan Cuti</label>
+                    <textarea id="cutiKeterangan" class="form-input" rows="3" placeholder="Tuliskan keperluan pengajuan cuti secara singkat dan jelas..."></textarea>
+                  </div>
+
+                  <!-- Dokumen Pendukung (Ambil dari File Lokal & Masuk ke Google Drive) -->
+                  <div class="form-group span-2">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+                      <label class="form-label" style="margin-bottom:0;">
+                        <i class="fa-solid fa-cloud-arrow-up" style="color:#38bdf8;"></i>
+                        <span>Dokumen Pendukung Cuti (Pilih Berkas Lokal Komputer / HP)</span>
+                        <span style="font-size:0.7rem; color:var(--text-muted); font-weight:normal;">(Opsional: Surat Dokter, Undangan, dll)</span>
+                      </label>
+                      <a href="https://drive.google.com/drive/folders/12Fcad07H3-DF3HJteLuvJ8Zpd3W7UzBD?usp=sharing" target="_blank" rel="noopener noreferrer" class="btn-gdrive-folder-pill" title="Buka Folder Penyimpanan Berkas Cuti di Google Drive">
+                        <i class="fa-brands fa-google-drive" style="color:#38bdf8;"></i>
+                        <span>Folder Drive Cuti</span>
+                        <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.65rem;"></i>
+                      </a>
+                    </div>
+
+                    <!-- Hidden File Input & Link Holder -->
+                    <input type="file" id="cutiDokumenFileInput" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" style="display:none;" onchange="onCutiDokumenFileSelected(event)">
+                    <input type="hidden" id="cutiLinkDokumen">
+
+                    <!-- Dropzone / Box File Selector -->
+                    <div class="cuti-file-dropzone" id="cutiFileDropzone" onclick="document.getElementById('cutiDokumenFileInput').click()">
+                      <div class="cuti-dropzone-idle" id="cutiDropzoneIdle">
+                        <div class="cuti-dropzone-icon">
+                          <i class="fa-solid fa-file-circle-plus"></i>
+                        </div>
+                        <div class="cuti-dropzone-text">
+                          <strong style="color:var(--text-light); font-size:0.85rem; display:block;">Pilih Dokumen dari Komputer / HP</strong>
+                          <span style="color:var(--text-muted); font-size:0.75rem;">Mendukung berkas: PDF, JPG, PNG, DOCX (Maks. 10MB)</span>
+                        </div>
+                      </div>
+
+                      <!-- Preview File Terpilih -->
+                      <div class="cuti-dropzone-selected" id="cutiDropzoneSelected" style="display:none;">
+                        <div class="cuti-selected-file-info">
+                          <div class="cuti-selected-file-icon" id="cutiSelectedFileIcon">
+                            <i class="fa-solid fa-file-pdf"></i>
+                          </div>
+                          <div>
+                            <div class="cuti-selected-file-name" id="cutiSelectedFileName">nama_dokumen.pdf</div>
+                            <div class="cuti-selected-file-meta" id="cutiSelectedFileMeta">0 KB • Berkas Lokal Terpilih</div>
+                          </div>
+                        </div>
+                        <button type="button" class="btn-remove-file" onclick="removeSelectedCutiFile(event)" title="Hapus File Terpilih">
+                          <i class="fa-solid fa-trash"></i>
+                          <span>Hapus</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="cuti-upload-note" id="cutiUploadNote">
+                      <i class="fa-solid fa-shield-halved" style="color:#38bdf8;"></i>
+                      <span>Berkas lokal akan otomatis dimasukkan ke folder Google Drive dan nama/link dokumen disimpan di tabel Supabase.</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Form Action Buttons -->
+                <div class="cuti-form-actions">
+                  <button type="button" class="btn-secondary" onclick="resetFormPengajuanCuti()">
+                    <i class="fa-solid fa-arrow-rotate-left"></i>
+                    <span>Reset</span>
+                  </button>
+                  <button type="submit" id="btnSubmitPengajuanCuti" class="btn-primary">
+                    <i class="fa-solid fa-paper-plane"></i>
+                    <span>Kirim Pengajuan Cuti</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Sisi Kanan: Kuota & Riwayat Permohonan Cuti Pribadi -->
+            <div class="content-card cuti-history-card">
+              <div class="cuti-card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-clock-rotate-left" style="color:var(--gold-light);"></i>
+                  <span>Riwayat & Kuota Cuti Anda</span>
+                </div>
+                <button type="button" class="btn-refresh-cuti" onclick="loadCutiKaryawanData(true)" title="Segarkan Data">
+                  <i class="fa-solid fa-rotate-right"></i>
+                </button>
+              </div>
+
+              <!-- 3-Pillar Quota Summary -->
+              <div class="cuti-quota-box">
+                <div class="cuti-quota-item">
+                  <span class="cuti-quota-label">Hak Cuti Bersih</span>
+                  <span class="cuti-quota-val" id="cutiUserNetQuota">12 Hari</span>
+                  <span class="cuti-quota-sub">12 - Cuti Bersama</span>
+                </div>
+                <div class="cuti-quota-item used">
+                  <span class="cuti-quota-label">Terpakai</span>
+                  <span class="cuti-quota-val" id="cutiUserUsedQuota">0 Hari</span>
+                  <span class="cuti-quota-sub">Disetujui</span>
+                </div>
+                <div class="cuti-quota-item remaining">
+                  <span class="cuti-quota-label">Sisa Kuota</span>
+                  <span class="cuti-quota-val" id="cutiUserRemainingQuota">12 Hari</span>
+                  <span class="cuti-quota-sub">Sisa Periode</span>
+                </div>
+              </div>
+
+              <!-- Search Bar Riwayat -->
+              <div class="cuti-search-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="cutiHistorySearch" placeholder="Cari riwayat (ID, tipe, status...)" oninput="filterCutiKaryawanHistory()">
+              </div>
+
+              <!-- List Cards Container -->
+              <div class="cuti-history-list" id="cutiHistoryListContainer">
+                <div class="cuti-empty-state">
+                  <i class="fa-solid fa-spinner fa-spin" style="font-size:1.8rem; color:#38bdf8;"></i>
+                  <p>Memuat riwayat pengajuan cuti...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 5F: CUTI BERSAMA, APPROVAL & MATRIKS KUOTA (mod_cuti_bersama)
+             ================================================================ -->
+        <div class="module-view" id="view-cuti_bersama">
+          <!-- Top Card / Header -->
+          <div class="cuti-top-banner">
+            <div class="cuti-banner-left">
+              <div class="cuti-icon-badge" style="background:rgba(245, 158, 11, 0.15); border-color:rgba(245, 158, 11, 0.3); color:var(--gold-light);">
+                <i class="fa-solid fa-calendar-day"></i>
+              </div>
+              <div>
+                <h3 class="cuti-banner-title">Manajemen Cuti Bersama, Approval & Matriks Kuota</h3>
+                <p class="cuti-banner-subtitle">Pengaturan daftar hari libur nasional, persetujuan permohonan cuti, dan kalkulasi sisa hak cuti seluruh karyawan</p>
+              </div>
+            </div>
+            <div class="cuti-banner-right">
+              <div class="cuti-stat-pill">
+                <span class="pulse-dot"></span>
+                <span>Pending Approval:</span>
+                <strong id="badgePendingApprovalCount" style="color:var(--gold-light); font-family:monospace;">0</strong>
+              </div>
+              <button type="button" class="btn-refresh-cuti" onclick="reloadCutiBersamaModule(true)" title="Segarkan Data">
+                <i class="fa-solid fa-rotate-right"></i>
+                <span>Refresh</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 3 Horizontal Tabs Switcher -->
+          <div class="cuti-tabs-nav">
+            <button type="button" class="cuti-tab-btn active" id="tabBtnCbList" onclick="switchCutiBersamaTab('list')">
+              <i class="fa-solid fa-calendar-days"></i>
+              <span>a. Daftar Hari Cuti Bersama & Libur (<span id="cbYearLabelNav">2026</span>)</span>
+            </button>
+            <button type="button" class="cuti-tab-btn" id="tabBtnCbApproval" onclick="switchCutiBersamaTab('approval')">
+              <i class="fa-solid fa-list-check"></i>
+              <span>b. Riwayat & Approval Permohonan Cuti</span>
+              <span id="tabBadgeApprovalPending" class="tab-badge-counter" style="display:none;">0</span>
+            </button>
+            <button type="button" class="cuti-tab-btn" id="tabBtnCbMatrix" onclick="switchCutiBersamaTab('matrix')">
+              <i class="fa-solid fa-chart-pie"></i>
+              <span>c. Matriks Sisa Kuota Cuti Karyawan</span>
+            </button>
+          </div>
+
+          <!-- TAB PANE A: DAFTAR HARI CUTI BERSAMA -->
+          <div class="content-card cuti-tab-pane active" id="paneCbList">
+            <!-- Summary 3 Stats Cards -->
+            <div class="cuti-stats-row">
+              <div class="cuti-stat-card">
+                <div class="stat-icon" style="color:#60a5fa; background:rgba(96,165,250,0.1);"><i class="fa-solid fa-umbrella-beach"></i></div>
+                <div>
+                  <span class="stat-sub">Total Hari Cuti Bersama</span>
+                  <div class="stat-val" id="cbStatTotalDays">0 Hari</div>
+                </div>
+              </div>
+              <div class="cuti-stat-card highlight-gold">
+                <div class="stat-icon" style="color:var(--gold-light); background:rgba(245,158,11,0.1);"><i class="fa-solid fa-scissors"></i></div>
+                <div>
+                  <span class="stat-sub">Memotong Cuti Tahunan</span>
+                  <div class="stat-val" id="cbStatPotongDays">0 Hari</div>
+                </div>
+              </div>
+              <div class="cuti-stat-card highlight-emerald">
+                <div class="stat-icon" style="color:#10b981; background:rgba(16,185,129,0.1);"><i class="fa-solid fa-user-shield"></i></div>
+                <div>
+                  <span class="stat-sub">Hak Cuti Bersih Karyawan</span>
+                  <div class="stat-val" id="cbStatNetDays">12 Hari</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Toolbar Table -->
+            <div class="cuti-table-toolbar">
+              <div class="toolbar-left">
+                <label for="cbSelectYear" style="font-size:0.78rem; color:var(--text-muted); font-weight:600;">Tahun Periode:</label>
+                <select id="cbSelectYear" class="form-input" style="width:130px; height:34px; font-weight:700; color:var(--gold-light);" onchange="onCutiBersamaYearChange()">
+                  <option value="2025">Tahun 2025</option>
+                  <option value="2026" selected>Tahun 2026</option>
+                  <option value="2027">Tahun 2027</option>
+                  <option value="2028">Tahun 2028</option>
+                </select>
+              </div>
+              <div class="toolbar-right">
+                <button type="button" class="btn-primary" onclick="openAddCutiBersamaModal()">
+                  <i class="fa-solid fa-plus"></i>
+                  <span>Tambah Cuti Bersama</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Table Cuti Bersama -->
+            <div class="table-responsive">
+              <table class="table-brosur">
+                <thead>
+                  <tr>
+                    <th style="width:50px; text-align:center;">NO</th>
+                    <th style="width:120px;">TANGGAL</th>
+                    <th>NAMA HARI LIBUR / CUTI BERSAMA</th>
+                    <th style="width:100px; text-align:center;">DURASI</th>
+                    <th style="width:160px; text-align:center;">POTONG CUTI TAHUNAN</th>
+                    <th>KETERANGAN</th>
+                    <th style="width:100px; text-align:center;">STATUS</th>
+                    <th style="width:110px; text-align:center;">AKSI</th>
+                  </tr>
+                </thead>
+                <tbody id="cbTableBody">
+                  <tr>
+                    <td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">Memuat data cuti bersama...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- TAB PANE B: RIWAYAT & APPROVAL STATUS PENGAJUAN CUTI -->
+          <div class="content-card cuti-tab-pane" id="paneCbApproval" style="display:none;">
+            <!-- Toolbar Approval -->
+            <div class="cuti-table-toolbar">
+              <div class="toolbar-left" style="flex:1; max-width:400px;">
+                <div class="cuti-search-wrap" style="width:100%;">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" id="cutiApprovalSearch" placeholder="Cari nama karyawan, NIK, tipe cuti..." oninput="filterCutiApprovalList()">
+                </div>
+              </div>
+              <div class="toolbar-right">
+                <select id="cutiApprovalStatusFilter" class="form-input" style="width:170px; height:34px;" onchange="filterCutiApprovalList()">
+                  <option value="ALL">Semua Status</option>
+                  <option value="Pending">Menunggu Approval</option>
+                  <option value="Disetujui">Disetujui</option>
+                  <option value="Ditolak">Ditolak</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Table Approval All Employees -->
+            <div class="table-responsive">
+              <table class="table-brosur">
+                <thead>
+                  <tr>
+                    <th style="width:140px;">ID / TGL PENGAJUAN</th>
+                    <th style="width:180px;">KARYAWAN</th>
+                    <th style="width:130px;">JENIS CUTI</th>
+                    <th style="width:180px;">PERIODE CUTI</th>
+                    <th style="width:85px; text-align:center;">DURASI</th>
+                    <th>ALASAN & LAMPIRAN</th>
+                    <th style="width:120px; text-align:center;">STATUS</th>
+                    <th style="width:130px; text-align:center;">AKSI APPROVAL</th>
+                  </tr>
+                </thead>
+                <tbody id="cutiApprovalTableBody">
+                  <tr>
+                    <td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">Memuat pengajuan cuti...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- TAB PANE C: MATRIKS SISA KUOTA CUTI SELURUH KARYAWAN -->
+          <div class="content-card cuti-tab-pane" id="paneCbMatrix" style="display:none;">
+            <!-- Matrix Header Info -->
+            <div class="cuti-stats-row">
+              <div class="cuti-stat-card">
+                <div class="stat-icon" style="color:#60a5fa; background:rgba(96,165,250,0.1);"><i class="fa-solid fa-calendar"></i></div>
+                <div>
+                  <span class="stat-sub">Kuota Standar HR</span>
+                  <div class="stat-val">12 Hari / Tahun</div>
+                </div>
+              </div>
+              <div class="cuti-stat-card highlight-gold">
+                <div class="stat-icon" style="color:var(--gold-light); background:rgba(245,158,11,0.1);"><i class="fa-solid fa-calendar-day"></i></div>
+                <div>
+                  <span class="stat-sub">Cuti Bersama (Potong Kuota)</span>
+                  <div class="stat-val" id="matrixCbPotongVal">0 Hari</div>
+                </div>
+              </div>
+              <div class="cuti-stat-card highlight-emerald">
+                <div class="stat-icon" style="color:#10b981; background:rgba(16,185,129,0.1);"><i class="fa-solid fa-calculator"></i></div>
+                <div>
+                  <span class="stat-sub">Net Kuota Hak Cuti Tahunan</span>
+                  <div class="stat-val" id="matrixNetQuotaVal">12 Hari</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Table Matriks Kuota -->
+            <div class="table-responsive">
+              <table class="table-brosur">
+                <thead>
+                  <tr>
+                    <th style="width:110px;">NIK</th>
+                    <th>NAMA KARYAWAN</th>
+                    <th>JABATAN</th>
+                    <th style="width:100px; text-align:center;">NET KUOTA</th>
+                    <th style="width:110px; text-align:center;">TERPAKAI (TAHUNAN)</th>
+                    <th style="width:95px; text-align:center;">CUTI SAKIT</th>
+                    <th style="width:95px; text-align:center;">CUTI UMRAH</th>
+                    <th style="width:110px; text-align:center;">CUTI MELAHIRKAN</th>
+                    <th style="width:130px; text-align:center;">SISA KUOTA CUTI</th>
+                  </tr>
+                </thead>
+                <tbody id="cutiMatrixTableBody">
+                  <tr>
+                    <td colspan="9" style="text-align:center; padding:30px; color:var(--text-muted);">Memuat matriks kuota...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 5B: REKAPITULASI ABSENSI BULANAN (MATRIX REKAP)
+             ================================================================ -->
+        <div class="module-view" id="view-rekap_absensi">
+          <div class="rekap-card">
+            
+            <!-- Toolbar Controls -->
+            <div class="rekap-toolbar">
+              <!-- Left: Month and Year Picker -->
+              <div class="rekap-toolbar-left">
+                <div class="rekap-month-picker">
+                  <button type="button" class="rekap-nav-btn" id="rekapPrevMonthBtn" title="Bulan Sebelumnya">
+                    <i class="fa-solid fa-chevron-left"></i>
+                  </button>
+                  <select id="rekapMonthSelect" class="rekap-select">
+                    <option value="1">Januari</option>
+                    <option value="2">Februari</option>
+                    <option value="3">Maret</option>
+                    <option value="4">April</option>
+                    <option value="5">Mei</option>
+                    <option value="6">Juni</option>
+                    <option value="7">Juli</option>
+                    <option value="8">Agustus</option>
+                    <option value="9">September</option>
+                    <option value="10" selected>Oktober</option>
+                    <option value="11">November</option>
+                    <option value="12">Desember</option>
+                  </select>
+                  <select id="rekapYearSelect" class="rekap-select">
+                    <option value="2024">2024</option>
+                    <option value="2025">2025</option>
+                    <option value="2026" selected>2026</option>
+                    <option value="2027">2027</option>
+                    <option value="2028">2028</option>
+                  </select>
+                  <button type="button" class="rekap-nav-btn" id="rekapNextMonthBtn" title="Bulan Berikutnya">
+                    <i class="fa-solid fa-chevron-right"></i>
+                  </button>
+                </div>
+                <button type="button" class="rekap-current-badge" id="rekapCurrentMonthBtn" title="Kembali ke Bulan Berjalan">
+                  <i class="fa-solid fa-calendar-day"></i> Bulan Berjalan
+                </button>
+              </div>
+
+              <!-- Center: Search and Location Filter -->
+              <div class="rekap-toolbar-center">
+                <div class="search-box">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" id="searchRekapInput" placeholder="Cari Nama atau Lokasi...">
+                </div>
+                <select id="filterRekapLokasi" class="form-input" style="width:auto; padding:9px 14px;">
+                  <option value="ALL">Semua Lokasi</option>
+                  <option value="PUSAT">Pusat</option>
+                  <option value="BEKASI">Bekasi</option>
+                  <option value="SOLO">Solo</option>
+                  <option value="BANYUMAS">Banyumas</option>
+                  <option value="SAMARINDA">Samarinda</option>
+                  <option value="PEMALANG">Pemalang</option>
+                  <option value="SURABAYA">Surabaya</option>
+                  <option value="PATI">Pati</option>
+                </select>
+              </div>
+
+              <!-- Right: Refresh & Actions -->
+              <div class="rekap-toolbar-right">
+                <button type="button" class="btn-secondary" id="refreshRekapBtn" style="padding: 9px 16px;">
+                  <i class="fa-solid fa-rotate"></i>
+                  <span>Refresh</span>
+                </button>
+                <button type="button" class="btn-gold" id="printRekapBtn" style="padding: 9px 16px;">
+                  <i class="fa-solid fa-print"></i>
+                  <span>Cetak / PDF</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Legend Bar -->
+            <div class="rekap-legend-bar">
+              <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700; text-transform:uppercase; margin-right:4px;">
+                <i class="fa-solid fa-tags"></i> Keterangan:
+              </span>
+              <span class="legend-item" style="border-color:rgba(16,185,129,0.3); color:#34d399;">
+                <span class="legend-dot" style="background:#10b981;"></span>
+                <strong>H</strong> = Hadir
+              </span>
+              <span class="legend-item" style="border-color:rgba(245,158,11,0.3); color:#fbbf24;">
+                <span class="legend-dot" style="background:#f59e0b;"></span>
+                <strong>S</strong> = Sakit
+              </span>
+              <span class="legend-item" style="border-color:rgba(6,182,212,0.3); color:#38bdf8;">
+                <span class="legend-dot" style="background:#06b6d4;"></span>
+                <strong>I</strong> = Izin
+              </span>
+              <span class="legend-item" style="border-color:rgba(239,68,68,0.3); color:#f87171;">
+                <span class="legend-dot" style="background:#ef4444;"></span>
+                <strong>A</strong> = Alpha
+              </span>
+              <span class="legend-item" style="border-color:rgba(236,72,153,0.3); color:#f472b6;">
+                <span class="legend-dot" style="background:#ec4899;"></span>
+                <strong>P</strong> = Dinas
+              </span>
+              <span class="legend-item" style="border-color:rgba(20,184,166,0.3); color:#5eead4;">
+                <span class="legend-dot" style="background:#14b8a6;"></span>
+                <strong>C</strong> = Cuti
+              </span>
+              <span class="legend-item" style="border-color:rgba(139,92,246,0.3); color:#c084fc;">
+                <span class="legend-dot" style="background:#8b5cf6;"></span>
+                <strong>L</strong> = Lain-lain
+              </span>
+              <span class="legend-item" style="border-color:rgba(244,63,94,0.4); color:#fb7185; background:rgba(244,63,94,0.08);">
+                <i class="fa-regular fa-calendar-xmark" style="font-size:0.75rem;"></i>
+                <strong>S / M</strong> = Libur Akhir Pekan (Arsiran)
+              </span>
+            </div>
+
+            <!-- KPI Summary Cards -->
+            <div class="rekap-kpi-grid">
+              <div class="rekap-kpi-card">
+                <div class="rekap-kpi-icon" style="background:rgba(245,158,11,0.15); color:var(--gold-light);">
+                  <i class="fa-solid fa-users"></i>
+                </div>
+                <div>
+                  <div class="rekap-kpi-val" id="kpiTotalKaryawan">0</div>
+                  <div class="rekap-kpi-lbl">Total Karyawan</div>
+                </div>
+              </div>
+
+              <div class="rekap-kpi-card">
+                <div class="rekap-kpi-icon" style="background:rgba(16,185,129,0.15); color:#34d399;">
+                  <i class="fa-solid fa-user-check"></i>
+                </div>
+                <div>
+                  <div class="rekap-kpi-val" id="kpiTotalHadir">0</div>
+                  <div class="rekap-kpi-lbl">Total Hadir (H)</div>
+                </div>
+              </div>
+
+              <div class="rekap-kpi-card">
+                <div class="rekap-kpi-icon" style="background:rgba(245,158,11,0.15); color:#fbbf24;">
+                  <i class="fa-solid fa-notes-medical"></i>
+                </div>
+                <div>
+                  <div class="rekap-kpi-val" id="kpiTotalSakitIzin">0</div>
+                  <div class="rekap-kpi-lbl">Sakit (S) & Izin (I)</div>
+                </div>
+              </div>
+
+              <div class="rekap-kpi-card">
+                <div class="rekap-kpi-icon" style="background:rgba(239,68,68,0.15); color:#f87171;">
+                  <i class="fa-solid fa-user-xmark"></i>
+                </div>
+                <div>
+                  <div class="rekap-kpi-val" id="kpiTotalAlpha">0</div>
+                  <div class="rekap-kpi-lbl">Alpha / Tanpa Ket. (A)</div>
+                </div>
+              </div>
+
+              <div class="rekap-kpi-card">
+                <div class="rekap-kpi-icon" style="background:rgba(236,72,153,0.15); color:#f472b6;">
+                  <i class="fa-solid fa-briefcase"></i>
+                </div>
+                <div>
+                  <div class="rekap-kpi-val" id="kpiTotalDinasCuti">0</div>
+                  <div class="rekap-kpi-lbl">Dinas (P) & Cuti (C)</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Dynamic Matrix Table -->
+            <div class="rekap-table-container">
+              <table class="matrix-table" id="rekapMatrixTable">
+                <thead id="rekapTableHead">
+                  <!-- Dynamically rendered by JavaScript -->
+                </thead>
+                <tbody id="rekapTableBody">
+                  <tr>
+                    <td colspan="42" style="text-align:center; padding:36px; color:var(--text-muted);">
+                      <i class="fa-solid fa-spinner fa-spin" style="margin-right:8px;"></i>
+                      Memuat data matriks rekapitulasi absensi...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 5C: RIWAYAT LOG ABSENSI (TABEL ABSENSI SUPABASE)
+             Desain antarmuka cyber dark & glowing cyan persis sesuai lampiran
+             ================================================================ -->
+        <div class="module-view" id="view-log_absensi">
+          <div class="content-card log-absensi-card">
+            
+            <div class="log-absensi-header">
+              <div class="log-absensi-title-wrap">
+                <div class="card-title">
+                  <i class="fa-solid fa-clipboard-user" style="color:#00e5ff;"></i>
+                  <span>Riwayat Log Absensi Karyawan</span>
+                </div>
+                <div class="log-absensi-subtitle">
+                  Sumber Data: Tabel <code>absensi</code> di Supabase • Real-time Monitoring & GPS Map
+                </div>
+              </div>
+
+              <div class="log-absensi-actions">
+                <div class="log-absensi-search">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" id="logAbsensiSearchInput" placeholder="Cari nama karyawan..." oninput="onLogAbsensiFilterChange()">
+                </div>
+                
+                <select id="logAbsensiTypeFilter" class="log-absensi-select" onchange="onLogAbsensiFilterChange()">
+                  <option value="ALL">Semua Tipe</option>
+                  <option value="Datang">Datang / Hadir</option>
+                  <option value="Izin">Izin</option>
+                  <option value="Sakit">Sakit</option>
+                  <option value="Pulang">Pulang</option>
+                </select>
+
+                <button type="button" class="btn-refresh-absensi" onclick="reloadLogAbsensiData()" title="Segarkan Data Absensi">
+                  <i class="fa-solid fa-rotate"></i>
+                  <span>Refresh</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Total badges bar -->
+            <div class="log-absensi-stats-bar">
+              <div class="absensi-stat-item">
+                <span class="stat-bullet cyan"></span>
+                <span>Total Data Absensi: <strong id="absensiStatTotal" style="color:#00e5ff;">0</strong></span>
+              </div>
+              <div class="absensi-stat-item">
+                <span class="stat-bullet green"></span>
+                <span>Hadir/Datang: <strong id="absensiStatDatang" style="color:#10b981;">0</strong></span>
+              </div>
+              <div class="absensi-stat-item">
+                <span class="stat-bullet blue"></span>
+                <span>Izin/Lainnya: <strong id="absensiStatIzin" style="color:#38bdf8;">0</strong></span>
+              </div>
+              <div class="absensi-stat-item" style="margin-left:auto; font-size:0.78rem; color:var(--text-muted);">
+                <i class="fa-solid fa-arrow-down-wide-short"></i> Urutan: <span id="absensiSortIndicator" style="color:#00e5ff;">Tanggal & Jam Terbaru (Desc)</span>
+              </div>
+            </div>
+
+            <div class="table-responsive log-absensi-table-container">
+              <table class="table-log-absensi">
+                <thead>
+                  <tr>
+                    <th class="col-no">NO</th>
+                    <th class="col-tanggal sortable" onclick="toggleSortLogAbsensi('tanggal')" title="Klik untuk mengurutkan Tanggal">
+                      TANGGAL <i class="fa-solid fa-caret-down sort-arrow" id="sortArrowTanggal"></i>
+                    </th>
+                    <th class="col-jam sortable" onclick="toggleSortLogAbsensi('jam')" title="Klik untuk mengurutkan Jam">
+                      JAM <i class="fa-solid fa-caret-down sort-arrow" id="sortArrowJam"></i>
+                    </th>
+                    <th class="col-nama">NAMA KARYAWAN</th>
+                    <th class="col-tipe">TIPE</th>
+                    <th class="col-kode">KODE</th>
+                    <th class="col-peta">PETA</th>
+                  </tr>
+                </thead>
+                <tbody id="logAbsensiTableBody">
+                  <tr>
+                    <td colspan="7" style="text-align:center; padding:36px; color:#64748b;">
+                      <i class="fa-solid fa-spinner fa-spin" style="color:#00e5ff; font-size:1.5rem;"></i>
+                      <div style="margin-top:10px;">Memuat data tabel absensi...</div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 5D: LAUNCHING BROSUR (TABEL LOGBROSUR & MNULOGBROSUR)
+             Tampilan Manajemen Arsip & Input Peluncuran Brosur
+             ================================================================ -->
+        <div class="module-view" id="view-launching_brosur">
+          <div class="content-card brosur-card">
+            
+            <!-- Module Top Bar with Tabs and Folder link -->
+            <div class="brosur-top-header">
+              <div class="brosur-header-title">
+                <div class="card-title">
+                  <i class="fa-solid fa-bullhorn" style="color:var(--gold-light);"></i>
+                  <span>Catalog & Manajemen Brosur Promosi</span>
+                </div>
+                <div class="brosur-header-subtitle">
+                  Daftar arsip & publikasi brosur paket perjalanan
+                </div>
+              </div>
+
+              <div class="brosur-header-actions">
+                <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc" target="_blank" rel="noopener noreferrer" class="btn-gdrive-folder" title="Buka Folder Penyimpanan Berkas">
+                  <i class="fa-solid fa-folder-open"></i>
+                  <span>Folder Berkas</span>
+                </a>
+              </div>
+            </div>
+
+            <!-- Tab Switcher Navigation -->
+            <div class="brosur-tabs-nav">
+              <button type="button" class="brosur-tab-btn active" id="tabBtnBrosurList" onclick="switchBrosurTab('list')">
+                <i class="fa-solid fa-folder-open"></i>
+                <span>📋 Daftar & Arsip Brosur (LogBrosur)</span>
+              </button>
+              <button type="button" class="brosur-tab-btn" id="tabBtnBrosurInput" onclick="switchBrosurTab('input')">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                <span>🚀 Input Brosur Baru (Form Inputan)</span>
+              </button>
+            </div>
+
+            <!-- TAB PANE 1: DAFTAR & ARSIP BROSUR -->
+            <div class="brosur-tab-pane active" id="tabPaneBrosurList">
+              
+              <!-- Quick Stats Grid -->
+              <div class="brosur-stats-grid">
+                <div class="brosur-stat-card">
+                  <div class="brosur-stat-icon gold"><i class="fa-solid fa-file-pdf"></i></div>
+                  <div>
+                    <div class="brosur-stat-val" id="brosurStatTotal">0</div>
+                    <div class="brosur-stat-lbl">Total Brosur Terdaftar</div>
+                  </div>
+                </div>
+
+                <div class="brosur-stat-card">
+                  <div class="brosur-stat-icon emerald"><i class="fa-solid fa-tags"></i></div>
+                  <div>
+                    <div class="brosur-stat-val" id="brosurStatCategory">0</div>
+                    <div class="brosur-stat-lbl">Kategori Materi</div>
+                  </div>
+                </div>
+
+                <div class="brosur-stat-card">
+                  <div class="brosur-stat-icon blue"><i class="fa-solid fa-circle-check"></i></div>
+                  <div>
+                    <div class="brosur-stat-val" id="brosurStatActive">0</div>
+                    <div class="brosur-stat-lbl">Brosur Aktif</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Filter & Search Toolbar -->
+              <div class="brosur-toolbar">
+                <div class="brosur-search-box">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" id="brosurSearchInput" placeholder="Cari nama brosur, kategori, atau catatan..." oninput="onBrosurFilterChange()">
+                </div>
+
+                <select id="brosurWilayahFilter" class="brosur-filter-select" onchange="onBrosurFilterChange()">
+                  <option value="ALL">Semua Wilayah</option>
+                </select>
+
+                <select id="brosurCategoryFilter" class="brosur-filter-select" onchange="onBrosurFilterChange()">
+                  <option value="ALL">Semua Kategori</option>
+                </select>
+
+                <!-- Filter Status Brosur (Default: Aktif) -->
+                <select id="brosurStatusFilter" class="brosur-filter-select" onchange="onBrosurFilterChange()">
+                  <option value="Aktif" selected>Status: Aktif</option>
+                  <option value="Expired">Status: Expired</option>
+                  <option value="ALL">Semua Status</option>
+                </select>
+
+                <!-- View Mode Switcher: Tabel vs Split Listing & Preview -->
+                <div class="brosur-view-toggle-group" role="group" aria-label="Mode Tampilan">
+                  <button type="button" class="btn-brosur-view active" id="btnViewModeTable" onclick="setBrosurViewMode('table')" title="Tampilan Tabel List">
+                    <i class="fa-solid fa-table-list"></i>
+                    <span>Tabel List</span>
+                  </button>
+                  <button type="button" class="btn-brosur-view" id="btnViewModeSplit" onclick="setBrosurViewMode('split')" title="Tampilan Listing & Pratinjau Dokumen Drive">
+                    <i class="fa-solid fa-table-columns"></i>
+                    <span>Listing & Preview Drive</span>
+                  </button>
+                </div>
+
+                <button type="button" class="btn-refresh-brosur" onclick="reloadBrosurData()" title="Segarkan Data">
+                  <i class="fa-solid fa-rotate"></i>
+                  <span>Refresh</span>
+                </button>
+
+                <button type="button" class="btn-add-brosur-shortcut" onclick="switchBrosurTab('input')">
+                  <i class="fa-solid fa-plus"></i>
+                  <span>Input Brosur Baru</span>
+                </button>
+              </div>
+
+              <!-- 1. TAMPILAN TABEL LIST (Default) -->
+              <div id="brosurTableViewContainer" class="table-responsive brosur-table-container">
+                <table class="table-brosur">
+                  <thead>
+                    <tr>
+                      <th style="width: 45px;">NO</th>
+                      <th>TGL UPLOAD</th>
+                      <th>VALID UNTIL</th>
+                      <th>WILAYAH</th>
+                      <th>KATEGORI</th>
+                      <th>NAMA BROSUR</th>
+                      <th style="text-align: center;">STATUS BROSUR</th>
+                      <th>CATATAN</th>
+                      <th style="text-align: center; width: 150px;">AKSI</th>
+                    </tr>
+                  </thead>
+                  <tbody id="logBrosurTableBody">
+                    <tr>
+                      <td colspan="9" style="text-align:center; padding:36px; color:#64748b;">
+                        <i class="fa-solid fa-spinner fa-spin" style="color:var(--gold-light); font-size:1.5rem;"></i>
+                        <div style="margin-top:10px;">Memuat data brosur...</div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- 2. TAMPILAN LISTING & PREVIEW GOOGLE DRIVE (Split View Berdampingan) -->
+              <div id="brosurSplitViewContainer" class="brosur-split-container" style="display: none;">
+                <!-- Sisi Kiri: Listing Kebawah Info Dokumen -->
+                <div class="brosur-split-left" id="brosurSplitLeft">
+                  <div class="brosur-split-list-header">
+                    <div class="brosur-split-list-title">
+                      <i class="fa-solid fa-layer-group" style="color:var(--gold-light);"></i>
+                      <span>Daftar Dokumen Brosur</span>
+                      <span class="brosur-split-badge-count" id="brosurSplitCount">0 Berkas</span>
+                    </div>
+                    <div style="font-size:0.75rem; color:var(--text-dim);">Klik kartu untuk membuka pratinjau</div>
+                  </div>
+                  <div class="brosur-split-cards" id="brosurSplitCardsList">
+                    <!-- Populated via renderBrosurSplitView() -->
+                  </div>
+                </div>
+
+                <!-- Sisi Kanan (Tab Kanan): Tampilan Langsung Dokumen Google Drive -->
+                <div class="brosur-split-right" id="brosurSplitRight">
+                  <div class="brosur-preview-header">
+                    <div class="brosur-preview-title-area">
+                      <div class="brosur-preview-badge" id="brosurPreviewBadge">GOOGLE DRIVE LIVE PREVIEW</div>
+                      <h4 class="brosur-preview-doc-title" id="brosurPreviewTitle">Pilih Dokumen Brosur</h4>
+                      <div class="brosur-preview-meta" id="brosurPreviewMeta">-</div>
+                    </div>
+                    <div class="brosur-preview-actions">
+                      <button type="button" class="btn-preview-tool" onclick="reloadActiveDrivePreview()" title="Muat Ulang Tampilan">
+                        <i class="fa-solid fa-rotate-right"></i>
+                      </button>
+                      <button type="button" class="btn-preview-tool" onclick="copyActiveDriveLink()" title="Salin Tautan">
+                        <i class="fa-solid fa-link"></i>
+                      </button>
+                      <a href="#" target="_blank" rel="noopener noreferrer" class="btn-preview-open" id="btnPreviewOpenExternal" title="Buka Dokumen di Google Drive Tab Baru">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        <span>Buka Drive</span>
+                      </a>
+                    </div>
+                  </div>
+
+                  <!-- Tab Navigasi Panel Kanan -->
+                  <div class="brosur-preview-tabs-nav">
+                    <button type="button" class="brosur-preview-tab-btn active" id="btnPrevTabDoc" onclick="switchPreviewSubTab('doc')">
+                      <i class="fa-solid fa-file-pdf"></i>
+                      <span>Tampilan Dokumen Drive</span>
+                    </button>
+                    <button type="button" class="brosur-preview-tab-btn" id="btnPrevTabDetail" onclick="switchPreviewSubTab('detail')">
+                      <i class="fa-solid fa-circle-info"></i>
+                      <span>Info & Ringkasan Lengkap</span>
+                    </button>
+                  </div>
+
+                  <!-- Sub-Tab 1: Live Google Drive Document Iframe -->
+                  <div class="brosur-preview-content active" id="panePrevTabDoc">
+                    <div class="brosur-iframe-wrapper">
+                      <div class="brosur-iframe-loading" id="brosurIframeLoader">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size:1.8rem; color:var(--gold-light);"></i>
+                        <span>Menghubungkan ke Google Drive Viewer...</span>
+                      </div>
+                      <iframe id="brosurPreviewIframe" src="about:blank" allow="autoplay" allowfullscreen></iframe>
+                    </div>
+                    <div class="brosur-iframe-footer">
+                      <span><i class="fa-solid fa-shield-halved" style="color:#38bdf8; margin-right:5px;"></i> Google Drive Secure Viewer PT. Fath Indah</span>
+                      <a href="#" target="_blank" rel="noopener noreferrer" id="brosurIframeDirectFallback">
+                        Buka dokumen langsung di Google Drive <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.7rem;"></i>
+                      </a>
+                    </div>
+                  </div>
+
+                  <!-- Sub-Tab 2: Detail Metadata Lengkap & Aksi -->
+                  <div class="brosur-preview-content" id="panePrevTabDetail" style="padding:18px; overflow-y:auto;">
+                    <div id="brosurDetailBody">
+                      <!-- Render detail metadata & WhatsApp / Edit / Delete buttons -->
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- TAB PANE 2: INPUT BROSUR BARU -->
+            <div class="brosur-tab-pane" id="tabPaneBrosurInput">
+              
+              <div class="brosur-form-card">
+                <div class="brosur-form-title">
+                  <i class="fa-solid fa-file-circle-plus" style="color:var(--gold-light);"></i>
+                  <span>Formulir Pendaftaran & Input Brosur Baru</span>
+                </div>
+
+                <form id="brosurInputForm" onsubmit="submitBrosurForm(event)">
+                  <!-- Hidden tglupload: diisi otomatis saat submit tanpa menampilkan box lampiran 1 -->
+                  <input type="hidden" id="inputBrosurTglUpload">
+                  <input type="hidden" id="inputBrosurLink" value="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc">
+
+                  <!-- Baris 1: Wilayah Brosur & Kategori Brosur -->
+                  <div class="form-row-grid">
+                    <div class="form-group">
+                      <label class="form-label" for="inputBrosurWilayah">
+                        <i class="fa-solid fa-map-location-dot" style="color:var(--gold-light);"></i> Wilayah Brosur (<code style="color:var(--gold-light);">namakanwil</code>) <span style="color:#ef4444;">*</span>
+                      </label>
+                      <select id="inputBrosurWilayah" class="form-input" required onchange="onBrosurWilayahChange()">
+                        <option value="">-- Pilih Wilayah Brosur --</option>
+                      </select>
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" for="inputBrosurCategory">
+                        <i class="fa-solid fa-layer-group" style="color:var(--gold-light);"></i> Kategori Brosur (<code style="color:var(--gold-light);">catagory</code>) <span style="color:#ef4444;">*</span>
+                      </label>
+                      <select id="inputBrosurCategory" class="form-input" required onchange="onBrosurCategoryChange()">
+                        <option value="">-- Pilih Kategori --</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Baris 2: Nama Brosur (Master) & Valid Until / Masa Berlaku Brosur -->
+                  <div class="form-row-grid">
+                    <div class="form-group" id="groupBrosurName" style="display:none; transition: all 0.3s ease;">
+                      <label class="form-label" for="inputBrosurName">
+                        <i class="fa-solid fa-file-signature" style="color:var(--gold-light);"></i> Nama Brosur Master (<code style="color:var(--gold-light);">brosurname</code>) <span style="color:#ef4444;">*</span>
+                      </label>
+                      <select id="inputBrosurName" class="form-input" onchange="onBrosurNameChange()">
+                        <option value="">-- Pilih Kategori Terlebih Dahulu --</option>
+                      </select>
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" for="inputBrosurValidUntil">
+                        <i class="fa-regular fa-calendar-check" style="color:#ffffff;"></i> Valid Until / Masa Berlaku Brosur (<code style="color:#ffffff;">validuntil</code>) <span style="color:#ef4444;">*</span>
+                      </label>
+                      <input type="date" id="inputBrosurValidUntil" class="form-input dtpicker-white" required>
+                      <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
+                        <i class="fa-solid fa-circle-info"></i> Pilih tanggal batas akhir masa berlaku brosur.
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Baris 3: Ambil Berkas Brosur dari Komputer Lokal -->
+                  <div class="form-group">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+                      <label class="form-label" style="margin-bottom:0;">
+                        <i class="fa-solid fa-folder-open" style="color:var(--gold-light);"></i> Ambil Berkas Brosur dari Komputer Anda
+                      </label>
+                      <div id="gdriveWebhookStatusPill" class="gdrive-status-badge pending" onclick="openGDriveConfigModal()" title="Klik untuk mengkonfigurasi Auto-Upload">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <span id="gdriveWebhookStatusText">Auto-Upload Berkas</span>
+                        <i class="fa-solid fa-gear" style="margin-left:4px;"></i>
+                      </div>
+                    </div>
+                    
+                    <div class="brosur-drop-zone" id="brosurDropZone" onclick="document.getElementById('localBrosurFileInput').click()">
+                      <input type="file" id="localBrosurFileInput" style="display:none;" accept=".pdf,image/*,.doc,.docx" onchange="handleLocalFileSelect(event)">
+                      <div class="drop-zone-icon">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                      </div>
+                      <div class="drop-zone-text" id="dropZoneText">
+                        <strong>Klik untuk memilih file</strong> atau seret file brosur ke sini
+                      </div>
+                      <div class="drop-zone-sub">
+                        Mendukung format: PDF, JPG, PNG, WEBP, Word Doc (Maks 50 MB)
+                      </div>
+                    </div>
+
+                    <!-- Selected File Info Banner -->
+                    <div class="selected-file-banner" id="selectedFileBanner" style="display:none; flex-direction:column; gap:10px; align-items:stretch;">
+                      <div style="display:flex; align-items:center; gap:12px;">
+                        <div class="file-info-icon"><i class="fa-solid fa-file-circle-check"></i></div>
+                        <div class="file-info-details">
+                          <div class="file-info-name" id="selectedFileName">Nama_file.pdf</div>
+                          <div class="file-info-meta" id="selectedFileMeta">Ukuran: 0 KB • Tipe: PDF</div>
+                        </div>
+                        <button type="button" class="btn-clear-file" onclick="clearSelectedFile()" title="Hapus Pilihan File">
+                          <i class="fa-solid fa-xmark"></i>
+                        </button>
+                      </div>
+                      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; align-items:center;">
+                        <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc" 
+                          target="_blank" rel="noopener noreferrer" class="btn-gdrive-folder" style="font-size:0.78rem; padding:6px 14px;"
+                          onclick="onUploadToGDriveClick()">
+                          <i class="fa-solid fa-folder-open"></i>
+                          <span>Buka Folder Berkas (Salin Nama)</span>
+                        </a>
+                        <button type="button" class="btn-gdrive-cfg-btn" onclick="openGDriveConfigModal()" title="Konfigurasi Webhook Auto-Upload">
+                          <i class="fa-solid fa-bolt"></i> <span>Pengaturan Auto-Upload</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Baris 4: Nama File Spesifik & Mudah Dibaca (Standar Penamaan Otomatis) [Hidden sesuai Lampiran 1] -->
+                  <div class="form-group" style="margin-top:12px; display:none;">
+                    <label class="form-label" style="display:flex; align-items:center; color:#ffffff;">
+                      <i class="fa-solid fa-tag" style="color:#ffffff;"></i>
+                      <span style="margin-left:6px;">Nama File Spesifik & Mudah Dibaca (Standar Penamaan Otomatis)</span>
+                      <span class="badge-view-only">View Saja</span>
+                    </label>
+                    <div class="specific-filename-box">
+                      <div class="specific-filename-text" id="generatedSpecificFileName">
+                        [Wilayah] [Nama Paket] [Jumlah Hari] [Tanggal Berangkat]
+                      </div>
+                      <button type="button" class="btn-copy-filename" id="btnCopyFileName" onclick="copySpecificFileName()" title="Salin nama file spesifik">
+                        <i class="fa-regular fa-copy"></i>
+                        <span>Salin Nama</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Baris 5: 3 Bagian Komponen Penamaan Otomatis (di bawah view saja & sebelum Catatan) (Requirement #6) -->
+                  <div class="brosur-composite-section" style="margin-top:12px; margin-bottom:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:var(--radius-md); padding:16px;">
+                    <div style="font-size:0.85rem; font-weight:600; color:#ffffff; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+                      <i class="fa-solid fa-sliders" style="color:#ffffff;"></i>
+                      <span>Rincian Komponen Paket (Direkam ke LogBrosur: <code>namapaket</code>):</span>
+                    </div>
+
+                    <div class="form-row-grid-3">
+                      <!-- a. Nama Paket (Format Text) -->
+                      <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label" for="inputBrosurNamaPaket" style="color:#ffffff;">
+                          <i class="fa-solid fa-box-archive" style="color:#ffffff;"></i> a. Nama Paket <span style="color:#ef4444;">*</span>
+                        </label>
+                        <input type="text" id="inputBrosurNamaPaket" class="form-input" placeholder="Contoh: Saphire" oninput="updateBrosurCompositeName()">
+                      </div>
+
+                      <!-- b. Jumlah Hari (Dropdown 9, 12, Customs) -->
+                      <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label" for="inputBrosurJumlahHari" style="color:#ffffff;">
+                          <i class="fa-solid fa-clock" style="color:#ffffff;"></i> b. Jumlah Hari <span style="color:#ef4444;">*</span>
+                        </label>
+                        <select id="inputBrosurJumlahHari" class="form-input" onchange="onJumlahHariChange()">
+                          <option value="">-- Pilih Hari --</option>
+                          <option value="9">9 Hari (9D)</option>
+                          <option value="12">12 Hari (12D)</option>
+                          <option value="custom">Customs</option>
+                        </select>
+                        <div id="groupCustomJumlahHari" style="display:none; margin-top:6px;">
+                          <input type="text" id="inputBrosurCustomHari" class="form-input" placeholder="Contoh: 29 34 atau 15" oninput="updateBrosurCompositeName()">
+                          <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
+                            <i class="fa-solid fa-circle-info"></i> Bisa diisi dua tanggal/hari (cth: 29 34 &rarr; 29H 34H)
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- c. Tanggal Berangkat (DTPICKER Icon Warna Putih) -->
+                      <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label" for="inputBrosurTglBerangkat" style="color:#ffffff;">
+                          <i class="fa-regular fa-calendar-days" style="color:#ffffff;"></i> c. Tanggal Berangkat <span style="color:#ef4444;">*</span>
+                        </label>
+                        <input type="date" id="inputBrosurTglBerangkat" class="form-input dtpicker-white" onchange="updateBrosurCompositeName()">
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Baris 6: Catatan / Deskripsi Tambahan -->
+                  <div class="form-group">
+                    <label class="form-label" for="inputBrosurCatatan">
+                      <i class="fa-solid fa-comment-dots" style="color:var(--gold-light);"></i> Catatan / Deskripsi Tambahan (<code style="color:var(--gold-light);">catatan</code>)
+                    </label>
+                    <textarea id="inputBrosurCatatan" class="form-input" rows="3" placeholder="Masukkan keterangan brosur, target promosi, atau rincian paket..."></textarea>
+                  </div>
+
+                  <!-- Submit Button Bar -->
+                  <div class="brosur-form-footer">
+                    <button type="button" class="btn-secondary" onclick="resetBrosurForm()">
+                      <i class="fa-solid fa-rotate-left"></i>
+                      <span>Reset Form</span>
+                    </button>
+                    <button type="submit" class="btn-gold" id="btnSubmitBrosur">
+                      <i class="fa-solid fa-cloud-arrow-up"></i>
+                      <span>Simpan Brosur</span>
+                    </button>
+                  </div>
+
+                </form>
+
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 6: KONFIGURASI DATABASE (Google Sheets vs Supabase)
+             ================================================================ -->
+        <div class="module-view" id="view-settings">
+          <div class="content-card">
+            <div class="card-title" style="margin-bottom:14px;">
+              <i class="fa-solid fa-sliders" style="color:var(--gold-light);"></i>
+              <span>Pilihan Sumber Database (Google Sheets / Supabase)</span>
+            </div>
+            <p style="color:var(--text-muted); font-size:0.88rem; margin-bottom:20px;">
+              Pilih database yang aktif untuk otentikasi login dan pencatatan riwayat aktivitas.
+            </p>
+
+            <div class="db-selector-grid">
+              <!-- Option 1: Google Sheets -->
+              <div class="db-option-card selected" id="optDbSheets" onclick="selectDatabase('googlesheets')">
+                <div class="db-option-header">
+                  <div class="db-option-title">
+                    <i class="fa-solid fa-file-excel" style="color:#22c55e;"></i>
+                    <span>Google Sheets</span>
+                  </div>
+                  <div class="radio-check"></div>
+                </div>
+                <p style="color:var(--text-muted); font-size:0.82rem; line-height:1.5;">
+                  Terkoneksi langsung ke spreadsheet <code>Users</code> & <code>ActivityLogs</code> publik.
+                </p>
+                <div class="badge badge-success" style="margin-top:12px;">Aktif Saat Ini</div>
+              </div>
+
+              <!-- Option 2: Supabase -->
+              <div class="db-option-card" id="optDbSupabase" onclick="selectDatabase('supabase')">
+                <div class="db-option-header">
+                  <div class="db-option-title">
+                    <i class="fa-solid fa-bolt" style="color:#60a5fa;"></i>
+                    <span>Supabase (PostgreSQL)</span>
+                  </div>
+                  <div class="radio-check"></div>
+                </div>
+                <p style="color:var(--text-muted); font-size:0.82rem; line-height:1.5;">
+                  Database SQL modern dengan performa tinggi, RLS, dan koneksi REST API cepat.
+                </p>
+                <div class="badge badge-blue" style="margin-top:12px;">Siap Dialihkan</div>
+              </div>
+            </div>
+
+            <!-- Supabase Parameters Form -->
+            <div class="switch-card">
+              <h4 style="color:#ffffff; margin-bottom:16px; font-weight:700;">Pengaturan Parameter Supabase</h4>
+
+              <div class="form-group">
+                <label class="form-label">Supabase Project URL</label>
+                <input type="url" id="supabaseUrlInput" class="form-input" placeholder="https://xyzcompany.supabase.co">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">Supabase Anon Key / API Key</label>
+                <input type="password" id="supabaseKeyInput" class="form-input"
+                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+              </div>
+
+              <div id="supabaseTestResult" style="margin-bottom:14px; font-size:0.88rem; display:none;"></div>
+
+              <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                <button type="button" class="btn-gold" onclick="saveSupabaseConfig()">
+                  <i class="fa-solid fa-floppy-disk"></i> Simpan Konfigurasi
+                </button>
+                <button type="button" class="btn-secondary" onclick="testSupabase()">
+                  <i class="fa-solid fa-plug"></i> Test Koneksi Supabase
+                </button>
+                <a href="/api/download-sql" class="btn-secondary" style="text-decoration:none;">
+                  <i class="fa-solid fa-download"></i> Unduh Skema SQL Supabase
+                </a>
+              </div>
+            </div>
+
+            <!-- Google Drive Auto-Upload Configuration Card -->
+            <div class="switch-card" style="margin-top:20px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+                <h4 style="color:#ffffff; margin:0; font-weight:700;">
+                  <i class="fa-brands fa-google-drive" style="color:#38bdf8;"></i> Integrasi Auto-Upload Google Drive (Launching Brosur)
+                </h4>
+                <div id="gdriveConfigStatusBadgeDb" class="gdrive-status-badge pending" onclick="openGDriveConfigModal()">
+                  <i class="fa-solid fa-cloud-arrow-up"></i>
+                  <span>Belum Terhubung</span>
+                </div>
+              </div>
+              <p style="color:var(--text-muted); font-size:0.82rem; line-height:1.5; margin-bottom:14px;">
+                Hubungkan Google Apps Script Web App agar seluruh file brosur yang diunggah langsung tersimpan secara otomatis di folder:
+                <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc" target="_blank" rel="noopener noreferrer" style="color:#38bdf8; text-decoration:underline;">
+                  Brosur - Google Drive (1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc)
+                </a>
+              </p>
+              <div class="form-group">
+                <label class="form-label">Google Apps Script Web App URL</label>
+                <div style="display:flex; gap:8px;">
+                  <input type="url" id="inputGDriveScriptUrlDb" class="form-input" 
+                    placeholder="https://script.google.com/macros/s/AKfycb.../exec"
+                    style="font-family:'JetBrains Mono', monospace; font-size:0.82rem;">
+                  <button type="button" class="btn-gold" style="white-space:nowrap; padding:0 16px;" onclick="testGDriveWebhookFromDb()">
+                    <i class="fa-solid fa-plug"></i> Test
+                  </button>
+                </div>
+                <div id="gdriveTestStatusDb" style="margin-top:6px; font-size:0.8rem; display:none;"></div>
+              </div>
+              <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:14px;">
+                <button type="button" class="btn-gold" onclick="saveGDriveConfigFromDb()">
+                  <i class="fa-solid fa-floppy-disk"></i> Simpan URL Auto-Upload
+                </button>
+                <button type="button" class="btn-secondary" onclick="openGDriveConfigModal()">
+                  <i class="fa-solid fa-book"></i> Lihat Panduan & Kode Skrip
+                </button>
+              </div>
+            </div>
+
+            <!-- Migration Instructions -->
+            <div class="content-card" style="background:rgba(8, 14, 28, 0.4); border-color:var(--border-subtle); margin-top:20px;">
+              <h4 style="color:var(--gold-light); margin-bottom:10px; font-weight:700;">
+                <i class="fa-solid fa-book-bookmark"></i> Panduan Migrasi ke Supabase
+              </h4>
+              <ol style="color:var(--text-muted); font-size:0.85rem; padding-left:20px; line-height:1.8;">
+                <li>Buka dashboard Supabase Anda di <a href="https://supabase.com" target="_blank"
+                    style="color:var(--gold-light);">supabase.com</a> dan buat project baru.</li>
+                <li>Klik menu <strong>SQL Editor</strong> di dashboard Supabase.</li>
+                <li>Unduh skema SQL menggunakan tombol <em>Unduh Skema SQL Supabase</em> di atas, lalu salin dan
+                  jalankan di SQL Editor Supabase. Skema ini sudah mencakup pembuatan tabel <code>users</code>,
+                  <code>activity_logs</code>, serta data awal (seed).</li>
+                <li>Salin <strong>Project URL</strong> dan <strong>Anon Key</strong> dari menu <em>Project Settings ->
+                    API</em> ke form pengaturan di atas.</li>
+                <li>Klik tombol kartu <strong>Supabase (PostgreSQL)</strong> untuk mengalihkan sistem secara langsung!
+                </li>
+              </ol>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ================================================================
+             DYNAMIC MODULE VIEW (Untuk Seluruh Modul dari Supabase Modules)
+             ================================================================ -->
+        <div class="module-view" id="view-dynamic-module">
+          <div class="content-card dynamic-module-box" id="dynamicModuleContent">
+            <!-- Dynamic module details rendered by JavaScript -->
+          </div>
+        </div>
+
+      </main>
+
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL: KONFIGURASI AUTO-UPLOAD GOOGLE DRIVE
+       ====================================================================== -->
+  <div class="gdrive-modal-backdrop" id="gdriveConfigModal" style="display:none;">
+    <div class="gdrive-modal-card">
+      <div class="gdrive-modal-header">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="gdrive-modal-icon">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+          </div>
+          <div>
+            <h3 class="gdrive-modal-title">Konfigurasi Auto-Upload Berkas Brosur</h3>
+            <p class="gdrive-modal-subtitle">Folder Target Penyimpanan Berkas</p>
+          </div>
+        </div>
+        <button type="button" class="gdrive-modal-close" onclick="closeGDriveConfigModal()">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="gdrive-modal-body">
+        <div class="gdrive-alert info">
+          <i class="fa-solid fa-circle-info"></i>
+          <div>
+            Agar file lokal langsung tersimpan secara otomatis, gunakan <strong>Webhook Apps Script</strong>. File yang diunggah akan otomatis memiliki link publik dan tercatat di database!
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top:14px;">
+          <label class="form-label">
+            <i class="fa-solid fa-link" style="color:var(--gold-light);"></i> URL Web App Apps Script
+          </label>
+          <div style="display:flex; gap:8px;">
+            <input type="url" id="inputGDriveScriptUrl" class="form-input" 
+              placeholder="https://script.google.com/macros/s/AKfycb.../exec"
+              style="font-family:'JetBrains Mono', monospace; font-size:0.82rem;">
+            <button type="button" class="btn-gold" style="white-space:nowrap; padding:0 16px;" onclick="testGDriveWebhook()">
+              <i class="fa-solid fa-plug"></i> Test
+            </button>
+          </div>
+          <div id="gdriveTestStatus" style="margin-top:6px; font-size:0.8rem; display:none;"></div>
+        </div>
+
+        <div class="gdrive-steps-accordion">
+          <div class="gdrive-steps-header" onclick="toggleGDriveGuide()">
+            <span style="font-weight:700; color:var(--gold-light); font-size:0.85rem;">
+              <i class="fa-solid fa-book"></i> Cara Pasang Webhook Auto-Upload (Hanya 1 Menit)
+            </span>
+            <i class="fa-solid fa-chevron-down" id="gdriveGuideChevron"></i>
+          </div>
+          <div class="gdrive-steps-content" id="gdriveStepsContent" style="display:none;">
+            <ol style="padding-left:18px; margin:8px 0; font-size:0.8rem; color:var(--text-muted); line-height:1.6;">
+              <li>Buka <a href="https://script.google.com" target="_blank" style="color:#38bdf8; text-decoration:underline;">script.google.com</a> dengan akun pemilik folder Brosur.</li>
+              <li>Klik <strong>New project</strong> (Proyek baru), beri nama <em>Uploader Brosur Fath Indah</em>.</li>
+              <li>Tempel skrip berikut lalu klik <strong>Save</strong>.</li>
+              <li>Klik <strong>Deploy</strong> (Terapkan) -> <strong>New deployment</strong> (Penerapan baru).</li>
+              <li>Pilih tipe <strong>Web app</strong> (Aplikasi web). Atur:
+                <br>• <em>Execute as:</em> <strong>Me (email anda)</strong>
+                <br>• <em>Who has access:</em> <strong>Anyone (Siapa saja)</strong>
+              </li>
+              <li>Klik <strong>Deploy</strong>, berikan otorisasi izin Drive, lalu salin URL Web App dan tempel pada form ini!</li>
+            </ol>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; margin-bottom:4px;">
+              <span style="font-size:0.75rem; color:var(--text-dim); font-weight:600;">KODE WEBHOOK SCRIPT:</span>
+              <button type="button" class="btn-copy-filename" onclick="copyAppsScriptCode()" id="btnCopyScriptCode" style="font-size:0.75rem; padding:4px 10px;">
+                <i class="fa-regular fa-copy"></i> <span>Salin Kode Skrip</span>
+              </button>
+            </div>
+            <pre class="gdrive-code-box" id="appsScriptCodeBlock"></pre>
+          </div>
+        </div>
+
+        <div style="margin-top:16px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+          <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc" target="_blank" rel="noopener noreferrer" class="btn-open-gdrive-link" style="padding:10px 14px; font-size:0.8rem;">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+            <span>Buka Folder Berkas Brosur</span>
+          </a>
+          <div style="display:flex; gap:8px;">
+            <button type="button" class="btn-secondary" onclick="closeGDriveConfigModal()">Tutup</button>
+            <button type="button" class="btn-gold" onclick="saveGDriveConfig()">
+              <i class="fa-solid fa-floppy-disk"></i> Simpan URL
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL: PROMPT UNCONFIGURED UPLOAD BERKAS
+       ====================================================================== -->
+  <div class="gdrive-modal-backdrop" id="gdrivePromptModal" style="display:none;">
+    <div class="gdrive-modal-card" style="max-width:540px;">
+      <div class="gdrive-modal-header">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="gdrive-modal-icon" style="background:rgba(245, 158, 11, 0.15); border-color:rgba(245, 158, 11, 0.35); color:#fbbf24;">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <div>
+            <h3 class="gdrive-modal-title" style="font-size:1.05rem;">Auto-Upload Berkas Belum Terhubung</h3>
+            <p class="gdrive-modal-subtitle">File terpilih: <span id="promptFileNameText" style="color:#38bdf8; font-weight:600;">file.pdf</span></p>
+          </div>
+        </div>
+        <button type="button" class="gdrive-modal-close" onclick="closeGDrivePromptModal()">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="gdrive-modal-body">
+        <p style="color:var(--text-muted); font-size:0.85rem; line-height:1.6; margin-bottom:14px;">
+          Anda memilih file lokal untuk brosur ini, namun <strong>Webhook Auto-Upload</strong> belum terhubung ke folder penyimpanan.
+        </p>
+        <p style="color:var(--text-dim); font-size:0.8rem; margin-bottom:18px;">
+          Pilih tindakan yang ingin Anda lakukan:
+        </p>
+
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <button type="button" class="btn-gold" onclick="promptActionSetup()" style="justify-content:flex-start; padding:12px 16px; text-align:left;">
+            <i class="fa-solid fa-bolt" style="font-size:1.1rem; width:24px;"></i>
+            <div>
+              <div style="font-weight:700;">Pasang Webhook Auto-Upload (Rekomendasi)</div>
+              <div style="font-size:0.75rem; opacity:0.85; font-weight:normal;">Siapkan 1 menit agar seluruh berkas otomatis tersimpan di cloud</div>
+            </div>
+          </button>
+
+          <button type="button" class="btn-secondary" onclick="promptActionManual()" style="justify-content:flex-start; padding:12px 16px; text-align:left; border-color:rgba(56, 189, 248, 0.4); color:#38bdf8;">
+            <i class="fa-solid fa-folder-open" style="font-size:1.1rem; width:24px;"></i>
+            <div>
+              <div style="font-weight:700;">Buka Folder Berkas & Upload Manual</div>
+              <div style="font-size:0.75rem; opacity:0.85; font-weight:normal;">Nama file akan disalin & folder berkas akan dibuka untuk drop file</div>
+            </div>
+          </button>
+
+          <button type="button" class="btn-secondary" onclick="promptActionSaveMetadataOnly()" style="justify-content:flex-start; padding:10px 16px; text-align:left; color:var(--text-muted);">
+            <i class="fa-solid fa-cloud-arrow-up" style="font-size:1.1rem; width:24px;"></i>
+            <div>
+              <div style="font-weight:600;">Simpan Data ke Database Saja (Tanpa Upload File)</div>
+              <div style="font-size:0.75rem; opacity:0.75;">Tautan akan mengarah ke folder berkas utama</div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODAL: UPDATE STATUS BROSUR (AKTIF / EXPIRED)
+       ====================================================================== -->
+  <div class="gdrive-modal-backdrop" id="updateStatusModal" style="display:none;">
+    <div class="gdrive-modal-card" style="max-width:520px;">
+      <div class="gdrive-modal-header">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="gdrive-modal-icon" style="background:rgba(56, 189, 248, 0.15); border-color:rgba(56, 189, 248, 0.35); color:#38bdf8;">
+            <i class="fa-solid fa-pen-to-square"></i>
+          </div>
+          <div>
+            <h3 class="gdrive-modal-title">Update Status Brosur</h3>
+            <p class="gdrive-modal-subtitle">Kelola masa berlaku dan status publikasi brosur</p>
+          </div>
+        </div>
+        <button type="button" class="gdrive-modal-close" onclick="closeUpdateStatusModal()">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="gdrive-modal-body">
+        <input type="hidden" id="modalStatusBrosurId">
+
+        <div class="brosur-info-summary-grid">
+          <div class="brosur-info-item" style="grid-column: span 2;">
+            <label>Nama Brosur</label>
+            <span id="modalStatusBrosurName">-</span>
+          </div>
+          <div class="brosur-info-item">
+            <label>Wilayah</label>
+            <span id="modalStatusBrosurWilayah">-</span>
+          </div>
+          <div class="brosur-info-item">
+            <label>Kategori</label>
+            <span id="modalStatusBrosurCat">-</span>
+          </div>
+          <div class="brosur-info-item">
+            <label>Tanggal Upload</label>
+            <span id="modalStatusBrosurTglUpload">-</span>
+          </div>
+          <div class="brosur-info-item">
+            <label>Valid Until</label>
+            <span id="modalStatusBrosurValidUntil">-</span>
+          </div>
+          <div class="brosur-info-item" style="grid-column: span 2;" id="modalStatusBrosurLinkContainer">
+            <label>Tautan Berkas Brosur</label>
+            <a href="#" id="modalStatusBrosurLink" target="_blank" rel="noopener noreferrer" style="color:#38bdf8; font-size:0.82rem; word-break:break-all;">
+              <i class="fa-solid fa-arrow-up-right-from-square"></i> Buka Berkas Brosur
+            </a>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top:16px;">
+          <label class="form-label" for="modalStatusSelect">
+            <i class="fa-solid fa-toggle-on" style="color:var(--gold-light);"></i> Pilih Status Brosur
+          </label>
+          <select id="modalStatusSelect" class="form-input" style="font-weight:600;">
+            <option value="Aktif">🟢 Aktif (Masih Berlaku / Dapat Dipublikasikan)</option>
+            <option value="Expired">🔴 Expired (Masa Berlaku Berakhir)</option>
+          </select>
+          <div style="font-size:0.75rem; color:var(--text-muted); margin-top:6px;">
+            <i class="fa-solid fa-circle-info"></i> Status ini akan langsung tersimpan di sistem.
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid var(--border-subtle); padding-top:16px;">
+          <button type="button" class="btn-secondary" onclick="closeUpdateStatusModal()">Batal</button>
+          <button type="button" class="btn-gold" id="btnSaveStatusChange" onclick="saveBrochureStatus()">
+            <i class="fa-solid fa-floppy-disk"></i> Simpan Perubahan Status
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================
+       MODAL 1: TAMBAH / EDIT HARI CUTI BERSAMA (mod_cuti_bersama)
+       ================================================================ -->
+  <div class="gdrive-modal-backdrop" id="modalCutiBersama" style="display:none;">
+    <div class="gdrive-modal-card" style="max-width:500px;">
+      <div class="gdrive-modal-header">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="gdrive-modal-icon" style="background:rgba(245, 158, 11, 0.15); border-color:rgba(245, 158, 11, 0.3); color:var(--gold-light);">
+            <i class="fa-solid fa-calendar-plus"></i>
+          </div>
+          <div>
+            <h3 class="gdrive-modal-title" id="modalCutiBersamaTitle">Tambah Hari Cuti Bersama</h3>
+            <p class="gdrive-modal-subtitle">Daftar hari libur nasional & cuti bersama resmi</p>
+          </div>
+        </div>
+        <button type="button" class="gdrive-modal-close" onclick="closeCutiBersamaModal()">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="gdrive-modal-body">
+        <form id="formCutiBersama" onsubmit="handleCutiBersamaSubmit(event)">
+          <input type="hidden" id="cbFormId">
+          <div class="form-grid-cuti" style="grid-template-columns:1fr 1fr;">
+            <!-- Tahun & Tanggal -->
+            <div class="form-group">
+              <label class="form-label" for="cbFormTahun">Tahun Periode *</label>
+              <input type="number" id="cbFormTahun" class="form-input" min="2020" max="2035" value="2026" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="cbFormTanggal">Tanggal Libur *</label>
+              <input type="date" id="cbFormTanggal" class="form-input" required>
+            </div>
+
+            <!-- Nama Hari Libur -->
+            <div class="form-group span-2">
+              <label class="form-label" for="cbFormNama">Nama Cuti Bersama / Hari Libur *</label>
+              <input type="text" id="cbFormNama" class="form-input" placeholder="Contoh: Cuti Bersama Hari Raya Idul Fitri..." required>
+            </div>
+
+            <!-- Jumlah Hari & Potong Cuti Tahunan -->
+            <div class="form-group">
+              <label class="form-label" for="cbFormJumlahHari">Jumlah Hari *</label>
+              <input type="number" id="cbFormJumlahHari" class="form-input" min="1" max="30" value="1" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="cbFormPotong">Potong Cuti Tahunan? *</label>
+              <select id="cbFormPotong" class="form-input" required>
+                <option value="Ya">Ya (Mengurangi Hak 12 Hari)</option>
+                <option value="Tidak">Tidak (Libur Nasional Bebas)</option>
+              </select>
+            </div>
+
+            <!-- Status & Keterangan -->
+            <div class="form-group span-2">
+              <label class="form-label" for="cbFormStatus">Status Keaktifan</label>
+              <select id="cbFormStatus" class="form-input">
+                <option value="Aktif">🟢 Aktif (Berlaku)</option>
+                <option value="Nonaktif">🔴 Nonaktif (Dibatalkan)</option>
+              </select>
+            </div>
+
+            <div class="form-group span-2">
+              <label class="form-label" for="cbFormKeterangan">Keterangan Tambahan</label>
+              <textarea id="cbFormKeterangan" class="form-input" rows="2" placeholder="Catatan opsional..."></textarea>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid var(--border-subtle); padding-top:16px;">
+            <button type="button" class="btn-secondary" onclick="closeCutiBersamaModal()">Batal</button>
+            <button type="submit" id="btnSaveCutiBersama" class="btn-primary">
+              <i class="fa-solid fa-floppy-disk"></i>
+              <span>Simpan Data</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================
+       MODAL 2: APPROVAL PERMOHONAN CUTI KARYAWAN (mod_cuti_bersama)
+       ================================================================ -->
+  <div class="gdrive-modal-backdrop" id="modalApprovalCuti" style="display:none;">
+    <div class="gdrive-modal-card" style="max-width:520px;">
+      <div class="gdrive-modal-header">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="gdrive-modal-icon" style="background:rgba(56, 189, 248, 0.15); border-color:rgba(56, 189, 248, 0.3); color:#38bdf8;">
+            <i class="fa-solid fa-user-check"></i>
+          </div>
+          <div>
+            <h3 class="gdrive-modal-title">Persetujuan (Approval) Cuti</h3>
+            <p class="gdrive-modal-subtitle">Keputusan Manajerial & Otorisasi Pengajuan Cuti</p>
+          </div>
+        </div>
+        <button type="button" class="gdrive-modal-close" onclick="closeApprovalCutiModal()">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="gdrive-modal-body">
+        <input type="hidden" id="approvalCutiId">
+        <!-- Info Ringkas Pengajuan -->
+        <div class="brosur-info-grid" style="grid-template-columns:1fr 1fr; margin-bottom:16px;">
+          <div class="brosur-info-item">
+            <span class="label">ID Permohonan:</span>
+            <span class="value" id="approvalInfoId" style="color:#38bdf8; font-family:monospace; font-weight:700;">-</span>
+          </div>
+          <div class="brosur-info-item">
+            <span class="label">Nama Karyawan:</span>
+            <span class="value" id="approvalInfoNama" style="color:var(--text-light); font-weight:700;">-</span>
+          </div>
+          <div class="brosur-info-item">
+            <span class="label">Jabatan / NIK:</span>
+            <span class="value" id="approvalInfoJabatan">-</span>
+          </div>
+          <div class="brosur-info-item">
+            <span class="label">Tipe Cuti / Durasi:</span>
+            <span class="value" id="approvalInfoTipe">-</span>
+          </div>
+          <div class="brosur-info-item" style="grid-column:span 2;">
+            <span class="label">Periode Cuti:</span>
+            <span class="value" id="approvalInfoPeriode">-</span>
+          </div>
+          <div class="brosur-info-item" style="grid-column:span 2;">
+            <span class="label">Alasan Pemohon:</span>
+            <span class="value" id="approvalInfoAlasan" style="color:var(--text-muted); font-style:italic;">-</span>
+          </div>
+          <div class="brosur-info-item" style="grid-column:span 2;" id="approvalInfoLinkWrapper">
+            <span class="label">Lampiran Dokumen:</span>
+            <a href="#" target="_blank" rel="noopener noreferrer" id="approvalInfoLink" style="color:#38bdf8; font-size:0.8rem; word-break:break-all;">-</a>
+          </div>
+        </div>
+
+        <!-- Keputusan Form -->
+        <div class="form-group" style="margin-top:14px;">
+          <label class="form-label" for="approvalStatusSelect">
+            <i class="fa-solid fa-stamp" style="color:var(--gold-light);"></i>
+            <span>Keputusan Approval</span>
+            <span class="required-star">*</span>
+          </label>
+          <select id="approvalStatusSelect" class="form-input" style="font-weight:700;">
+            <option value="Disetujui">🟢 Setujui Pengajuan Cuti (Disetujui)</option>
+            <option value="Ditolak">🔴 Tolak Pengajuan Cuti (Ditolak)</option>
+            <option value="Pending">🟡 Tunda / Kembalikan ke Menunggu Approval</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-top:12px;">
+          <label class="form-label" for="approvalCatatan">Catatan / Alasan Keputusan (Opsional)</label>
+          <textarea id="approvalCatatan" class="form-input" rows="2" placeholder="Tuliskan catatan otorisasi untuk karyawan bersangkutan..."></textarea>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid var(--border-subtle); padding-top:16px;">
+          <button type="button" class="btn-secondary" onclick="closeApprovalCutiModal()">Batal</button>
+          <button type="button" class="btn-primary" id="btnSubmitApprovalDecision" onclick="submitCutiApprovalDecision()">
+            <i class="fa-solid fa-check-double"></i>
+            <span>Simpan Keputusan</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main JavaScript File -->
+  <script src="js/app.js"></script>
+</body>
+
+</html>

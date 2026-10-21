@@ -4681,7 +4681,131 @@ async function fetchEmployeesForCuti(forceRefresh = false) {
     }
   }
 
-  // 1. Coba ambil dari state.data.users
+  // 1. Prioritas Utama: Ambil dari Tabel Supabase "Bio_Karyawan" (atau view "bio_karyawan" / "Bio Karyawan")
+  try {
+    const endpoints = [
+      `${SUPABASE_CONFIG.url}/rest/v1/Bio_Karyawan?select=*&order=nama_karyawan.asc`,
+      `${SUPABASE_CONFIG.url}/rest/v1/bio_karyawan?select=*&order=nama_karyawan.asc`
+    ];
+
+    for (const url of endpoints) {
+      try {
+        const res = await fetch(url, {
+          headers: {
+            'apikey': SUPABASE_CONFIG.anonKey,
+            'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+          }
+        });
+        if (res.ok) {
+          const list = await res.json();
+          if (Array.isArray(list) && list.length > 0) {
+            const mapped = list
+              .filter(k => {
+                const st = String(k.status || 'Aktif').toLowerCase();
+                return st !== 'inactive' && st !== 'nonaktif' && st !== 'non-aktif';
+              })
+              .map(k => ({
+                nik: k.nik || k.NIK || '',
+                nama: k.nama_karyawan || k['Nama Karyawan'] || '',
+                jabatan: k.jabatan || k.Jabatan || k.divisi || 'Staff',
+                kanwil: k.kantor || k.Kantor || 'Pusat',
+                divisi: k.divisi || k.Divisi || '',
+                status: k.status || 'Aktif'
+              }))
+              .filter(e => e.nama && e.nama !== 'Karyawan');
+
+            if (mapped.length > 0) {
+              mapped.sort((a, b) => a.nama.localeCompare(b.nama));
+              state.cuti.employees = mapped;
+              return state.cuti.employees;
+            }
+          }
+        }
+      } catch (errInner) {
+        // coba endpoint berikutnya
+      }
+    }
+  } catch (errSupabase) {
+    console.warn('Gagal memuat Bio_Karyawan dari Supabase REST:', errSupabase);
+  }
+
+  // 2. Prioritas Kedua: Ambil dari Backend Server API /api/bio-karyawan
+  try {
+    const resServer = await fetch('/api/bio-karyawan');
+    if (resServer.ok) {
+      const json = await resServer.json();
+      const list = json.data || json;
+      if (Array.isArray(list) && list.length > 0) {
+        const mapped = list
+          .filter(k => {
+            const st = String(k.status || 'Aktif').toLowerCase();
+            return st !== 'inactive' && st !== 'nonaktif' && st !== 'non-aktif';
+          })
+          .map(k => ({
+            nik: k.nik || k.NIK || '',
+            nama: k.nama_karyawan || k['Nama Karyawan'] || '',
+            jabatan: k.jabatan || k.Jabatan || k.divisi || 'Staff',
+            kanwil: k.kantor || k.Kantor || 'Pusat',
+            divisi: k.divisi || k.Divisi || '',
+            status: k.status || 'Aktif'
+          }))
+          .filter(e => e.nama && e.nama !== 'Karyawan');
+
+        if (mapped.length > 0) {
+          mapped.sort((a, b) => a.nama.localeCompare(b.nama));
+          state.cuti.employees = mapped;
+          return state.cuti.employees;
+        }
+      }
+    }
+  } catch (errServer) {
+    // Abaikan jika running static
+  }
+
+  // 3. Prioritas Ketiga (LIVE Direct Sheet Fallback): Ambil langsung dari Google Sheet "Bio Karyawan"
+  // Spreadsheet ID: 1VL8trcMIcZ6n5Be-2-9YwmC1pOsKliO_wbILmU_cC1s
+  try {
+    const sheetId = '1VL8trcMIcZ6n5Be-2-9YwmC1pOsKliO_wbILmU_cC1s';
+    const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent('Bio Karyawan')}`;
+    const resGviz = await fetch(sheetUrl);
+    if (resGviz.ok) {
+      const text = await resGviz.text();
+      const jsonStr = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+      const data = JSON.parse(jsonStr);
+      if (data && data.table && Array.isArray(data.table.rows)) {
+        const cols = data.table.cols.map(c => (c ? c.label : ''));
+        const mapped = data.table.rows.map((r, idx) => {
+          const obj = {};
+          cols.forEach((colName, cidx) => {
+            const cell = r.c ? r.c[cidx] : null;
+            obj[colName] = cell && cell.v !== undefined ? cell.v : '';
+          });
+          return {
+            nik: String(obj['NIK'] || `EMP-${String(idx + 1).padStart(3, '0')}`).trim(),
+            nama: String(obj['Nama Karyawan'] || '').trim(),
+            jabatan: String(obj['Jabatan'] || obj['Divisi'] || 'Staff').trim(),
+            kanwil: String(obj['Kantor'] || 'Pusat').trim(),
+            divisi: String(obj['Divisi'] || '').trim(),
+            status: String(obj['Status'] || 'Aktif').trim()
+          };
+        })
+        .filter(k => {
+          const st = (k.status || 'Aktif').toLowerCase();
+          return k.nama && k.nama !== 'Karyawan' && st !== 'non aktif' && st !== 'inactive' && st !== 'nonaktif';
+        });
+
+        if (mapped.length > 0) {
+          mapped.sort((a, b) => a.nama.localeCompare(b.nama));
+          state.cuti.employees = mapped;
+          return state.cuti.employees;
+        }
+      }
+    }
+  } catch (errGviz) {
+    console.warn('Gagal memuat Bio Karyawan langsung dari Google Sheet:', errGviz);
+  }
+
+  // 4. Fallback ke state.data.users
   if (state.data && state.data.users && state.data.users.length > 0) {
     const mapped = state.data.users
       .filter(u => {
@@ -4704,7 +4828,7 @@ async function fetchEmployeesForCuti(forceRefresh = false) {
     }
   }
 
-  // 2. Direct fetch dari Supabase users table
+  // 5. Fallback ke Supabase users table
   try {
     const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/users?select=*&order=full_name.asc`, {
       headers: {
@@ -4747,7 +4871,7 @@ async function fetchEmployeesForCuti(forceRefresh = false) {
     console.warn('Gagal memuat users dari Supabase untuk cuti:', err);
   }
 
-  // 3. Fallback: Ekstrak dari riwayat data cuti_karyawan yang sudah pernah ada
+  // 6. Fallback: Ekstrak dari riwayat data cuti_karyawan yang sudah pernah ada
   if (state.cuti.karyawanList && state.cuti.karyawanList.length > 0) {
     const seen = new Set();
     const fromCuti = [];
@@ -4772,6 +4896,7 @@ async function fetchEmployeesForCuti(forceRefresh = false) {
 
   return [];
 }
+
 
 // Handler File Dokumen Lokal Cuti
 window.onCutiDokumenFileSelected = function(event) {
