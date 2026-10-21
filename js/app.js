@@ -2562,6 +2562,7 @@ window.onJumlahHariChange = function() {
 };
 
 window.updateBrosurCompositeName = function() {
+  const wilayah = (document.getElementById('inputBrosurWilayah')?.value || '').trim();
   const paket = (document.getElementById('inputBrosurNamaPaket')?.value || '').trim();
   const hariSelect = document.getElementById('inputBrosurJumlahHari')?.value || '';
   let hari = hariSelect;
@@ -2571,15 +2572,17 @@ window.updateBrosurCompositeName = function() {
   const tglBerangkat = document.getElementById('inputBrosurTglBerangkat')?.value || '';
 
   const displayBox = document.getElementById('generatedSpecificFileName');
-  if (!displayBox) return;
 
-  if (!paket && !hari && !tglBerangkat) {
-    displayBox.textContent = '[Nama Paket] [Jumlah Hari] [Tanggal Berangkat]';
-    displayBox.style.color = 'var(--text-muted)';
+  if (!wilayah && !paket && !hari && !tglBerangkat) {
+    if (displayBox) {
+      displayBox.textContent = '[Wilayah] [Nama Paket] [Jumlah Hari] [Tanggal Berangkat]';
+      displayBox.style.color = 'var(--text-muted)';
+    }
     state.generatedSpecificFileName = '';
     return;
   }
 
+  const partWilayah = wilayah ? `[${wilayah}]` : '[Wilayah]';
   const partPaket = paket ? `[${paket}]` : '[Nama Paket]';
   const partHari = hari ? `[${hari}D]` : '[Jumlah Hari]';
 
@@ -2596,11 +2599,13 @@ window.updateBrosurCompositeName = function() {
     }
   }
 
-  // Format hasil: [Nama Paket] [Jumlah Hari +"D"] [dd mmm yyyy] contoh [Saphire] [12D] [01 Okt 2026]
-  const combinedName = `${partPaket} ${partHari} ${partTgl}`;
+  // Requirement #2: [Wilayah] [Nama Paket] [Jumlah Hari +"D"] [dd mmm yyyy]
+  const combinedName = `${partWilayah} ${partPaket} ${partHari} ${partTgl}`;
   state.generatedSpecificFileName = combinedName;
-  displayBox.textContent = combinedName;
-  displayBox.style.color = '#38bdf8';
+  if (displayBox) {
+    displayBox.textContent = combinedName;
+    displayBox.style.color = '#38bdf8';
+  }
 };
 
 function updateGeneratedFileName() {
@@ -2742,10 +2747,10 @@ window.submitBrosurForm = async function(event) {
   const validuntil = document.getElementById('inputBrosurValidUntil')?.value;
   const tglupload = document.getElementById('inputBrosurTglUpload')?.value || new Date().toISOString().slice(0, 10);
   let link = document.getElementById('inputBrosurLink')?.value.trim() || GDRIVE_BROSUR_FOLDER_URL;
-  const catatan = document.getElementById('inputBrosurCatatan')?.value.trim() || '';
+  const catatan = (document.getElementById('inputBrosurCatatan')?.value || '').trim();
 
-  // Requirement #6: 3 Bagian (Nama Paket, Jumlah Hari, Tanggal Berangkat) digabung menjadi namapaket
-  // Format: [Nama Paket] [Jumlah Hari +"D"] [dd mmm yyyy] contoh [Saphire] [12D] [01 Okt 2026]
+  // Requirement #2: 3 Bagian + [Wilayah] digabung menjadi namapaket
+  // Format: [Wilayah] [Nama Paket] [Jumlah Hari +"D"] [dd mmm yyyy]
   const paket = (document.getElementById('inputBrosurNamaPaket')?.value || '').trim();
   const hariSelect = document.getElementById('inputBrosurJumlahHari')?.value || '';
   let hari = hariSelect;
@@ -2755,7 +2760,8 @@ window.submitBrosurForm = async function(event) {
   const tglBerangkat = document.getElementById('inputBrosurTglBerangkat')?.value || '';
 
   let generatedNamaPaket = '';
-  if (paket || hari || tglBerangkat) {
+  if (wilayah || paket || hari || tglBerangkat) {
+    const partWilayah = wilayah ? `[${wilayah}]` : '';
     const partPaket = paket ? `[${paket}]` : '';
     const partHari = hari ? `[${hari}D]` : '';
     let partTgl = '';
@@ -2770,7 +2776,7 @@ window.submitBrosurForm = async function(event) {
         partTgl = `[${d} ${mmm} ${y}]`;
       }
     }
-    generatedNamaPaket = [partPaket, partHari, partTgl].filter(Boolean).join(' ');
+    generatedNamaPaket = [partWilayah, partPaket, partHari, partTgl].filter(Boolean).join(' ');
   }
 
   // Jika nama brosur master belum terpilih, gunakan hasil komponen paket
@@ -2865,9 +2871,10 @@ async function executeSaveBrosurToSupabase(payload) {
   const { wilayah, catagory, brosurname, namapaket, link, catatan, validuntil, tglupload, status, specificName } = payload;
   const btnSubmit = document.getElementById('btnSubmitBrosur');
 
-  const fullCatatan = catatan + (specificName ? ` [File: ${specificName}]` : '');
+  // Requirement #4: untuk isian catatan pada tabel LogBrosur apabila kosong diisi "" (blank) saja, murni catatan user saja
+  const finalCatatan = (catatan || '').trim();
 
-  // Requirement #6: direkam pada tabel LogBrosur Header namapaket
+  // Requirement #2 & #6: direkam pada tabel LogBrosur Header namapaket
   const supabasePayload = {
     catagory: catagory,
     brosurname: brosurname,
@@ -2877,7 +2884,7 @@ async function executeSaveBrosurToSupabase(payload) {
     validuntil: validuntil || null,
     tglupload: tglupload || new Date().toISOString().slice(0, 10),
     status: status || 'Aktif',
-    catatan: fullCatatan
+    catatan: finalCatatan
   };
 
   let savedItem = null;
@@ -2943,7 +2950,7 @@ async function executeSaveBrosurToSupabase(payload) {
       validuntil: validuntil || null,
       tglupload: tglupload || new Date().toISOString().slice(0, 10),
       status: status || 'Aktif',
-      catatan: fullCatatan
+      catatan: finalCatatan
     };
   } else {
     savedItem.wilayah = savedItem.lokasibrosur || savedItem.wilayah || wilayah;
@@ -3093,9 +3100,11 @@ function renderBrosurTable() {
           <span class="brosur-cat-badge ${badgeClass}">${cat}</span>
         </td>
         <td>
-          <strong style="color:#ffffff; font-size:0.9rem;">${name}</strong>
-          ${item.namapaket ? `<div style="font-size:0.78rem; color:#38bdf8; font-weight:600; margin-top:2px; font-family:'JetBrains Mono',monospace;"><i class="fa-solid fa-box-archive" style="font-size:0.72rem; margin-right:4px;"></i>${item.namapaket}</div>` : ''}
-          <div style="font-size:0.75rem; color:#94a3b8; font-family:'JetBrains Mono',monospace;">${idBadge}</div>
+          <a href="${link}" target="_blank" rel="noopener noreferrer" style="color:#ffffff; font-size:0.9rem; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:color 0.2s;" onmouseover="this.style.color='#38bdf8'" onmouseout="this.style.color='#ffffff'" title="Klik untuk membuka berkas brosur">
+            <span>${name}</span>
+            <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.75rem; color:#38bdf8;"></i>
+          </a>
+          ${item.namapaket ? `<div style="font-size:0.78rem; color:#38bdf8; font-weight:600; margin-top:3px; font-family:'JetBrains Mono',monospace;"><i class="fa-solid fa-box-archive" style="font-size:0.72rem; margin-right:4px;"></i>${item.namapaket}</div>` : ''}
         </td>
         <td style="text-align:center;">
           <span class="brosur-status-pill ${statusPillClass}">
