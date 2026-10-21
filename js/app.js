@@ -56,7 +56,8 @@ const state = {
   brosurFilter: {
     search: '',
     category: 'ALL',
-    wilayah: 'ALL'
+    wilayah: 'ALL',
+    status: 'Aktif'
   },
   selectedLocalBrosurFile: null
 };
@@ -1004,7 +1005,7 @@ function switchModule(moduleName) {
     users: { title: 'Manajemen Pengguna', breadcrumb: 'Master Data / Otorisasi Tabel Users' },
     rekap_absensi: { title: 'Rekapitulasi Absensi Karyawan', breadcrumb: 'SDM / Rekapitulasi Presensi Matrix & Arsiran Libur' },
     log_absensi: { title: 'Riwayat Log Absensi', breadcrumb: 'SDM & Karyawan / Akses Data Tabel Absensi Supabase' },
-    launching_brosur: { title: 'Launching Brosur', breadcrumb: 'Marketing / Manajemen Tabel LogBrosur & MnuLogBrosur' },
+    launching_brosur: { title: 'Catalog Brosur', breadcrumb: 'Marketing / Catalog Brosur' },
     cuti_absensi: { title: 'Presensi & Cuti Karyawan', breadcrumb: 'SDM / Absensi & Pengajuan Cuti' },
     settings: { title: 'Konfigurasi Database', breadcrumb: 'Sistem / Pengalihan Google Sheets & Supabase' }
   };
@@ -2527,48 +2528,89 @@ window.clearSelectedFile = function() {
   updateGeneratedFileName();
 };
 
-function sanitizeFileNamePart(str) {
-  return (str || '')
-    .trim()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/\s+/g, '_');
+// Helper format tanggal dd mmm yy (Lampiran 3)
+function formatDateDdMmmYy(dateStr) {
+  if (!dateStr || dateStr === '-' || dateStr === 'null' || dateStr === 'undefined') return '-';
+  const clean = String(dateStr).trim().slice(0, 10);
+  const parts = clean.split('-');
+  if (parts.length === 3) {
+    const y = parts[0];
+    const m = parseInt(parts[1], 10);
+    const d = parts[2].padStart(2, '0');
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const mmm = months[m - 1] || parts[1];
+    const yy = y.length === 4 ? y.slice(2) : y;
+    return `${d} ${mmm} ${yy}`;
+  }
+  return dateStr;
 }
 
-function updateGeneratedFileName() {
-  const wil = document.getElementById('inputBrosurWilayah')?.value || '';
-  const cat = document.getElementById('inputBrosurCategory')?.value || '';
-  const name = document.getElementById('inputBrosurName')?.value || '';
-  const file = state.selectedLocalBrosurFile;
+// Requirement #6: 3 Bagian Komponen Penamaan Otomatis
+window.onJumlahHariChange = function() {
+  const select = document.getElementById('inputBrosurJumlahHari');
+  const groupCustom = document.getElementById('groupCustomJumlahHari');
+  if (select && groupCustom) {
+    if (select.value === 'custom') {
+      groupCustom.style.display = 'block';
+    } else {
+      groupCustom.style.display = 'none';
+      const customInput = document.getElementById('inputBrosurCustomHari');
+      if (customInput) customInput.value = '';
+    }
+  }
+  updateBrosurCompositeName();
+};
+
+window.updateBrosurCompositeName = function() {
+  const paket = (document.getElementById('inputBrosurNamaPaket')?.value || '').trim();
+  const hariSelect = document.getElementById('inputBrosurJumlahHari')?.value || '';
+  let hari = hariSelect;
+  if (hariSelect === 'custom') {
+    hari = (document.getElementById('inputBrosurCustomHari')?.value || '').trim();
+  }
+  const tglBerangkat = document.getElementById('inputBrosurTglBerangkat')?.value || '';
+
   const displayBox = document.getElementById('generatedSpecificFileName');
   if (!displayBox) return;
 
-  if (!wil && !cat && !name && !file) {
-    displayBox.textContent = 'Pilih wilayah, kategori, nama brosur dan file lokal untuk membuat nama spesifik...';
+  if (!paket && !hari && !tglBerangkat) {
+    displayBox.textContent = '[Nama Paket] [Jumlah Hari] [Tanggal Berangkat]';
     displayBox.style.color = 'var(--text-muted)';
+    state.generatedSpecificFileName = '';
     return;
   }
 
-  const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const wilPart = wil ? sanitizeFileNamePart(wil).toUpperCase() + '_' : '';
-  const catPart = cat ? sanitizeFileNamePart(cat).toUpperCase() + '_' : '';
-  const namePart = name ? sanitizeFileNamePart(name) + '_' : 'BROSUR_';
-  
-  let ext = 'pdf';
-  if (file && file.name.includes('.')) {
-    ext = file.name.split('.').pop().toLowerCase();
+  const partPaket = paket ? `[${paket}]` : '[Nama Paket]';
+  const partHari = hari ? `[${hari}D]` : '[Jumlah Hari]';
+
+  let partTgl = '[Tanggal Berangkat]';
+  if (tglBerangkat) {
+    const parts = tglBerangkat.split('-');
+    if (parts.length === 3) {
+      const y = parts[0];
+      const m = parseInt(parts[1], 10);
+      const d = parts[2].padStart(2, '0');
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      const mmm = months[m - 1] || parts[1];
+      partTgl = `[${d} ${mmm} ${y}]`;
+    }
   }
 
-  const generated = `${wilPart}${catPart}${namePart}${todayStr}.${ext}`;
-  state.generatedSpecificFileName = generated;
-
-  displayBox.textContent = generated;
+  // Format hasil: [Nama Paket] [Jumlah Hari +"D"] [dd mmm yyyy] contoh [Saphire] [12D] [01 Okt 2026]
+  const combinedName = `${partPaket} ${partHari} ${partTgl}`;
+  state.generatedSpecificFileName = combinedName;
+  displayBox.textContent = combinedName;
   displayBox.style.color = '#38bdf8';
+};
+
+function updateGeneratedFileName() {
+  updateBrosurCompositeName();
 }
 
 window.copySpecificFileName = function() {
   const text = state.generatedSpecificFileName || document.getElementById('generatedSpecificFileName')?.textContent;
   if (!text || text.includes('...')) {
-    alert('Harap pilih wilayah, kategori dan nama brosur terlebih dahulu.');
+    alert('Harap isi Nama Paket, Jumlah Hari, atau Tanggal Berangkat.');
     return;
   }
 
@@ -2595,7 +2637,19 @@ window.resetBrosurForm = function() {
   const groupName = document.getElementById('groupBrosurName');
   if (groupName) groupName.style.display = 'none';
 
-  // Tanggal Upload diisi otomatis tanggal hari ini (yyyy-mm-dd)
+  // Reset 3 Bagian Komponen Penamaan Otomatis
+  const inputPaket = document.getElementById('inputBrosurNamaPaket');
+  if (inputPaket) inputPaket.value = '';
+  const inputHari = document.getElementById('inputBrosurJumlahHari');
+  if (inputHari) inputHari.value = '';
+  const groupCustom = document.getElementById('groupCustomJumlahHari');
+  if (groupCustom) groupCustom.style.display = 'none';
+  const inputCustomHari = document.getElementById('inputBrosurCustomHari');
+  if (inputCustomHari) inputCustomHari.value = '';
+  const inputTglBerangkat = document.getElementById('inputBrosurTglBerangkat');
+  if (inputTglBerangkat) inputTglBerangkat.value = '';
+
+  // Tanggal Upload diisi otomatis tanggal hari ini (yyyy-mm-dd) ke input hidden
   const todayYmd = new Date().toISOString().slice(0, 10);
   const tglUploadInput = document.getElementById('inputBrosurTglUpload');
   if (tglUploadInput) tglUploadInput.value = todayYmd;
@@ -2611,7 +2665,7 @@ window.resetBrosurForm = function() {
   if (linkInput) linkInput.value = GDRIVE_BROSUR_FOLDER_URL;
 
   clearSelectedFile();
-  updateGeneratedFileName();
+  updateBrosurCompositeName();
 };
 
 async function uploadBrosurToGoogleDrive(file, generatedFileName) {
@@ -2684,14 +2738,52 @@ window.submitBrosurForm = async function(event) {
 
   const wilayah = document.getElementById('inputBrosurWilayah')?.value || '';
   const catagory = document.getElementById('inputBrosurCategory')?.value;
-  const brosurname = document.getElementById('inputBrosurName')?.value;
+  let brosurname = document.getElementById('inputBrosurName')?.value || '';
   const validuntil = document.getElementById('inputBrosurValidUntil')?.value;
   const tglupload = document.getElementById('inputBrosurTglUpload')?.value || new Date().toISOString().slice(0, 10);
   let link = document.getElementById('inputBrosurLink')?.value.trim() || GDRIVE_BROSUR_FOLDER_URL;
   const catatan = document.getElementById('inputBrosurCatatan')?.value.trim() || '';
 
+  // Requirement #6: 3 Bagian (Nama Paket, Jumlah Hari, Tanggal Berangkat) digabung menjadi namapaket
+  // Format: [Nama Paket] [Jumlah Hari +"D"] [dd mmm yyyy] contoh [Saphire] [12D] [01 Okt 2026]
+  const paket = (document.getElementById('inputBrosurNamaPaket')?.value || '').trim();
+  const hariSelect = document.getElementById('inputBrosurJumlahHari')?.value || '';
+  let hari = hariSelect;
+  if (hariSelect === 'custom') {
+    hari = (document.getElementById('inputBrosurCustomHari')?.value || '').trim();
+  }
+  const tglBerangkat = document.getElementById('inputBrosurTglBerangkat')?.value || '';
+
+  let generatedNamaPaket = '';
+  if (paket || hari || tglBerangkat) {
+    const partPaket = paket ? `[${paket}]` : '';
+    const partHari = hari ? `[${hari}D]` : '';
+    let partTgl = '';
+    if (tglBerangkat) {
+      const parts = tglBerangkat.split('-');
+      if (parts.length === 3) {
+        const y = parts[0];
+        const m = parseInt(parts[1], 10);
+        const d = parts[2].padStart(2, '0');
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+        const mmm = months[m - 1] || parts[1];
+        partTgl = `[${d} ${mmm} ${y}]`;
+      }
+    }
+    generatedNamaPaket = [partPaket, partHari, partTgl].filter(Boolean).join(' ');
+  }
+
+  // Jika nama brosur master belum terpilih, gunakan hasil komponen paket
+  if (!brosurname) {
+    if (generatedNamaPaket) {
+      brosurname = generatedNamaPaket;
+    } else if (paket) {
+      brosurname = paket;
+    }
+  }
+
   if (!wilayah) {
-    alert('Harap pilih Wilayah Brosur (namakanwill dari Tabel KanwilFathIndah)!');
+    alert('Harap pilih Wilayah Brosur!');
     return;
   }
 
@@ -2701,7 +2793,7 @@ window.submitBrosurForm = async function(event) {
   }
 
   if (!brosurname) {
-    alert('Harap pilih Nama Brosur!');
+    alert('Harap lengkapi rincian Nama Paket atau pilih Nama Brosur!');
     return;
   }
 
@@ -2711,12 +2803,12 @@ window.submitBrosurForm = async function(event) {
   }
 
   const selectedFile = state.selectedLocalBrosurFile;
-  const specificName = state.generatedSpecificFileName || (selectedFile ? selectedFile.name : '');
+  const specificName = generatedNamaPaket || state.generatedSpecificFileName || (selectedFile ? selectedFile.name : '');
   const gdriveWebhookUrl = getGDriveWebhookUrl();
 
   // Jika file lokal dipilih tapi webhook belum dipasang, tampilkan modal interaktif untuk konfirmasi
   if (selectedFile && !gdriveWebhookUrl) {
-    pendingBrosurPayload = { wilayah, catagory, brosurname, link, catatan, validuntil, tglupload, status: 'Aktif', selectedFile, specificName };
+    pendingBrosurPayload = { wilayah, catagory, brosurname, namapaket: generatedNamaPaket, link, catatan, validuntil, tglupload, status: 'Aktif', selectedFile, specificName };
     openGDrivePromptModal(selectedFile.name);
     return;
   }
@@ -2726,37 +2818,36 @@ window.submitBrosurForm = async function(event) {
     btnSubmit.disabled = true;
   }
 
-  // Jika webhook aktif dan file dipilih: upload file ke Google Drive terlebih dahulu!
+  // Jika webhook aktif dan file dipilih: upload berkas terlebih dahulu
   if (selectedFile && gdriveWebhookUrl) {
     if (btnSubmit) {
-      btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mengunggah file ke Google Drive (1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc)...';
+      btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mengunggah berkas brosur...';
     }
 
     try {
       const uploadResult = await uploadBrosurToGoogleDrive(selectedFile, specificName);
       if (uploadResult && uploadResult.success) {
-        // Ambil link view publik langsung dari file yang baru diunggah!
         link = uploadResult.directLink || uploadResult.fileUrl || link;
         const linkInput = document.getElementById('inputBrosurLink');
         if (linkInput) linkInput.value = link;
       } else {
         const errMsg = uploadResult?.message || 'Koneksi ke Webhook Apps Script gagal';
-        const continueSave = confirm(`Peringatan: Gagal mengunggah file ke Google Drive (${errMsg}).\n\nApakah Anda tetap ingin menyimpan rekaman ke Supabase dengan link folder?`);
+        const continueSave = confirm(`Peringatan: Gagal mengunggah berkas secara otomatis (${errMsg}).\n\nApakah Anda tetap ingin menyimpan data brosur?`);
         if (!continueSave) {
           if (btnSubmit) {
             btnSubmit.disabled = false;
-            btnSubmit.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> <span>Simpan ke LogBrosur (Supabase)</span>';
+            btnSubmit.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> <span>Simpan Brosur</span>';
           }
           return;
         }
       }
     } catch (uploadErr) {
-      console.error('Error auto-upload Google Drive:', uploadErr);
-      const continueSave = confirm(`Peringatan: Gagal mengunggah file ke Google Drive (${uploadErr.message}).\n\nApakah Anda tetap ingin menyimpan rekaman ke Supabase?`);
+      console.error('Error auto-upload:', uploadErr);
+      const continueSave = confirm(`Peringatan: Gagal mengunggah berkas (${uploadErr.message}).\n\nApakah Anda tetap ingin menyimpan data brosur?`);
       if (!continueSave) {
         if (btnSubmit) {
           btnSubmit.disabled = false;
-          btnSubmit.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> <span>Simpan ke LogBrosur (Supabase)</span>';
+          btnSubmit.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> <span>Simpan Brosur</span>';
         }
         return;
       }
@@ -2764,23 +2855,23 @@ window.submitBrosurForm = async function(event) {
   }
 
   if (btnSubmit) {
-    btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan ke Supabase LogBrosur...';
+    btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan data brosur...';
   }
 
-  await executeSaveBrosurToSupabase({ wilayah, catagory, brosurname, link, catatan, validuntil, tglupload, status: 'Aktif', specificName });
+  await executeSaveBrosurToSupabase({ wilayah, catagory, brosurname, namapaket: generatedNamaPaket, link, catatan, validuntil, tglupload, status: 'Aktif', specificName });
 };
 
 async function executeSaveBrosurToSupabase(payload) {
-  const { wilayah, catagory, brosurname, link, catatan, validuntil, tglupload, status, specificName } = payload;
+  const { wilayah, catagory, brosurname, namapaket, link, catatan, validuntil, tglupload, status, specificName } = payload;
   const btnSubmit = document.getElementById('btnSubmitBrosur');
 
   const fullCatatan = catatan + (specificName ? ` [File: ${specificName}]` : '');
 
-  // Sesuai skema tabel Supabase LogBrosur:
-  // Kolom: catagory, brosurname, lokasibrosur, link, validuntil, tglupload, status, catatan
+  // Requirement #6: direkam pada tabel LogBrosur Header namapaket
   const supabasePayload = {
     catagory: catagory,
     brosurname: brosurname,
+    namapaket: namapaket || null,
     lokasibrosur: wilayah,
     link: link,
     validuntil: validuntil || null,
@@ -2792,7 +2883,7 @@ async function executeSaveBrosurToSupabase(payload) {
   let savedItem = null;
   let savedToSupabase = false;
 
-  // 1. Simpan langsung ke Supabase LogBrosur via REST API
+  // 1. Simpan langsung via Supabase REST API
   try {
     const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/LogBrosur`, {
       method: 'POST',
@@ -2811,10 +2902,10 @@ async function executeSaveBrosurToSupabase(payload) {
       savedToSupabase = true;
     } else {
       const errText = await res.text();
-      console.warn('Gagal insert langsung ke Supabase LogBrosur:', res.status, errText);
+      console.warn('Gagal insert ke LogBrosur:', res.status, errText);
     }
   } catch (e) {
-    console.warn('Gagal fetch insert ke Supabase:', e.message);
+    console.warn('Gagal fetch insert ke database:', e.message);
   }
 
   // 2. Jika direct fetch gagal, panggil backend server /api/brosur/log
@@ -2845,6 +2936,7 @@ async function executeSaveBrosurToSupabase(payload) {
       created_at: new Date().toISOString(),
       catagory: catagory,
       brosurname: brosurname,
+      namapaket: namapaket || null,
       lokasibrosur: wilayah,
       wilayah: wilayah,
       link: link,
@@ -2863,12 +2955,11 @@ async function executeSaveBrosurToSupabase(payload) {
 
   if (btnSubmit) {
     btnSubmit.disabled = false;
-    btnSubmit.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> <span>Simpan ke LogBrosur (Supabase)</span>';
+    btnSubmit.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> <span>Simpan Brosur</span>';
   }
 
-  const idMsg = savedItem.id ? `\n(ID Record Supabase: #${savedItem.id})` : '';
-  const uploadInfo = link !== GDRIVE_BROSUR_FOLDER_URL ? `\n\nLink File Langsung di Google Drive:\n${link}` : `\n\nFolder Google Drive: ${link}`;
-  alert(`Brosur "${brosurname}" untuk wilayah ${wilayah} berhasil direkam ke database LogBrosur Supabase!${idMsg}${uploadInfo}`);
+  const idMsg = savedItem.id ? `\n(ID Record: #${savedItem.id})` : '';
+  alert(`Brosur "${brosurname}" untuk wilayah ${wilayah} berhasil disimpan!${idMsg}`);
 
   resetBrosurForm();
   renderBrosurTable();
@@ -2883,6 +2974,8 @@ function renderBrosurTable() {
   const search = (state.brosurFilter.search || '').toLowerCase();
   const category = state.brosurFilter.category || 'ALL';
   const wilayahFilter = state.brosurFilter.wilayah || 'ALL';
+  const statusFilter = state.brosurFilter.status || 'Aktif';
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   // Filter
   const filtered = list.filter(item => {
@@ -2890,7 +2983,17 @@ function renderBrosurTable() {
     const cat = (item.catagory || item.category || '').toLowerCase();
     const name = (item.brosurname || item.name || '').toLowerCase();
     const notes = (item.catatan || '').toLowerCase();
-    const status = (item.status || 'aktif').toLowerCase();
+
+    // Hitung status aktif / expired berdasarkan status tersimpan dan masa berlaku
+    let rawStatus = (item.status || 'Aktif').trim();
+    const isPastDate = item.validuntil && item.validuntil < todayStr;
+    const isExpired = rawStatus.toLowerCase() === 'expired' || isPastDate;
+    const effectiveStatus = isExpired ? 'Expired' : 'Aktif';
+
+    // Requirement #5: Filter Status Brosur (Default: Aktif)
+    if (statusFilter !== 'ALL' && effectiveStatus !== statusFilter) {
+      return false;
+    }
 
     if (wilayahFilter !== 'ALL' && (item.wilayah || item.lokasibrosur || '') !== wilayahFilter) {
       return false;
@@ -2900,7 +3003,7 @@ function renderBrosurTable() {
       return false;
     }
 
-    if (search && !wil.includes(search) && !cat.includes(search) && !name.includes(search) && !notes.includes(search) && !status.includes(search)) {
+    if (search && !wil.includes(search) && !cat.includes(search) && !name.includes(search) && !notes.includes(search)) {
       return false;
     }
 
@@ -2910,10 +3013,19 @@ function renderBrosurTable() {
   // Update Stats
   const elTotal = document.getElementById('brosurStatTotal');
   const elCat = document.getElementById('brosurStatCategory');
+  const elActive = document.getElementById('brosurStatActive');
   if (elTotal) elTotal.textContent = list.length;
   if (elCat) {
     const cats = new Set(list.map(x => x.catagory || x.category).filter(Boolean));
     elCat.textContent = cats.size || 0;
+  }
+  if (elActive) {
+    const activeCount = list.filter(item => {
+      const isPast = item.validuntil && item.validuntil < todayStr;
+      const isExp = (item.status || '').trim().toLowerCase() === 'expired' || isPast;
+      return !isExp;
+    }).length;
+    elActive.textContent = activeCount;
   }
 
   if (filtered.length === 0) {
@@ -2928,8 +3040,6 @@ function renderBrosurTable() {
     return;
   }
 
-  const todayStr = new Date().toISOString().slice(0, 10);
-
   tbody.innerHTML = filtered.map((item, idx) => {
     const no = idx + 1;
     const wil = item.lokasibrosur || item.wilayah || 'Pusat';
@@ -2939,15 +3049,13 @@ function renderBrosurTable() {
     const link = item.link || GDRIVE_BROSUR_FOLDER_URL;
     const idBadge = item.id ? (typeof item.id === 'number' ? `ID: #${item.id}` : item.id) : '';
 
-    // Tanggal Upload (yyyy-mm-dd)
-    let tglUploadDisplay = item.tglupload || '';
-    if (!tglUploadDisplay && item.created_at) {
-      tglUploadDisplay = String(item.created_at).slice(0, 10);
+    // Requirement #4: Tanggal Upload & Valid Until dibuat format dd mmm yy (Lampiran 3)
+    let rawTglUpload = item.tglupload || '';
+    if (!rawTglUpload && item.created_at) {
+      rawTglUpload = String(item.created_at).slice(0, 10);
     }
-    if (!tglUploadDisplay) tglUploadDisplay = '-';
-
-    // Valid Until (yyyy-mm-dd)
-    const validUntilDisplay = item.validuntil || '-';
+    const tglUploadDisplay = formatDateDdMmmYy(rawTglUpload);
+    const validUntilDisplay = formatDateDdMmmYy(item.validuntil);
 
     // Status Brosur (Aktif / Expired)
     let rawStatus = (item.status || 'Aktif').trim();
@@ -2986,6 +3094,7 @@ function renderBrosurTable() {
         </td>
         <td>
           <strong style="color:#ffffff; font-size:0.9rem;">${name}</strong>
+          ${item.namapaket ? `<div style="font-size:0.78rem; color:#38bdf8; font-weight:600; margin-top:2px; font-family:'JetBrains Mono',monospace;"><i class="fa-solid fa-box-archive" style="font-size:0.72rem; margin-right:4px;"></i>${item.namapaket}</div>` : ''}
           <div style="font-size:0.75rem; color:#94a3b8; font-family:'JetBrains Mono',monospace;">${idBadge}</div>
         </td>
         <td style="text-align:center;">
@@ -2997,10 +3106,10 @@ function renderBrosurTable() {
           ${notes}
         </td>
         <td style="text-align:center; white-space:nowrap;">
-          <a href="${link}" target="_blank" rel="noopener noreferrer" class="btn-action-icon" title="Buka File / Google Drive">
+          <a href="${link}" target="_blank" rel="noopener noreferrer" class="btn-action-icon" title="Buka Berkas">
             <i class="fa-solid fa-arrow-up-right-from-square"></i>
           </a>
-          <button type="button" class="btn-action-icon btn-action-edit" onclick="openUpdateStatusModal('${safeId}')" title="Update Status Brosur (Aktif / Expired)">
+          <button type="button" class="btn-action-icon btn-action-edit" onclick="openUpdateStatusModal('${safeId}')" title="Update Status Brosur">
             <i class="fa-solid fa-pen-to-square"></i>
           </button>
           <button type="button" class="btn-action-icon btn-action-delete" onclick="deleteBrosurRecord('${safeId}')" title="Hapus Brosur">
@@ -3158,9 +3267,9 @@ window.deleteBrosurRecord = async function(id) {
 
 window.copyBrosurLink = function(url) {
   navigator.clipboard.writeText(url).then(() => {
-    alert('Link Google Drive berhasil disalin ke clipboard!');
+    alert('Tautan berkas berhasil disalin ke clipboard!');
   }).catch(() => {
-    prompt('Salin link Google Drive berikut:', url);
+    prompt('Salin tautan berkas berikut:', url);
   });
 };
 
@@ -3168,9 +3277,11 @@ window.onBrosurFilterChange = function() {
   const searchInput = document.getElementById('brosurSearchInput');
   const catSelect = document.getElementById('brosurCategoryFilter');
   const wilSelect = document.getElementById('brosurWilayahFilter');
+  const statusSelect = document.getElementById('brosurStatusFilter');
   if (searchInput) state.brosurFilter.search = searchInput.value.trim();
   if (catSelect) state.brosurFilter.category = catSelect.value;
   if (wilSelect) state.brosurFilter.wilayah = wilSelect.value;
+  if (statusSelect) state.brosurFilter.status = statusSelect.value;
   renderBrosurTable();
 };
 
@@ -3179,9 +3290,9 @@ window.reloadBrosurData = async function() {
   if (tbody) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="8" style="text-align:center; padding:36px; color:#64748b;">
+        <td colspan="9" style="text-align:center; padding:36px; color:#64748b;">
           <i class="fa-solid fa-spinner fa-spin" style="color:var(--gold-light); font-size:1.5rem;"></i>
-          <div style="margin-top:10px;">Menghubungi Supabase dan memperbarui data brosur...</div>
+          <div style="margin-top:10px;">Memperbarui data brosur...</div>
         </td>
       </tr>
     `;

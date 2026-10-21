@@ -130,9 +130,9 @@
           <span class="nav-label">Riwayat Log Absensi</span>
         </a>
 
-        <a href="#launching_brosur" class="nav-item" data-module="mod_input_brosur" data-tooltip="Launching Brosur">
+        <a href="#launching_brosur" class="nav-item" data-module="mod_input_brosur" data-tooltip="Catalog Brosur">
           <i class="fa-solid fa-bullhorn nav-icon"></i>
-          <span class="nav-label">Launching Brosur</span>
+          <span class="nav-label">Catalog Brosur</span>
         </a>
       </nav>
 
@@ -817,22 +817,22 @@
         <div class="module-view" id="view-launching_brosur">
           <div class="content-card brosur-card">
             
-            <!-- Module Top Bar with Tabs and Google Drive link -->
+            <!-- Module Top Bar with Tabs and Folder link -->
             <div class="brosur-top-header">
               <div class="brosur-header-title">
                 <div class="card-title">
                   <i class="fa-solid fa-bullhorn" style="color:var(--gold-light);"></i>
-                  <span>Launching & Manajemen Brosur Promosi</span>
+                  <span>Catalog & Manajemen Brosur Promosi</span>
                 </div>
                 <div class="brosur-header-subtitle">
-                  Sumber Data: Tabel <code>LogBrosur</code>, <code>MnuLogBrosur</code>, <code>CatPaket</code> di Supabase • Cloud Storage Google Drive
+                  Daftar arsip & publikasi brosur paket perjalanan
                 </div>
               </div>
 
               <div class="brosur-header-actions">
-                <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc" target="_blank" rel="noopener noreferrer" class="btn-gdrive-folder" title="Buka Folder Penyimpanan Google Drive">
-                  <i class="fa-brands fa-google-drive"></i>
-                  <span>Brosur - Google Drive</span>
+                <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc" target="_blank" rel="noopener noreferrer" class="btn-gdrive-folder" title="Buka Folder Penyimpanan Berkas">
+                  <i class="fa-solid fa-folder-open"></i>
+                  <span>Folder Berkas</span>
                 </a>
               </div>
             </div>
@@ -871,10 +871,10 @@
                 </div>
 
                 <div class="brosur-stat-card">
-                  <div class="brosur-stat-icon blue"><i class="fa-brands fa-google-drive"></i></div>
+                  <div class="brosur-stat-icon blue"><i class="fa-solid fa-circle-check"></i></div>
                   <div>
-                    <div class="brosur-stat-val" style="font-size:1.1rem; color:#38bdf8;">Google Drive</div>
-                    <div class="brosur-stat-lbl" style="font-size:0.75rem;">1nDoE-UPkzVwt6m...</div>
+                    <div class="brosur-stat-val" id="brosurStatActive">0</div>
+                    <div class="brosur-stat-lbl">Brosur Aktif</div>
                   </div>
                 </div>
               </div>
@@ -894,7 +894,14 @@
                   <option value="ALL">Semua Kategori</option>
                 </select>
 
-                <button type="button" class="btn-refresh-brosur" onclick="reloadBrosurData()" title="Segarkan Data dari Supabase">
+                <!-- Filter Status Brosur (Default: Aktif) -->
+                <select id="brosurStatusFilter" class="brosur-filter-select" onchange="onBrosurFilterChange()">
+                  <option value="Aktif" selected>Status: Aktif</option>
+                  <option value="Expired">Status: Expired</option>
+                  <option value="ALL">Semua Status</option>
+                </select>
+
+                <button type="button" class="btn-refresh-brosur" onclick="reloadBrosurData()" title="Segarkan Data">
                   <i class="fa-solid fa-rotate"></i>
                   <span>Refresh</span>
                 </button>
@@ -925,7 +932,7 @@
                     <tr>
                       <td colspan="9" style="text-align:center; padding:36px; color:#64748b;">
                         <i class="fa-solid fa-spinner fa-spin" style="color:var(--gold-light); font-size:1.5rem;"></i>
-                        <div style="margin-top:10px;">Memuat data dari tabel LogBrosur Supabase...</div>
+                        <div style="margin-top:10px;">Memuat data brosur...</div>
                       </td>
                     </tr>
                   </tbody>
@@ -940,79 +947,66 @@
               <div class="brosur-form-card">
                 <div class="brosur-form-title">
                   <i class="fa-solid fa-file-circle-plus" style="color:var(--gold-light);"></i>
-                  <span>Formulir Pendaftaran & Launching Brosur Baru</span>
+                  <span>Formulir Pendaftaran & Input Brosur Baru</span>
                 </div>
-                <p class="brosur-form-desc">
-                  Isi formulir berikut untuk mendaftarkan brosur ke tabel <code>LogBrosur</code>. ID dan Waktu Dibuat diisi otomatis oleh sistem. File dapat dipilih dari komputer lokal dan diarahkan ke Google Drive Folder.
-                </p>
 
                 <form id="brosurInputForm" onsubmit="submitBrosurForm(event)">
-                  
-                  <!-- Row 1: Valid Until (DTPICKER) & Tanggal Upload Info (Requirement #2) -->
+                  <!-- Hidden tglupload: diisi otomatis saat submit tanpa menampilkan box lampiran 1 -->
+                  <input type="hidden" id="inputBrosurTglUpload">
+                  <input type="hidden" id="inputBrosurLink" value="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc">
+
+                  <!-- Baris 1: Wilayah Brosur & Kategori Brosur -->
                   <div class="form-row-grid">
                     <div class="form-group">
-                      <label class="form-label" for="inputBrosurValidUntil">
-                        <i class="fa-regular fa-calendar-check" style="color:var(--gold-light);"></i> Valid Until / Masa Berlaku Brosur (<code style="color:var(--gold-light);">validuntil</code>) <span style="color:#ef4444;">*</span>
+                      <label class="form-label" for="inputBrosurWilayah">
+                        <i class="fa-solid fa-map-location-dot" style="color:var(--gold-light);"></i> Wilayah Brosur (<code style="color:var(--gold-light);">namakanwill</code>) <span style="color:#ef4444;">*</span>
                       </label>
-                      <input type="date" id="inputBrosurValidUntil" class="form-input" required>
-                      <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
-                        <i class="fa-solid fa-circle-info"></i> Pilih tanggal batas akhir masa berlaku brosur (format: yyyy-mm-dd).
-                      </div>
+                      <select id="inputBrosurWilayah" class="form-input" required onchange="onBrosurWilayahChange()">
+                        <option value="">-- Pilih Wilayah Brosur --</option>
+                      </select>
                     </div>
 
                     <div class="form-group">
-                      <label class="form-label" for="inputBrosurTglUpload">
-                        <i class="fa-solid fa-cloud-arrow-up" style="color:var(--gold-light);"></i> Tanggal Upload (<code style="color:var(--gold-light);">tglupload</code>)
+                      <label class="form-label" for="inputBrosurCategory">
+                        <i class="fa-solid fa-layer-group" style="color:var(--gold-light);"></i> Kategori Brosur (<code style="color:var(--gold-light);">catagory</code>) <span style="color:#ef4444;">*</span>
                       </label>
-                      <input type="date" id="inputBrosurTglUpload" class="form-input readonly-input" readonly>
+                      <select id="inputBrosurCategory" class="form-input" required onchange="onBrosurCategoryChange()">
+                        <option value="">-- Pilih Kategori --</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Baris 2: Nama Brosur (Master) & Valid Until / Masa Berlaku Brosur -->
+                  <div class="form-row-grid">
+                    <div class="form-group" id="groupBrosurName" style="display:none; transition: all 0.3s ease;">
+                      <label class="form-label" for="inputBrosurName">
+                        <i class="fa-solid fa-file-signature" style="color:var(--gold-light);"></i> Nama Brosur Master (<code style="color:var(--gold-light);">brosurname</code>) <span style="color:#ef4444;">*</span>
+                      </label>
+                      <select id="inputBrosurName" class="form-input" onchange="onBrosurNameChange()">
+                        <option value="">-- Pilih Kategori Terlebih Dahulu --</option>
+                      </select>
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" for="inputBrosurValidUntil">
+                        <i class="fa-regular fa-calendar-check" style="color:#ffffff;"></i> Valid Until / Masa Berlaku Brosur (<code style="color:#ffffff;">validuntil</code>) <span style="color:#ef4444;">*</span>
+                      </label>
+                      <input type="date" id="inputBrosurValidUntil" class="form-input dtpicker-white" required>
                       <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
-                        <i class="fa-solid fa-clock"></i> Otomatis diset tanggal hari ini saat berkas diunggah (yyyy-mm-dd).
+                        <i class="fa-solid fa-circle-info"></i> Pilih tanggal batas akhir masa berlaku brosur.
                       </div>
                     </div>
                   </div>
 
-                  <!-- Row 2: Wilayah Dropdown (from KanwilFathIndah header namakanwill) -->
-                  <div class="form-group">
-                    <label class="form-label" for="inputBrosurWilayah">
-                      <i class="fa-solid fa-map-location-dot" style="color:var(--gold-light);"></i> Wilayah Brosur (<code style="color:var(--gold-light);">namakanwill</code> dari Tabel KanwilFathIndah) <span style="color:#ef4444;">*</span>
-                    </label>
-                    <select id="inputBrosurWilayah" class="form-input" required onchange="onBrosurWilayahChange()">
-                      <option value="">-- Pilih Wilayah Brosur --</option>
-                    </select>
-                  </div>
-
-                  <!-- Row 3: Category Dropdown (from CatPaket header catagory) -->
-                  <div class="form-group">
-                    <label class="form-label" for="inputBrosurCategory">
-                      <i class="fa-solid fa-layer-group" style="color:var(--gold-light);"></i> Kategori Brosur (<code style="color:var(--gold-light);">catagory</code> dari Tabel CatPaket) <span style="color:#ef4444;">*</span>
-                    </label>
-                    <select id="inputBrosurCategory" class="form-input" required onchange="onBrosurCategoryChange()">
-                      <option value="">-- Pilih Kategori --</option>
-                    </select>
-                  </div>
-
-                  <!-- Row 4: Brochure Name Dropdown (from MnuLogBrosur header brosurname - Hidden until Category is selected) -->
-                  <div class="form-group" id="groupBrosurName" style="display:none; transition: all 0.3s ease;">
-                    <label class="form-label" for="inputBrosurName">
-                      <i class="fa-solid fa-file-signature" style="color:var(--gold-light);"></i> Nama Brosur (<code style="color:var(--gold-light);">brosurname</code> dari Tabel MnuLogBrosur) <span style="color:#ef4444;">*</span>
-                    </label>
-                    <select id="inputBrosurName" class="form-input" onchange="onBrosurNameChange()">
-                      <option value="">-- Pilih Kategori Terlebih Dahulu --</option>
-                    </select>
-                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">
-                      <i class="fa-solid fa-circle-info"></i> Pilihan nama brosur dicari otomatis dari tabel MnuLogBrosur berdasarkan Kategori yang dipilih.
-                    </div>
-                  </div>
-
-                  <!-- Row 5: Local File Picker (Ambil dari local folder) -->
+                  <!-- Baris 3: Ambil Berkas Brosur dari Komputer Lokal -->
                   <div class="form-group">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
                       <label class="form-label" style="margin-bottom:0;">
-                        <i class="fa-solid fa-folder-open" style="color:var(--gold-light);"></i> Ambil File dari Local Folder / Komputer Anda
+                        <i class="fa-solid fa-folder-open" style="color:var(--gold-light);"></i> Ambil Berkas Brosur dari Komputer Anda
                       </label>
-                      <div id="gdriveWebhookStatusPill" class="gdrive-status-badge pending" onclick="openGDriveConfigModal()" title="Klik untuk mengkonfigurasi Auto-Upload Google Drive">
-                        <i class="fa-brands fa-google-drive"></i>
-                        <span id="gdriveWebhookStatusText">Auto-Upload Drive: Belum Dikonfigurasi</span>
+                      <div id="gdriveWebhookStatusPill" class="gdrive-status-badge pending" onclick="openGDriveConfigModal()" title="Klik untuk mengkonfigurasi Auto-Upload">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <span id="gdriveWebhookStatusText">Auto-Upload Berkas</span>
                         <i class="fa-solid fa-gear" style="margin-left:4px;"></i>
                       </div>
                     </div>
@@ -1026,7 +1020,7 @@
                         <strong>Klik untuk memilih file</strong> atau seret file brosur ke sini
                       </div>
                       <div class="drop-zone-sub">
-                        Mendukung format: PDF, JPG, PNG, WEBP, Word Doc (Maks 50 MB) • Target: Folder Google Drive
+                        Mendukung format: PDF, JPG, PNG, WEBP, Word Doc (Maks 50 MB)
                       </div>
                     </div>
 
@@ -1046,8 +1040,8 @@
                         <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc" 
                           target="_blank" rel="noopener noreferrer" class="btn-gdrive-folder" style="font-size:0.78rem; padding:6px 14px;"
                           onclick="onUploadToGDriveClick()">
-                          <i class="fa-brands fa-google-drive"></i>
-                          <span>Buka Folder Google Drive (Salin Nama Standar)</span>
+                          <i class="fa-solid fa-folder-open"></i>
+                          <span>Buka Folder Berkas (Salin Nama)</span>
                         </a>
                         <button type="button" class="btn-gdrive-cfg-btn" onclick="openGDriveConfigModal()" title="Konfigurasi Webhook Auto-Upload">
                           <i class="fa-solid fa-bolt"></i> <span>Pengaturan Auto-Upload</span>
@@ -1056,14 +1050,16 @@
                     </div>
                   </div>
 
-                  <!-- Row 6: Generated Specific & Readable Filename (Requirement #5) -->
-                  <div class="form-group">
-                    <label class="form-label">
-                      <i class="fa-solid fa-tag" style="color:var(--gold-light);"></i> Nama File Spesifik & Mudah Dibaca (Standar Penamaan Otomatis)
+                  <!-- Baris 4: Nama File Spesifik & Mudah Dibaca (Standar Penamaan Otomatis) [View Saja] (Requirement #6) -->
+                  <div class="form-group" style="margin-top:12px;">
+                    <label class="form-label" style="display:flex; align-items:center; color:#ffffff;">
+                      <i class="fa-solid fa-tag" style="color:#ffffff;"></i>
+                      <span style="margin-left:6px;">Nama File Spesifik & Mudah Dibaca (Standar Penamaan Otomatis)</span>
+                      <span class="badge-view-only">View Saja</span>
                     </label>
                     <div class="specific-filename-box">
                       <div class="specific-filename-text" id="generatedSpecificFileName">
-                        Pilih wilayah, kategori, nama brosur dan file lokal untuk membuat nama spesifik...
+                        [Nama Paket] [Jumlah Hari] [Tanggal Berangkat]
                       </div>
                       <button type="button" class="btn-copy-filename" id="btnCopyFileName" onclick="copySpecificFileName()" title="Salin nama file spesifik">
                         <i class="fa-regular fa-copy"></i>
@@ -1072,10 +1068,49 @@
                     </div>
                   </div>
 
-                  <!-- Hidden Google Drive Link (Otomatis diarahkan ke Google Drive tanpa input manual) -->
-                  <input type="hidden" id="inputBrosurLink" value="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc">
+                  <!-- Baris 5: 3 Bagian Komponen Penamaan Otomatis (di bawah view saja & sebelum Catatan) (Requirement #6) -->
+                  <div class="brosur-composite-section" style="margin-top:12px; margin-bottom:14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.1); border-radius:var(--radius-md); padding:16px;">
+                    <div style="font-size:0.85rem; font-weight:600; color:#ffffff; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+                      <i class="fa-solid fa-sliders" style="color:#ffffff;"></i>
+                      <span>Rincian Komponen Paket (Direkam ke LogBrosur: <code>namapaket</code>):</span>
+                    </div>
 
-                  <!-- Row 7: Catatan (catatan) -->
+                    <div class="form-row-grid-3">
+                      <!-- a. Nama Paket (Format Text) -->
+                      <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label" for="inputBrosurNamaPaket" style="color:#ffffff;">
+                          <i class="fa-solid fa-box-archive" style="color:#ffffff;"></i> a. Nama Paket <span style="color:#ef4444;">*</span>
+                        </label>
+                        <input type="text" id="inputBrosurNamaPaket" class="form-input" placeholder="Contoh: Saphire" oninput="updateBrosurCompositeName()">
+                      </div>
+
+                      <!-- b. Jumlah Hari (Dropdown 9, 12, Customs) -->
+                      <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label" for="inputBrosurJumlahHari" style="color:#ffffff;">
+                          <i class="fa-solid fa-clock" style="color:#ffffff;"></i> b. Jumlah Hari <span style="color:#ef4444;">*</span>
+                        </label>
+                        <select id="inputBrosurJumlahHari" class="form-input" onchange="onJumlahHariChange()">
+                          <option value="">-- Pilih Hari --</option>
+                          <option value="9">9 Hari (9D)</option>
+                          <option value="12">12 Hari (12D)</option>
+                          <option value="custom">Customs</option>
+                        </select>
+                        <div id="groupCustomJumlahHari" style="display:none; margin-top:6px;">
+                          <input type="number" id="inputBrosurCustomHari" class="form-input" min="1" max="99" placeholder="Hari (cth: 15)" oninput="updateBrosurCompositeName()">
+                        </div>
+                      </div>
+
+                      <!-- c. Tanggal Berangkat (DTPICKER Icon Warna Putih) -->
+                      <div class="form-group" style="margin-bottom:0;">
+                        <label class="form-label" for="inputBrosurTglBerangkat" style="color:#ffffff;">
+                          <i class="fa-regular fa-calendar-days" style="color:#ffffff;"></i> c. Tanggal Berangkat <span style="color:#ef4444;">*</span>
+                        </label>
+                        <input type="date" id="inputBrosurTglBerangkat" class="form-input dtpicker-white" onchange="updateBrosurCompositeName()">
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Baris 6: Catatan / Deskripsi Tambahan -->
                   <div class="form-group">
                     <label class="form-label" for="inputBrosurCatatan">
                       <i class="fa-solid fa-comment-dots" style="color:var(--gold-light);"></i> Catatan / Deskripsi Tambahan (<code style="color:var(--gold-light);">catatan</code>)
@@ -1091,7 +1126,7 @@
                     </button>
                     <button type="submit" class="btn-gold" id="btnSubmitBrosur">
                       <i class="fa-solid fa-cloud-arrow-up"></i>
-                      <span>Simpan ke LogBrosur (Supabase)</span>
+                      <span>Simpan Brosur</span>
                     </button>
                   </div>
 
@@ -1262,11 +1297,11 @@
       <div class="gdrive-modal-header">
         <div style="display:flex; align-items:center; gap:10px;">
           <div class="gdrive-modal-icon">
-            <i class="fa-brands fa-google-drive"></i>
+            <i class="fa-solid fa-cloud-arrow-up"></i>
           </div>
           <div>
-            <h3 class="gdrive-modal-title">Konfigurasi Auto-Upload Google Drive</h3>
-            <p class="gdrive-modal-subtitle">Folder Target: <code>Brosur (1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc)</code></p>
+            <h3 class="gdrive-modal-title">Konfigurasi Auto-Upload Berkas Brosur</h3>
+            <p class="gdrive-modal-subtitle">Folder Target Penyimpanan Berkas</p>
           </div>
         </div>
         <button type="button" class="gdrive-modal-close" onclick="closeGDriveConfigModal()">
@@ -1278,13 +1313,13 @@
         <div class="gdrive-alert info">
           <i class="fa-solid fa-circle-info"></i>
           <div>
-            Agar file lokal langsung tersimpan ke folder Google Drive secara otomatis, gunakan <strong>Google Apps Script Web App</strong>. File yang diunggah akan otomatis memiliki link Google Drive publik dan tercatat di Supabase!
+            Agar file lokal langsung tersimpan secara otomatis, gunakan <strong>Webhook Apps Script</strong>. File yang diunggah akan otomatis memiliki link publik dan tercatat di database!
           </div>
         </div>
 
         <div class="form-group" style="margin-top:14px;">
           <label class="form-label">
-            <i class="fa-solid fa-link" style="color:var(--gold-light);"></i> URL Web App Google Apps Script
+            <i class="fa-solid fa-link" style="color:var(--gold-light);"></i> URL Web App Apps Script
           </label>
           <div style="display:flex; gap:8px;">
             <input type="url" id="inputGDriveScriptUrl" class="form-input" 
@@ -1300,13 +1335,13 @@
         <div class="gdrive-steps-accordion">
           <div class="gdrive-steps-header" onclick="toggleGDriveGuide()">
             <span style="font-weight:700; color:var(--gold-light); font-size:0.85rem;">
-              <i class="fa-solid fa-book"></i> Cara Pasang Google Apps Script (Hanya 1 Menit)
+              <i class="fa-solid fa-book"></i> Cara Pasang Webhook Auto-Upload (Hanya 1 Menit)
             </span>
             <i class="fa-solid fa-chevron-down" id="gdriveGuideChevron"></i>
           </div>
           <div class="gdrive-steps-content" id="gdriveStepsContent" style="display:none;">
             <ol style="padding-left:18px; margin:8px 0; font-size:0.8rem; color:var(--text-muted); line-height:1.6;">
-              <li>Buka <a href="https://script.google.com" target="_blank" style="color:#38bdf8; text-decoration:underline;">script.google.com</a> dengan akun Google pemilik folder Brosur.</li>
+              <li>Buka <a href="https://script.google.com" target="_blank" style="color:#38bdf8; text-decoration:underline;">script.google.com</a> dengan akun pemilik folder Brosur.</li>
               <li>Klik <strong>New project</strong> (Proyek baru), beri nama <em>Uploader Brosur Fath Indah</em>.</li>
               <li>Tempel skrip berikut lalu klik <strong>Save</strong>.</li>
               <li>Klik <strong>Deploy</strong> (Terapkan) -> <strong>New deployment</strong> (Penerapan baru).</li>
@@ -1317,7 +1352,7 @@
               <li>Klik <strong>Deploy</strong>, berikan otorisasi izin Drive, lalu salin URL Web App dan tempel pada form ini!</li>
             </ol>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; margin-bottom:4px;">
-              <span style="font-size:0.75rem; color:var(--text-dim); font-weight:600;">KODE GOOGLE APPS SCRIPT:</span>
+              <span style="font-size:0.75rem; color:var(--text-dim); font-weight:600;">KODE WEBHOOK SCRIPT:</span>
               <button type="button" class="btn-copy-filename" onclick="copyAppsScriptCode()" id="btnCopyScriptCode" style="font-size:0.75rem; padding:4px 10px;">
                 <i class="fa-regular fa-copy"></i> <span>Salin Kode Skrip</span>
               </button>
@@ -1329,7 +1364,7 @@
         <div style="margin-top:16px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
           <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc" target="_blank" rel="noopener noreferrer" class="btn-open-gdrive-link" style="padding:10px 14px; font-size:0.8rem;">
             <i class="fa-solid fa-arrow-up-right-from-square"></i>
-            <span>Buka Folder Brosur di Google Drive</span>
+            <span>Buka Folder Berkas Brosur</span>
           </a>
           <div style="display:flex; gap:8px;">
             <button type="button" class="btn-secondary" onclick="closeGDriveConfigModal()">Tutup</button>
@@ -1343,7 +1378,7 @@
   </div>
 
   <!-- ======================================================================
-       MODAL: PROMPT UNCONFIGURED UPLOAD GOOGLE DRIVE
+       MODAL: PROMPT UNCONFIGURED UPLOAD BERKAS
        ====================================================================== -->
   <div class="gdrive-modal-backdrop" id="gdrivePromptModal" style="display:none;">
     <div class="gdrive-modal-card" style="max-width:540px;">
@@ -1353,7 +1388,7 @@
             <i class="fa-solid fa-triangle-exclamation"></i>
           </div>
           <div>
-            <h3 class="gdrive-modal-title" style="font-size:1.05rem;">Auto-Upload Google Drive Belum Dipasang</h3>
+            <h3 class="gdrive-modal-title" style="font-size:1.05rem;">Auto-Upload Berkas Belum Terhubung</h3>
             <p class="gdrive-modal-subtitle">File terpilih: <span id="promptFileNameText" style="color:#38bdf8; font-weight:600;">file.pdf</span></p>
           </div>
         </div>
@@ -1364,10 +1399,7 @@
 
       <div class="gdrive-modal-body">
         <p style="color:var(--text-muted); font-size:0.85rem; line-height:1.6; margin-bottom:14px;">
-          Anda memilih file lokal untuk brosur ini, namun <strong>Webhook Auto-Upload Google Drive</strong> belum terhubung ke folder 
-          <a href="https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc" target="_blank" rel="noopener noreferrer" style="color:#38bdf8;">
-            Brosur - Google Drive
-          </a>.
+          Anda memilih file lokal untuk brosur ini, namun <strong>Webhook Auto-Upload</strong> belum terhubung ke folder penyimpanan.
         </p>
         <p style="color:var(--text-dim); font-size:0.8rem; margin-bottom:18px;">
           Pilih tindakan yang ingin Anda lakukan:
@@ -1378,23 +1410,23 @@
             <i class="fa-solid fa-bolt" style="font-size:1.1rem; width:24px;"></i>
             <div>
               <div style="font-weight:700;">Pasang Webhook Auto-Upload (Rekomendasi)</div>
-              <div style="font-size:0.75rem; opacity:0.85; font-weight:normal;">Siapkan 1 menit agar seluruh file otomatis terupload ke Drive</div>
+              <div style="font-size:0.75rem; opacity:0.85; font-weight:normal;">Siapkan 1 menit agar seluruh berkas otomatis tersimpan di cloud</div>
             </div>
           </button>
 
           <button type="button" class="btn-secondary" onclick="promptActionManual()" style="justify-content:flex-start; padding:12px 16px; text-align:left; border-color:rgba(56, 189, 248, 0.4); color:#38bdf8;">
-            <i class="fa-brands fa-google-drive" style="font-size:1.1rem; width:24px;"></i>
+            <i class="fa-solid fa-folder-open" style="font-size:1.1rem; width:24px;"></i>
             <div>
-              <div style="font-weight:700;">Buka Google Drive & Upload Manual</div>
-              <div style="font-size:0.75rem; opacity:0.85; font-weight:normal;">Nama file akan disalin & folder Drive akan dibuka untuk drop file</div>
+              <div style="font-weight:700;">Buka Folder Berkas & Upload Manual</div>
+              <div style="font-size:0.75rem; opacity:0.85; font-weight:normal;">Nama file akan disalin & folder berkas akan dibuka untuk drop file</div>
             </div>
           </button>
 
           <button type="button" class="btn-secondary" onclick="promptActionSaveMetadataOnly()" style="justify-content:flex-start; padding:10px 16px; text-align:left; color:var(--text-muted);">
             <i class="fa-solid fa-cloud-arrow-up" style="font-size:1.1rem; width:24px;"></i>
             <div>
-              <div style="font-weight:600;">Simpan Data ke Supabase Saja (Tanpa Upload File)</div>
-              <div style="font-size:0.75rem; opacity:0.75;">Tautan akan mengarah ke folder Google Drive utama</div>
+              <div style="font-weight:600;">Simpan Data ke Database Saja (Tanpa Upload File)</div>
+              <div style="font-size:0.75rem; opacity:0.75;">Tautan akan mengarah ke folder berkas utama</div>
             </div>
           </button>
         </div>
@@ -1447,9 +1479,9 @@
             <span id="modalStatusBrosurValidUntil">-</span>
           </div>
           <div class="brosur-info-item" style="grid-column: span 2;" id="modalStatusBrosurLinkContainer">
-            <label>Tautan File Google Drive</label>
+            <label>Tautan Berkas Brosur</label>
             <a href="#" id="modalStatusBrosurLink" target="_blank" rel="noopener noreferrer" style="color:#38bdf8; font-size:0.82rem; word-break:break-all;">
-              <i class="fa-solid fa-arrow-up-right-from-square"></i> Buka File di Google Drive
+              <i class="fa-solid fa-arrow-up-right-from-square"></i> Buka Berkas Brosur
             </a>
           </div>
         </div>
@@ -1463,7 +1495,7 @@
             <option value="Expired">🔴 Expired (Masa Berlaku Berakhir)</option>
           </select>
           <div style="font-size:0.75rem; color:var(--text-muted); margin-top:6px;">
-            <i class="fa-solid fa-circle-info"></i> Status ini akan langsung tersimpan di tabel <code>LogBrosur</code> Supabase.
+            <i class="fa-solid fa-circle-info"></i> Status ini akan langsung tersimpan di sistem.
           </div>
         </div>
 
