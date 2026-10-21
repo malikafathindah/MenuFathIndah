@@ -968,7 +968,9 @@ function switchModule(moduleName) {
   else if (moduleName === 'mod_users' || moduleName === 'mod_sistem_user') viewId = 'users';
   else if (moduleName === 'mod_attendance' || moduleName === 'rekap_absensi' || moduleName === 'mod_rekap_absensi') viewId = 'rekap_absensi';
   else if (moduleName === 'mod_data_attendance' || moduleName === 'log_absensi' || moduleName === 'riwayat_log_absensi') viewId = 'log_absensi';
-  else if (moduleName === 'mod_cuti_karyawan' || moduleName === 'mod_presensi') viewId = 'cuti_absensi';
+  else if (moduleName === 'mod_cuti_karyawan' || moduleName === 'cuti_karyawan') viewId = 'cuti_karyawan';
+  else if (moduleName === 'mod_cuti_bersama' || moduleName === 'cuti_bersama') viewId = 'cuti_bersama';
+  else if (moduleName === 'mod_presensi') viewId = 'cuti_absensi';
   else if (moduleName === 'mod_input_brosur' || moduleName === 'launching_brosur' || moduleName === 'mod_view_brochure') viewId = 'launching_brosur';
   else if (moduleName === 'mod_modules' || moduleName === 'settings') viewId = 'settings';
 
@@ -1008,6 +1010,8 @@ function switchModule(moduleName) {
     rekap_absensi: { title: 'Rekapitulasi Absensi Karyawan', breadcrumb: 'SDM / Rekapitulasi Presensi Matrix & Arsiran Libur' },
     log_absensi: { title: 'Riwayat Log Absensi', breadcrumb: 'SDM & Karyawan / Akses Data Tabel Absensi Supabase' },
     launching_brosur: { title: 'Catalog Brosur', breadcrumb: 'Marketing / Catalog Brosur' },
+    cuti_karyawan: { title: 'Pengajuan & Riwayat Cuti Karyawan', breadcrumb: 'SDM & Karyawan / Pengajuan Cuti Mandiri & Kuota' },
+    cuti_bersama: { title: 'Cuti Bersama, Approval & Matriks Cuti', breadcrumb: 'SDM & Manajemen / Master Cuti Bersama & Persetujuan' },
     cuti_absensi: { title: 'Presensi & Cuti Karyawan', breadcrumb: 'SDM / Absensi & Pengajuan Cuti' },
     settings: { title: 'Konfigurasi Database', breadcrumb: 'Sistem / Pengalihan Google Sheets & Supabase' }
   };
@@ -1027,6 +1031,8 @@ function switchModule(moduleName) {
   if (viewId === 'rekap_absensi') renderRekapAbsensi();
   if (viewId === 'log_absensi') renderLogAbsensiTable();
   if (viewId === 'launching_brosur') initLaunchingBrosurView();
+  if (viewId === 'cuti_karyawan') initCutiKaryawanView();
+  if (viewId === 'cuti_bersama') initCutiBersamaView();
   if (viewId === 'cuti_absensi') renderCutiAbsensi();
   if (viewId === 'settings') renderSettings();
 }
@@ -4616,3 +4622,1238 @@ window.exportLogsToCSV = function() {
   a.click();
   document.body.removeChild(a);
 };
+
+// ==========================================================================
+// 12. MODUL CUTI KARYAWAN & CUTI BERSAMA (SUPABASE DIRECT INTEGRATION)
+//     mod_cuti_karyawan (Pengajuan Mandiri & Kuota)
+//     mod_cuti_bersama  (Setting Cuti Bersama, Approval & Matriks Kuota)
+// ==========================================================================
+
+if (!state.cuti) {
+  state.cuti = {
+    karyawanList: [],
+    bersamaList: [],
+    employees: [],
+    selectedYear: '2026',
+    activeCbTab: 'list',
+    userQuota: { netQuota: 12, terpakai: 0, sisaCuti: 12 },
+    activeApprovalItem: null
+  };
+}
+
+// Helper: Format Tanggal Indonesia (dd Mmm yyyy)
+function formatIndoCutiDate(dateStr) {
+  if (!dateStr) return '-';
+  try {
+    const cleanStr = String(dateStr).split('T')[0].split(' ')[0];
+    const parts = cleanStr.split('-');
+    if (parts.length === 3) {
+      const year = parts[0];
+      const monthIdx = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      return `${day} ${months[monthIdx] || parts[1]} ${year}`;
+    }
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      const day = d.getDate();
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+      return `${day} ${months[d.getMonth()]} ${d.getFullYear()}`;
+    }
+  } catch (e) {
+    // fallback
+  }
+  return String(dateStr);
+}
+
+// Helper: Dapatkan daftar karyawan untuk dropdown
+async function fetchEmployeesForCuti() {
+  if (state.cuti.employees && state.cuti.employees.length > 0) {
+    return state.cuti.employees;
+  }
+
+  // Coba ambil dari state.data.users
+  if (state.data && state.data.users && state.data.users.length > 0) {
+    state.cuti.employees = state.data.users.map((u, idx) => ({
+      nik: u.id || u.NoUrut || `EMP-${String(idx + 1).padStart(3, '0')}`,
+      nama: u.full_name || u.username || 'Karyawan',
+      jabatan: u.role || 'Staff',
+      kanwil: u.kanwil || 'Pusat'
+    }));
+    return state.cuti.employees;
+  }
+
+  // Direct fetch dari Supabase users table
+  try {
+    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/users?select=*&order=full_name.asc`, {
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+      }
+    });
+    if (res.ok) {
+      const users = await res.json();
+      state.cuti.employees = users.map((u, idx) => ({
+        nik: u.id || u.NoUrut || `EMP-${String(idx + 1).padStart(3, '0')}`,
+        nama: u.full_name || u.username || 'Karyawan',
+        jabatan: u.role || 'Staff',
+        kanwil: u.kanwil || 'Pusat'
+      }));
+      return state.cuti.employees;
+    }
+  } catch (err) {
+    console.warn('Gagal memuat users untuk cuti:', err);
+  }
+
+  return [];
+}
+
+// ==========================================================================
+// 12.1 MODUL PENGAJUAN CUTI KARYAWAN (mod_cuti_karyawan)
+// ==========================================================================
+
+async function initCutiKaryawanView() {
+  const user = state.currentUser || { username: 'Staff', role: 'Staff', full_name: 'Staff Karyawan' };
+  const isAdmin = (user.role || '').toLowerCase() === 'admin' || (user.role || '').toLowerCase() === 'administrator utama';
+
+  // Badge User di Banner
+  const userBadgeEl = document.getElementById('cutiUserBadgeText');
+  if (userBadgeEl) {
+    userBadgeEl.textContent = `${user.full_name || user.username} (${user.role || 'Staff'})`;
+  }
+
+  // Setup Form Pengajuan Cuti (Admin vs Staff)
+  const selWrap = document.getElementById('cutiNamaSelectWrapper');
+  const roWrap = document.getElementById('cutiNamaReadonlyWrapper');
+  const noteEl = document.getElementById('cutiNamaModeNote');
+  const inputNama = document.getElementById('cutiNamaKaryawanInput');
+  const inputNik = document.getElementById('cutiNik');
+  const inputJabatan = document.getElementById('cutiJabatan');
+  const selectNama = document.getElementById('cutiNamaKaryawanSelect');
+
+  const employees = await fetchEmployeesForCuti();
+
+  if (isAdmin) {
+    if (selWrap) selWrap.style.display = 'block';
+    if (roWrap) roWrap.style.display = 'none';
+    if (noteEl) noteEl.textContent = '(Mode Admin: Dapat memilih karyawan)';
+
+    if (selectNama && employees.length > 0) {
+      selectNama.innerHTML = '<option value="">-- Pilih Karyawan --</option>' +
+        employees.map(e => `<option value="${e.nama}" data-nik="${e.nik}" data-jabatan="${e.jabatan}">${e.nama} (${e.jabatan || 'Staff'})</option>`).join('');
+      
+      // Default pilih user yang login jika ada di list
+      const matched = employees.find(e => e.nama.toLowerCase() === (user.full_name || user.username).toLowerCase());
+      if (matched) {
+        selectNama.value = matched.nama;
+        if (inputNik) inputNik.value = matched.nik;
+        if (inputJabatan) inputJabatan.value = matched.jabatan;
+      } else {
+        if (inputNik) inputNik.value = user.id || 'EMP-001';
+        if (inputJabatan) inputJabatan.value = user.role || 'Staff';
+      }
+    }
+  } else {
+    if (selWrap) selWrap.style.display = 'none';
+    if (roWrap) roWrap.style.display = 'block';
+    if (noteEl) noteEl.textContent = '(Otomatis dari Akun Login)';
+    if (inputNama) inputNama.value = user.full_name || user.username || 'Staff';
+    if (inputNik) inputNik.value = user.id || 'EMP-001';
+    if (inputJabatan) inputJabatan.value = user.role || 'Staff';
+  }
+
+  // Inisialisasi Tanggal Mulai & Selesai Default (Hari Ini)
+  const todayIso = new Date().toISOString().split('T')[0];
+  const tglMulaiEl = document.getElementById('cutiTglMulai');
+  const tglSelesaiEl = document.getElementById('cutiTglSelesai');
+  if (tglMulaiEl && !tglMulaiEl.value) tglMulaiEl.value = todayIso;
+  if (tglSelesaiEl && !tglSelesaiEl.value) tglSelesaiEl.value = todayIso;
+  calculateCutiDurationDays();
+
+  // Load Data Cuti & Kuota
+  await loadCutiKaryawanData();
+}
+
+function onAdminSelectCutiEmployee() {
+  const selectNama = document.getElementById('cutiNamaKaryawanSelect');
+  const inputNik = document.getElementById('cutiNik');
+  const inputJabatan = document.getElementById('cutiJabatan');
+  if (!selectNama) return;
+
+  const opt = selectNama.options[selectNama.selectedIndex];
+  if (opt && opt.value) {
+    if (inputNik) inputNik.value = opt.getAttribute('data-nik') || '-';
+    if (inputJabatan) inputJabatan.value = opt.getAttribute('data-jabatan') || 'Karyawan';
+  }
+}
+
+function calculateCutiDurationDays() {
+  const tglMulaiEl = document.getElementById('cutiTglMulai');
+  const tglSelesaiEl = document.getElementById('cutiTglSelesai');
+  const jumlahHariEl = document.getElementById('cutiJumlahHari');
+  const durasiTextEl = document.getElementById('cutiDurasiText');
+  if (!tglMulaiEl || !tglSelesaiEl || !jumlahHariEl) return;
+
+  const startVal = tglMulaiEl.value;
+  const endVal = tglSelesaiEl.value;
+  if (!startVal || !endVal) return;
+
+  const dStart = new Date(startVal);
+  const dEnd = new Date(endVal);
+
+  if (dEnd < dStart) {
+    tglSelesaiEl.value = startVal;
+    jumlahHariEl.value = 1;
+    if (durasiTextEl) durasiTextEl.textContent = '1 Hari';
+    return;
+  }
+
+  // Hitung jumlah hari kerja (inklusif)
+  const diffTime = Math.abs(dEnd - dStart);
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  jumlahHariEl.value = diffDays;
+  if (durasiTextEl) durasiTextEl.textContent = `${diffDays} Hari`;
+}
+
+async function loadCutiKaryawanData(forceRefresh) {
+  const listContainer = document.getElementById('cutiHistoryListContainer');
+  if (listContainer && forceRefresh) {
+    listContainer.innerHTML = `
+      <div class="cuti-empty-state">
+        <i class="fa-solid fa-spinner fa-spin" style="font-size:1.8rem; color:#38bdf8;"></i>
+        <p>Memuat riwayat pengajuan cuti...</p>
+      </div>
+    `;
+  }
+
+  try {
+    // 1. Fetch cuti_karyawan dari Supabase
+    const resKaryawan = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/cuti_karyawan?select=*&order=tanggalpengajuan.desc`, {
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+      }
+    });
+
+    if (resKaryawan.ok) {
+      state.cuti.karyawanList = await resKaryawan.json();
+    }
+
+    // 2. Fetch cuti_bersama dari Supabase jika belum dimuat
+    if (!state.cuti.bersamaList || state.cuti.bersamaList.length === 0 || forceRefresh) {
+      const resBersama = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/cuti_bersama?select=*&order=tanggal.asc`, {
+        headers: {
+          'apikey': SUPABASE_CONFIG.anonKey,
+          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+        }
+      });
+      if (resBersama.ok) {
+        state.cuti.bersamaList = await resBersama.json();
+      }
+    }
+
+    // 3. Hitung Kuota Cuti Pribadi Pengguna
+    calculateAndRenderUserCutiQuota();
+
+    // 4. Render Riwayat Pengajuan
+    renderCutiKaryawanHistory();
+
+  } catch (err) {
+    console.error('Error loadCutiKaryawanData:', err);
+    if (listContainer) {
+      listContainer.innerHTML = `
+        <div class="cuti-empty-state" style="color:#fb7185;">
+          <i class="fa-solid fa-triangle-exclamation" style="font-size:1.8rem;"></i>
+          <p>Gagal memuat data cuti dari database Supabase.</p>
+        </div>
+      `;
+    }
+  }
+}
+
+function calculateAndRenderUserCutiQuota() {
+  const user = state.currentUser || {};
+  const userName = (user.full_name || user.username || '').toLowerCase().trim();
+  const userId = (user.id || '').toLowerCase().trim();
+  const currentYear = new Date().getFullYear().toString();
+
+  // Hitung total Cuti Bersama yang memotong kuota tahunan pada tahun berjalan
+  let totalCbPotong = 0;
+  (state.cuti.bersamaList || []).forEach(cb => {
+    const st = String(cb.status || '').trim().toLowerCase();
+    const potong = String(cb.potongcutitahunan || '').trim().toLowerCase();
+    const thn = String(cb.tahun || cb.tanggal || '').slice(0, 4);
+    if ((st === 'aktif' || st === '') && potong === 'ya' && (!thn || thn === currentYear)) {
+      totalCbPotong += Number(cb.jumlahhari || 1);
+    }
+  });
+
+  const baseQuota = 12;
+  const netQuota = Math.max(0, baseQuota - totalCbPotong);
+
+  // Filter permohonan cuti user yang disetujui (atau non-rejected) pada tahun berjalan
+  let terpakai = 0;
+  (state.cuti.karyawanList || []).forEach(c => {
+    const cNama = String(c.namakaryawan || '').toLowerCase().trim();
+    const cNik = String(c.nik || '').toLowerCase().trim();
+    const isSameUser = (cNama && (cNama === userName || userName.includes(cNama) || cNama.includes(userName))) || (cNik && cNik === userId);
+    
+    if (isSameUser) {
+      const st = String(c.statusapproval || '').toLowerCase();
+      const isApproved = st.includes('setuju') || st.includes('approve');
+      const isTahunan = String(c.tipecuti || '').toLowerCase().includes('tahunan');
+      const cYear = String(c.tanggalmulai || c.tanggalpengajuan || '').slice(0, 4);
+      
+      if (isApproved && isTahunan && (!cYear || cYear === currentYear)) {
+        terpakai += Number(c.jumlahhari || 1);
+      }
+    }
+  });
+
+  const sisaCuti = Math.max(0, netQuota - terpakai);
+  state.cuti.userQuota = { netQuota, terpakai, sisaCuti };
+
+  const netEl = document.getElementById('cutiUserNetQuota');
+  const usedEl = document.getElementById('cutiUserUsedQuota');
+  const remEl = document.getElementById('cutiUserRemainingQuota');
+
+  if (netEl) netEl.textContent = `${netQuota} Hari`;
+  if (usedEl) usedEl.textContent = `${terpakai} Hari`;
+  if (remEl) remEl.textContent = `${sisaCuti} Hari`;
+}
+
+function renderCutiKaryawanHistory(filterKeyword) {
+  const listContainer = document.getElementById('cutiHistoryListContainer');
+  if (!listContainer) return;
+
+  const user = state.currentUser || {};
+  const userName = (user.full_name || user.username || '').toLowerCase().trim();
+  const userId = (user.id || '').toLowerCase().trim();
+  const isAdmin = (user.role || '').toLowerCase() === 'admin' || (user.role || '').toLowerCase() === 'administrator utama';
+
+  let list = (state.cuti.karyawanList || []);
+
+  // Jika bukan admin, hanya tampilkan cuti miliknya sendiri
+  if (!isAdmin) {
+    list = list.filter(c => {
+      const cNama = String(c.namakaryawan || '').toLowerCase().trim();
+      const cNik = String(c.nik || '').toLowerCase().trim();
+      return (cNama && (cNama === userName || userName.includes(cNama) || cNama.includes(userName))) || (cNik && cNik === userId);
+    });
+  }
+
+  // Filter Keyword jika ada
+  const kw = (filterKeyword || '').toLowerCase().trim();
+  if (kw) {
+    list = list.filter(c =>
+      String(c.cutiid || '').toLowerCase().includes(kw) ||
+      String(c.namakaryawan || '').toLowerCase().includes(kw) ||
+      String(c.tipecuti || '').toLowerCase().includes(kw) ||
+      String(c.statusapproval || '').toLowerCase().includes(kw) ||
+      String(c.keterangan || '').toLowerCase().includes(kw)
+    );
+  }
+
+  if (list.length === 0) {
+    listContainer.innerHTML = `
+      <div class="cuti-empty-state" style="padding:32px 16px; text-align:center;">
+        <i class="fa-solid fa-folder-open" style="font-size:2rem; color:var(--text-dim); margin-bottom:10px;"></i>
+        <p style="font-size:0.85rem; font-weight:700; color:var(--text-main); margin-bottom:4px;">Belum Ada Riwayat Cuti</p>
+        <span style="font-size:0.75rem; color:var(--text-muted);">Pengajuan cuti yang telah diajukan akan tampil di sini secara real-time.</span>
+      </div>
+    `;
+    return;
+  }
+
+  listContainer.innerHTML = list.map(item => {
+    const st = String(item.statusapproval || 'Pending').trim();
+    let badgeCls = 'pending';
+    let icon = 'fa-clock';
+    if (st.toLowerCase().includes('setuju') || st.toLowerCase().includes('approve')) {
+      badgeCls = 'disetujui';
+      icon = 'fa-circle-check';
+    } else if (st.toLowerCase().includes('tolak') || st.toLowerCase().includes('reject')) {
+      badgeCls = 'ditolak';
+      icon = 'fa-circle-xmark';
+    }
+
+    const tglMulai = formatIndoCutiDate(item.tanggalmulai);
+    const tglSelesai = formatIndoCutiDate(item.tanggalselesai);
+    const durasi = item.jumlahhari || 1;
+
+    return `
+      <div class="cuti-history-card-item">
+        <div class="cuti-history-top">
+          <span class="cuti-id-tag">${item.cutiid || 'CT-NEW'}</span>
+          <span class="cuti-status-badge ${badgeCls}">
+            <i class="fa-solid ${icon}"></i>
+            <span>${st}</span>
+          </span>
+        </div>
+        <div class="cuti-type-badge">${item.tipecuti || 'Cuti Tahunan'} • ${durasi} Hari Kerja</div>
+        <div class="cuti-period-text">
+          <i class="fa-regular fa-calendar" style="color:#38bdf8;"></i>
+          <span>${tglMulai} ${tglMulai !== tglSelesai ? 's.d ' + tglSelesai : ''}</span>
+        </div>
+        ${item.keterangan ? `<div class="cuti-reason-text">"${item.keterangan}"</div>` : ''}
+        ${item.linkdokumen ? `
+          <div style="margin-top:6px;">
+            <a href="${item.linkdokumen}" target="_blank" rel="noopener noreferrer" style="font-size:0.72rem; color:#38bdf8; display:inline-flex; align-items:center; gap:4px;">
+              <i class="fa-solid fa-paperclip"></i>
+              <span>Lampiran Dokumen Drive</span>
+              <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.65rem;"></i>
+            </a>
+          </div>
+        ` : ''}
+        ${item.catatanapproval ? `
+          <div class="cuti-approval-note">
+            <i class="fa-solid fa-comment-dots" style="margin-right:4px;"></i> Catatan Otorisasi: ${item.catatanapproval}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+}
+
+function filterCutiKaryawanHistory() {
+  const searchInput = document.getElementById('cutiHistorySearch');
+  renderCutiKaryawanHistory(searchInput ? searchInput.value : '');
+}
+
+async function handlePengajuanCutiSubmit(event) {
+  if (event) event.preventDefault();
+
+  const user = state.currentUser || {};
+  const isAdmin = (user.role || '').toLowerCase() === 'admin' || (user.role || '').toLowerCase() === 'administrator utama';
+
+  const selectNama = document.getElementById('cutiNamaKaryawanSelect');
+  const inputNama = document.getElementById('cutiNamaKaryawanInput');
+  const inputNik = document.getElementById('cutiNik');
+  const inputJabatan = document.getElementById('cutiJabatan');
+  const inputTipe = document.getElementById('cutiTipe');
+  const inputTglMulai = document.getElementById('cutiTglMulai');
+  const inputTglSelesai = document.getElementById('cutiTglSelesai');
+  const inputJumlahHari = document.getElementById('cutiJumlahHari');
+  const inputKeterangan = document.getElementById('cutiKeterangan');
+  const inputLink = document.getElementById('cutiLinkDokumen');
+  const btnSubmit = document.getElementById('btnSubmitPengajuanCuti');
+
+  const namaKaryawan = isAdmin ? (selectNama ? selectNama.value : '') : (inputNama ? inputNama.value : '');
+  if (!namaKaryawan) {
+    alert('Nama karyawan wajib diisi!');
+    return;
+  }
+
+  const tglMulai = inputTglMulai ? inputTglMulai.value : '';
+  const tglSelesai = inputTglSelesai ? inputTglSelesai.value : '';
+  if (!tglMulai || !tglSelesai) {
+    alert('Tanggal mulai dan selesai wajib diisi!');
+    return;
+  }
+
+  const nik = inputNik ? inputNik.value : (user.id || 'EMP-001');
+  const jabatan = inputJabatan ? inputJabatan.value : (user.role || 'Staff');
+  const tipeCuti = inputTipe ? inputTipe.value : 'Cuti Tahunan';
+  const jumlahHari = parseFloat(inputJumlahHari ? inputJumlahHari.value : 1) || 1;
+  const keterangan = inputKeterangan ? inputKeterangan.value : '';
+  const linkDokumen = inputLink ? inputLink.value.trim() : null;
+
+  // Generate Unique CutiID: CT-2026-XXXX
+  const cutiId = `CT-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`;
+  const nowIso = new Date().toISOString();
+
+  const payload = {
+    cutiid: cutiId,
+    tanggalpengajuan: nowIso,
+    nik: nik,
+    namakaryawan: namaKaryawan,
+    jabatan: jabatan,
+    tipecuti: tipeCuti,
+    tanggalmulai: tglMulai,
+    tanggalselesai: tglSelesai,
+    jumlahhari: jumlahHari,
+    keterangan: keterangan,
+    linkdokumen: linkDokumen || null,
+    statusapproval: 'Pending',
+    approvedby: null,
+    approvedat: null,
+    catatanapproval: null,
+    createdat: nowIso
+  };
+
+  if (btnSubmit) {
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan ke Supabase...';
+  }
+
+  try {
+    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/cuti_karyawan`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok || res.status === 201) {
+      alert(`✅ Berhasil! Pengajuan cuti [${cutiId}] untuk ${namaKaryawan} telah tersimpan di Supabase.`);
+      resetFormPengajuanCuti();
+      await loadCutiKaryawanData(true);
+    } else {
+      const errText = await res.text();
+      alert(`⚠️ Gagal menyimpan permohonan cuti: ${errText}`);
+    }
+  } catch (err) {
+    console.error('Submit error:', err);
+    alert(`⚠️ Terjadi kesalahan koneksi ke Supabase: ${err.message}`);
+  } finally {
+    if (btnSubmit) {
+      btnSubmit.disabled = false;
+      btnSubmit.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Kirim Pengajuan Cuti';
+    }
+  }
+}
+
+function resetFormPengajuanCuti() {
+  const form = document.getElementById('formPengajuanCuti');
+  if (form) form.reset();
+
+  const todayIso = new Date().toISOString().split('T')[0];
+  const tglMulaiEl = document.getElementById('cutiTglMulai');
+  const tglSelesaiEl = document.getElementById('cutiTglSelesai');
+  const durasiEl = document.getElementById('cutiJumlahHari');
+  const durasiText = document.getElementById('cutiDurasiText');
+
+  if (tglMulaiEl) tglMulaiEl.value = todayIso;
+  if (tglSelesaiEl) tglSelesaiEl.value = todayIso;
+  if (durasiEl) durasiEl.value = 1;
+  if (durasiText) durasiText.textContent = '1 Hari';
+}
+
+// ==========================================================================
+// 12.2 MODUL CUTI BERSAMA, APPROVAL & MATRIKS KUOTA (mod_cuti_bersama)
+// ==========================================================================
+
+async function initCutiBersamaView() {
+  await reloadCutiBersamaModule();
+}
+
+function switchCutiBersamaTab(tabName) {
+  state.cuti.activeCbTab = tabName;
+
+  const btnList = document.getElementById('tabBtnCbList');
+  const btnApproval = document.getElementById('tabBtnCbApproval');
+  const btnMatrix = document.getElementById('tabBtnCbMatrix');
+
+  const paneList = document.getElementById('paneCbList');
+  const paneApproval = document.getElementById('paneCbApproval');
+  const paneMatrix = document.getElementById('paneCbMatrix');
+
+  if (btnList) btnList.classList.toggle('active', tabName === 'list');
+  if (btnApproval) btnApproval.classList.toggle('active', tabName === 'approval');
+  if (btnMatrix) btnMatrix.classList.toggle('active', tabName === 'matrix');
+
+  if (paneList) paneList.style.display = tabName === 'list' ? 'block' : 'none';
+  if (paneApproval) paneApproval.style.display = tabName === 'approval' ? 'block' : 'none';
+  if (paneMatrix) paneMatrix.style.display = tabName === 'matrix' ? 'block' : 'none';
+}
+
+async function reloadCutiBersamaModule(forceRefresh) {
+  const yearSelect = document.getElementById('cbSelectYear');
+  if (yearSelect) state.cuti.selectedYear = yearSelect.value || '2026';
+
+  const yearNavLabel = document.getElementById('cbYearLabelNav');
+  if (yearNavLabel) yearNavLabel.textContent = state.cuti.selectedYear;
+
+  try {
+    // 1. Fetch Cuti Bersama
+    const resCb = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/cuti_bersama?select=*&order=tanggal.asc`, {
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+      }
+    });
+    if (resCb.ok) {
+      state.cuti.bersamaList = await resCb.json();
+    }
+
+    // 2. Fetch Cuti Karyawan
+    const resCk = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/cuti_karyawan?select=*&order=tanggalpengajuan.desc`, {
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+      }
+    });
+    if (resCk.ok) {
+      state.cuti.karyawanList = await resCk.json();
+    }
+
+    // Pastikan employees loaded
+    await fetchEmployeesForCuti();
+
+    // Render Tab 1: Cuti Bersama
+    renderCutiBersamaTable();
+
+    // Render Tab 2: Approval
+    renderCutiApprovalTable();
+
+    // Render Tab 3: Matriks Kuota
+    renderCutiMatrixTable();
+
+  } catch (err) {
+    console.error('Error reloadCutiBersamaModule:', err);
+  }
+}
+
+function onCutiBersamaYearChange() {
+  const yearSelect = document.getElementById('cbSelectYear');
+  if (yearSelect) state.cuti.selectedYear = yearSelect.value;
+  const yearNavLabel = document.getElementById('cbYearLabelNav');
+  if (yearNavLabel) yearNavLabel.textContent = state.cuti.selectedYear;
+
+  renderCutiBersamaTable();
+  renderCutiMatrixTable();
+}
+
+function renderCutiBersamaTable() {
+  const tbody = document.getElementById('cbTableBody');
+  if (!tbody) return;
+
+  const targetYear = state.cuti.selectedYear || '2026';
+  const allCb = state.cuti.bersamaList || [];
+
+  // Filter per tahun
+  const filtered = allCb.filter(item => {
+    const y = String(item.tahun || item.tanggal || '').slice(0, 4);
+    return !targetYear || y === targetYear;
+  });
+
+  // Hitung stats
+  let totalHari = 0;
+  let totalPotong = 0;
+  filtered.forEach(item => {
+    const st = String(item.status || 'Aktif').trim().toLowerCase();
+    const durasi = Number(item.jumlahhari || 1);
+    if (st === 'aktif' || st === '') {
+      totalHari += durasi;
+      if (String(item.potongcutitahunan || '').toLowerCase() === 'ya') {
+        totalPotong += durasi;
+      }
+    }
+  });
+
+  const netHak = Math.max(0, 12 - totalPotong);
+
+  const statTotalEl = document.getElementById('cbStatTotalDays');
+  const statPotongEl = document.getElementById('cbStatPotongDays');
+  const statNetEl = document.getElementById('cbStatNetDays');
+  if (statTotalEl) statTotalEl.textContent = `${totalHari} Hari`;
+  if (statPotongEl) statPotongEl.textContent = `${totalPotong} Hari`;
+  if (statNetEl) statNetEl.textContent = `${netHak} Hari`;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="8" style="text-align:center; padding:32px; color:var(--text-muted);">
+          Tidak ada data cuti bersama / libur nasional pada tahun ${targetYear}.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((item, idx) => {
+    const isPotong = String(item.potongcutitahunan || 'Ya').toLowerCase() === 'ya';
+    const isAktif = String(item.status || 'Aktif').toLowerCase() === 'aktif';
+    const safeItem = JSON.stringify(item).replace(/"/g, '&quot;');
+
+    return `
+      <tr>
+        <td style="text-align:center; font-family:monospace; color:var(--text-dim);">${idx + 1}</td>
+        <td style="font-family:monospace; color:var(--text-light); font-size:0.82rem;">${formatIndoCutiDate(item.tanggal)}</td>
+        <td>
+          <strong style="color:var(--text-main); font-size:0.85rem;">${item.namaharilibur || 'Hari Libur'}</strong>
+          <div style="font-size:0.7rem; color:var(--text-muted); font-family:monospace;">ID: ${item.id} • Tahun: ${item.tahun}</div>
+        </td>
+        <td style="text-align:center;">
+          <span style="background:rgba(255,255,255,0.06); padding:3px 10px; border-radius:6px; font-family:monospace; font-weight:700; color:var(--text-light);">
+            ${item.jumlahhari || 1} Hari
+          </span>
+        </td>
+        <td style="text-align:center;">
+          <span class="status-pill ${isPotong ? 'warning' : 'info'}" style="font-size:0.72rem;">
+            ${isPotong ? 'Ya (Potong Kuota)' : 'Tidak (Libur Bebas)'}
+          </span>
+        </td>
+        <td style="color:var(--text-muted); font-size:0.8rem;">${item.keterangan || '-'}</td>
+        <td style="text-align:center;">
+          <span class="status-pill ${isAktif ? 'active' : 'inactive'}" style="font-size:0.72rem;">
+            ${isAktif ? 'Aktif' : 'Nonaktif'}
+          </span>
+        </td>
+        <td style="text-align:center;">
+          <div style="display:inline-flex; gap:6px;">
+            <button type="button" class="btn-action edit" onclick="editCutiBersama('${item.id}')" title="Edit Hari Libur">
+              <i class="fa-solid fa-pen-to-square"></i>
+            </button>
+            <button type="button" class="btn-action delete" onclick="deleteCutiBersama('${item.id}')" title="Hapus Hari Libur">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderCutiApprovalTable(filterKeyword, filterStatus) {
+  const tbody = document.getElementById('cutiApprovalTableBody');
+  if (!tbody) return;
+
+  const allCuti = state.cuti.karyawanList || [];
+
+  // Hitung pending counter
+  const pendingCount = allCuti.filter(c => {
+    const st = String(c.statusapproval || '').toLowerCase();
+    return st.includes('pending') || st.includes('tunggu');
+  }).length;
+
+  const badgePendingHeader = document.getElementById('badgePendingApprovalCount');
+  const badgePendingTab = document.getElementById('tabBadgeApprovalPending');
+
+  if (badgePendingHeader) badgePendingHeader.textContent = pendingCount;
+  if (badgePendingTab) {
+    badgePendingTab.textContent = pendingCount;
+    badgePendingTab.style.display = pendingCount > 0 ? 'inline-block' : 'none';
+  }
+
+  const kw = (filterKeyword !== undefined ? filterKeyword : (document.getElementById('cutiApprovalSearch')?.value || '')).toLowerCase().trim();
+  const stFilter = (filterStatus !== undefined ? filterStatus : (document.getElementById('cutiApprovalStatusFilter')?.value || 'ALL')).toLowerCase().trim();
+
+  let list = allCuti.filter(item => {
+    // Filter keyword
+    const matchKw = !kw ||
+      String(item.cutiid || '').toLowerCase().includes(kw) ||
+      String(item.namakaryawan || '').toLowerCase().includes(kw) ||
+      String(item.nik || '').toLowerCase().includes(kw) ||
+      String(item.tipecuti || '').toLowerCase().includes(kw) ||
+      String(item.keterangan || '').toLowerCase().includes(kw);
+
+    // Filter status
+    const itemSt = String(item.statusapproval || 'Pending').toLowerCase();
+    let matchSt = true;
+    if (stFilter !== 'all') {
+      if (stFilter === 'pending') matchSt = itemSt.includes('pending') || itemSt.includes('tunggu');
+      else if (stFilter === 'disetujui') matchSt = itemSt.includes('setuju') || itemSt.includes('approve');
+      else if (stFilter === 'ditolak') matchSt = itemSt.includes('tolak') || itemSt.includes('reject');
+    }
+
+    return matchKw && matchSt;
+  });
+
+  if (list.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="8" style="text-align:center; padding:32px; color:var(--text-muted);">
+          Tidak ada pengajuan cuti yang sesuai kriteria pencarian.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = list.map(item => {
+    const st = String(item.statusapproval || 'Pending').trim();
+    let badgeCls = 'pending';
+    let icon = 'fa-clock';
+    if (st.toLowerCase().includes('setuju') || st.toLowerCase().includes('approve')) {
+      badgeCls = 'disetujui';
+      icon = 'fa-circle-check';
+    } else if (st.toLowerCase().includes('tolak') || st.toLowerCase().includes('reject')) {
+      badgeCls = 'ditolak';
+      icon = 'fa-circle-xmark';
+    }
+
+    const tglPengajuan = formatIndoCutiDate(item.tanggalpengajuan);
+    const tglMulai = formatIndoCutiDate(item.tanggalmulai);
+    const tglSelesai = formatIndoCutiDate(item.tanggalselesai);
+    const durasi = item.jumlahhari || 1;
+
+    return `
+      <tr>
+        <td>
+          <strong style="color:#38bdf8; font-family:monospace; font-size:0.85rem;">${item.cutiid || 'CT-NEW'}</strong>
+          <div style="font-size:0.7rem; color:var(--text-dim);">${tglPengajuan}</div>
+        </td>
+        <td>
+          <strong style="color:var(--text-light); font-size:0.85rem;">${item.namakaryawan || '-'}</strong>
+          <div style="font-size:0.72rem; color:var(--text-muted); font-family:monospace;">${item.jabatan || 'Staff'} • NIK: ${item.nik || '-'}</div>
+        </td>
+        <td>
+          <span style="font-size:0.75rem; color:#c084fc; background:rgba(168,85,247,0.1); border:1px solid rgba(168,85,247,0.25); padding:2px 8px; border-radius:6px; font-weight:600;">
+            ${item.tipecuti || 'Cuti Tahunan'}
+          </span>
+        </td>
+        <td style="font-size:0.8rem; color:var(--text-light);">
+          <div>${tglMulai}</div>
+          <div style="font-size:0.7rem; color:var(--text-dim);">s.d ${tglSelesai}</div>
+        </td>
+        <td style="text-align:center;">
+          <span style="background:rgba(255,255,255,0.06); padding:3px 8px; border-radius:6px; font-family:monospace; font-weight:700; color:var(--text-light);">
+            ${durasi} Hari
+          </span>
+        </td>
+        <td style="max-width:220px;">
+          <div style="font-size:0.78rem; color:var(--text-main); line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${item.keterangan || '-'}">
+            ${item.keterangan || '-'}
+          </div>
+          ${item.linkdokumen ? `
+            <a href="${item.linkdokumen}" target="_blank" rel="noopener noreferrer" style="font-size:0.7rem; color:#38bdf8; display:inline-flex; align-items:center; gap:4px; margin-top:3px;">
+              <i class="fa-solid fa-paperclip"></i> Lampiran Drive
+            </a>
+          ` : ''}
+          ${item.catatanapproval ? `
+            <div style="font-size:0.68rem; color:#f59e0b; font-style:italic; margin-top:2px;">
+              Catatan: ${item.catatanapproval}
+            </div>
+          ` : ''}
+        </td>
+        <td style="text-align:center;">
+          <span class="cuti-status-badge ${badgeCls}">
+            <i class="fa-solid ${icon}"></i>
+            <span>${st}</span>
+          </span>
+        </td>
+        <td style="text-align:center;">
+          <div style="display:inline-flex; gap:6px;">
+            <button type="button" class="btn-action view" onclick="openApprovalCutiModal('${item.cutiid}')" title="Proses Persetujuan">
+              <i class="fa-solid fa-stamp"></i>
+              <span style="font-size:0.72rem; margin-left:4px;">Proses</span>
+            </button>
+            <button type="button" class="btn-action delete" onclick="deleteCutiRequest('${item.cutiid}')" title="Hapus Permohonan Cuti">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function filterCutiApprovalList() {
+  const searchInput = document.getElementById('cutiApprovalSearch');
+  const statusSelect = document.getElementById('cutiApprovalStatusFilter');
+  renderCutiApprovalTable(
+    searchInput ? searchInput.value : '',
+    statusSelect ? statusSelect.value : 'ALL'
+  );
+}
+
+function renderCutiMatrixTable() {
+  const tbody = document.getElementById('cutiMatrixTableBody');
+  if (!tbody) return;
+
+  const targetYear = state.cuti.selectedYear || '2026';
+
+  // 1. Hitung total cuti bersama yang memotong kuota pada tahun target
+  let totalCbPotong = 0;
+  (state.cuti.bersamaList || []).forEach(cb => {
+    const st = String(cb.status || 'Aktif').trim().toLowerCase();
+    const potong = String(cb.potongcutitahunan || '').trim().toLowerCase();
+    const y = String(cb.tahun || cb.tanggal || '').slice(0, 4);
+    if ((st === 'aktif' || st === '') && potong === 'ya' && (!y || y === targetYear)) {
+      totalCbPotong += Number(cb.jumlahhari || 1);
+    }
+  });
+
+  const baseQuota = 12;
+  const netQuota = Math.max(0, baseQuota - totalCbPotong);
+
+  const matPotongEl = document.getElementById('matrixCbPotongVal');
+  const matNetEl = document.getElementById('matrixNetQuotaVal');
+  if (matPotongEl) matPotongEl.textContent = `${totalCbPotong} Hari`;
+  if (matNetEl) matNetEl.textContent = `${netQuota} Hari`;
+
+  // 2. Daftar karyawan
+  const employees = state.cuti.employees || [];
+  if (employees.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="9" style="text-align:center; padding:32px; color:var(--text-muted);">
+          Belum ada master data karyawan untuk menghitung matriks kuota.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  // 3. Agregasikan permohonan cuti per karyawan
+  const allCuti = state.cuti.karyawanList || [];
+
+  tbody.innerHTML = employees.map(emp => {
+    const empName = (emp.nama || '').toLowerCase().trim();
+    const empNik = (emp.nik || '').toLowerCase().trim();
+
+    let usedTahunan = 0;
+    let cutiSakit = 0;
+    let cutiUmrah = 0;
+    let cutiMelahirkan = 0;
+
+    allCuti.forEach(c => {
+      const cNama = String(c.namakaryawan || '').toLowerCase().trim();
+      const cNik = String(c.nik || '').toLowerCase().trim();
+      const isMatch = (cNama && (cNama === empName || empName.includes(cNama) || cNama.includes(empName))) || (cNik && cNik === empNik);
+
+      if (isMatch) {
+        const st = String(c.statusapproval || '').toLowerCase();
+        // Hanya hitung jika disetujui (atau non-rejected)
+        const isApproved = st.includes('setuju') || st.includes('approve');
+        const dur = Number(c.jumlahhari || 1);
+        const tipe = String(c.tipecuti || '').toLowerCase();
+        const y = String(c.tanggalmulai || c.tanggalpengajuan || '').slice(0, 4);
+
+        if (isApproved && (!y || y === targetYear)) {
+          if (tipe.includes('tahunan')) usedTahunan += dur;
+          else if (tipe.includes('sakit')) cutiSakit += dur;
+          else if (tipe.includes('umrah') || tipe.includes('ibadah')) cutiUmrah += dur;
+          else if (tipe.includes('lahir') || tipe.includes('melahirkan')) cutiMelahirkan += dur;
+        }
+      }
+    });
+
+    const sisa = Math.max(0, netQuota - usedTahunan);
+    let sisaBadgeCls = 'safe';
+    if (sisa === 0) sisaBadgeCls = 'danger';
+    else if (sisa <= 3) sisaBadgeCls = 'warning';
+
+    return `
+      <tr>
+        <td style="font-family:monospace; color:#38bdf8; font-size:0.8rem;">${emp.nik || '-'}</td>
+        <td>
+          <strong style="color:var(--text-light); font-size:0.85rem;">${emp.nama}</strong>
+          ${usedTahunan > 0 || cutiSakit > 0 || cutiUmrah > 0 ? `
+            <span style="margin-left:6px; font-size:0.65rem; background:rgba(56,189,248,0.15); border:1px solid rgba(56,189,248,0.3); color:#38bdf8; padding:1px 6px; border-radius:10px;">
+              Pernah Cuti
+            </span>
+          ` : ''}
+        </td>
+        <td style="color:var(--text-muted); font-size:0.8rem;">${emp.jabatan || 'Staff'}</td>
+        <td style="text-align:center; font-family:monospace; font-weight:700; color:var(--text-light);">${netQuota} Hari</td>
+        <td style="text-align:center; font-family:monospace; font-weight:700; color:#fbbf24;">${usedTahunan} Hari</td>
+        <td style="text-align:center; font-family:monospace; color:#c084fc;">${cutiSakit} Hari</td>
+        <td style="text-align:center; font-family:monospace; color:#2dd4bf;">${cutiUmrah} Hari</td>
+        <td style="text-align:center; font-family:monospace; color:#f472b6;">${cutiMelahirkan} Hari</td>
+        <td style="text-align:center;">
+          <span class="matrix-sisa-badge ${sisaBadgeCls}">
+            ${sisa} Hari
+          </span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// ==========================================================================
+// 12.3 MODAL & ACTION HANDLERS
+// ==========================================================================
+
+function openAddCutiBersamaModal() {
+  const modal = document.getElementById('modalCutiBersama');
+  const title = document.getElementById('modalCutiBersamaTitle');
+  const form = document.getElementById('formCutiBersama');
+  if (form) form.reset();
+
+  const idInput = document.getElementById('cbFormId');
+  if (idInput) idInput.value = '';
+
+  const thnInput = document.getElementById('cbFormTahun');
+  if (thnInput) thnInput.value = state.cuti.selectedYear || '2026';
+
+  if (title) title.textContent = 'Tambah Hari Cuti Bersama';
+  if (modal) modal.style.display = 'flex';
+}
+
+function editCutiBersama(id) {
+  const item = (state.cuti.bersamaList || []).find(cb => cb.id === id);
+  if (!item) return;
+
+  const modal = document.getElementById('modalCutiBersama');
+  const title = document.getElementById('modalCutiBersamaTitle');
+
+  const idInput = document.getElementById('cbFormId');
+  const thnInput = document.getElementById('cbFormTahun');
+  const tglInput = document.getElementById('cbFormTanggal');
+  const namaInput = document.getElementById('cbFormNama');
+  const jmlInput = document.getElementById('cbFormJumlahHari');
+  const potongInput = document.getElementById('cbFormPotong');
+  const stInput = document.getElementById('cbFormStatus');
+  const ketInput = document.getElementById('cbFormKeterangan');
+
+  if (idInput) idInput.value = item.id;
+  if (thnInput) thnInput.value = item.tahun || '2026';
+  if (tglInput) tglInput.value = item.tanggal ? item.tanggal.split('T')[0] : '';
+  if (namaInput) namaInput.value = item.namaharilibur || '';
+  if (jmlInput) jmlInput.value = item.jumlahhari || 1;
+  if (potongInput) potongInput.value = item.potongcutitahunan || 'Ya';
+  if (stInput) stInput.value = item.status || 'Aktif';
+  if (ketInput) ketInput.value = item.keterangan || '';
+
+  if (title) title.textContent = `Edit Cuti Bersama [${item.id}]`;
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeCutiBersamaModal() {
+  const modal = document.getElementById('modalCutiBersama');
+  if (modal) modal.style.display = 'none';
+}
+
+async function handleCutiBersamaSubmit(event) {
+  if (event) event.preventDefault();
+
+  const idInput = document.getElementById('cbFormId');
+  const thnInput = document.getElementById('cbFormTahun');
+  const tglInput = document.getElementById('cbFormTanggal');
+  const namaInput = document.getElementById('cbFormNama');
+  const jmlInput = document.getElementById('cbFormJumlahHari');
+  const potongInput = document.getElementById('cbFormPotong');
+  const stInput = document.getElementById('cbFormStatus');
+  const ketInput = document.getElementById('cbFormKeterangan');
+  const btnSave = document.getElementById('btnSaveCutiBersama');
+
+  const isEdit = !!(idInput && idInput.value);
+  const cbId = isEdit ? idInput.value : `CB-${thnInput.value || 2026}-${String(Date.now()).slice(-4)}`;
+
+  const payload = {
+    id: cbId,
+    tahun: String(thnInput.value || '2026'),
+    tanggal: tglInput.value,
+    namaharilibur: namaInput.value,
+    jumlahhari: parseFloat(jmlInput.value || 1) || 1,
+    potongcutitahunan: potongInput.value || 'Ya',
+    status: stInput.value || 'Aktif',
+    keterangan: ketInput.value || null,
+    createdat: new Date().toISOString()
+  };
+
+  if (btnSave) {
+    btnSave.disabled = true;
+    btnSave.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...';
+  }
+
+  try {
+    let res;
+    if (isEdit) {
+      // PATCH ke Supabase
+      res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/cuti_bersama?id=eq.${cbId}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_CONFIG.anonKey,
+          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+    } else {
+      // POST ke Supabase
+      res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/cuti_bersama`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_CONFIG.anonKey,
+          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify(payload)
+      });
+    }
+
+    if (res.ok || res.status === 201 || res.status === 204) {
+      alert(`✅ Data Cuti Bersama ${cbId} berhasil disimpan ke Supabase!`);
+      closeCutiBersamaModal();
+      await reloadCutiBersamaModule(true);
+    } else {
+      const err = await res.text();
+      alert(`⚠️ Gagal menyimpan Cuti Bersama: ${err}`);
+    }
+  } catch (err) {
+    console.error('Error saving cuti bersama:', err);
+    alert(`⚠️ Terjadi kesalahan: ${err.message}`);
+  } finally {
+    if (btnSave) {
+      btnSave.disabled = false;
+      btnSave.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan Data';
+    }
+  }
+}
+
+async function deleteCutiBersama(id) {
+  if (!confirm(`Apakah Anda yakin ingin menghapus Hari Cuti Bersama [${id}]?`)) return;
+
+  try {
+    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/cuti_bersama?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+      }
+    });
+
+    if (res.ok || res.status === 204) {
+      alert(`✅ Cuti Bersama [${id}] berhasil dihapus dari Supabase!`);
+      await reloadCutiBersamaModule(true);
+    } else {
+      const err = await res.text();
+      alert(`⚠️ Gagal menghapus: ${err}`);
+    }
+  } catch (err) {
+    console.error('Delete CB error:', err);
+    alert(`⚠️ Terjadi kesalahan: ${err.message}`);
+  }
+}
+
+function openApprovalCutiModal(cutiId) {
+  const item = (state.cuti.karyawanList || []).find(c => c.cutiid === cutiId);
+  if (!item) return;
+
+  state.cuti.activeApprovalItem = item;
+
+  const modal = document.getElementById('modalApprovalCuti');
+  const inputId = document.getElementById('approvalCutiId');
+  const infoId = document.getElementById('approvalInfoId');
+  const infoNama = document.getElementById('approvalInfoNama');
+  const infoJabatan = document.getElementById('approvalInfoJabatan');
+  const infoTipe = document.getElementById('approvalInfoTipe');
+  const infoPeriode = document.getElementById('approvalInfoPeriode');
+  const infoAlasan = document.getElementById('approvalInfoAlasan');
+  const infoLink = document.getElementById('approvalInfoLink');
+  const infoLinkWrapper = document.getElementById('approvalInfoLinkWrapper');
+  const selectStatus = document.getElementById('approvalStatusSelect');
+  const textCatatan = document.getElementById('approvalCatatan');
+
+  if (inputId) inputId.value = item.cutiid;
+  if (infoId) infoId.textContent = item.cutiid;
+  if (infoNama) infoNama.textContent = item.namakaryawan || '-';
+  if (infoJabatan) infoJabatan.textContent = `${item.jabatan || 'Staff'} • NIK: ${item.nik || '-'}`;
+  if (infoTipe) infoTipe.textContent = `${item.tipecuti || 'Cuti Tahunan'} • ${item.jumlahhari || 1} Hari Kerja`;
+  if (infoPeriode) infoPeriode.textContent = `${formatIndoCutiDate(item.tanggalmulai)} s.d ${formatIndoCutiDate(item.tanggalselesai)}`;
+  if (infoAlasan) infoAlasan.textContent = item.keterangan ? `"${item.keterangan}"` : '-';
+
+  if (infoLink && infoLinkWrapper) {
+    if (item.linkdokumen) {
+      infoLink.href = item.linkdokumen;
+      infoLink.textContent = item.linkdokumen;
+      infoLinkWrapper.style.display = 'block';
+    } else {
+      infoLinkWrapper.style.display = 'none';
+    }
+  }
+
+  if (selectStatus) {
+    const curSt = String(item.statusapproval || 'Pending').toLowerCase();
+    if (curSt.includes('setuju') || curSt.includes('approve')) selectStatus.value = 'Disetujui';
+    else if (curSt.includes('tolak') || curSt.includes('reject')) selectStatus.value = 'Ditolak';
+    else selectStatus.value = 'Pending';
+  }
+
+  if (textCatatan) textCatatan.value = item.catatanapproval || '';
+
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeApprovalCutiModal() {
+  const modal = document.getElementById('modalApprovalCuti');
+  if (modal) modal.style.display = 'none';
+}
+
+async function submitCutiApprovalDecision() {
+  const inputId = document.getElementById('approvalCutiId');
+  const selectStatus = document.getElementById('approvalStatusSelect');
+  const textCatatan = document.getElementById('approvalCatatan');
+  const btnSubmit = document.getElementById('btnSubmitApprovalDecision');
+
+  const cutiId = inputId ? inputId.value : '';
+  if (!cutiId) return;
+
+  const decision = selectStatus ? selectStatus.value : 'Disetujui';
+  const catatan = textCatatan ? textCatatan.value.trim() : '';
+
+  const user = state.currentUser || {};
+  const approverName = user.full_name || user.username || 'Admin Manajerial';
+  const nowIso = new Date().toISOString();
+
+  const payload = {
+    statusapproval: decision,
+    approvedby: approverName,
+    approvedat: nowIso,
+    catatanapproval: catatan || null
+  };
+
+  if (btnSubmit) {
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan Otorisasi...';
+  }
+
+  try {
+    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/cuti_karyawan?cutiid=eq.${cutiId}`, {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok || res.status === 204) {
+      alert(`✅ Keputusan approval cuti [${cutiId}] berhasil disimpan sebagai '${decision}' di Supabase!`);
+      closeApprovalCutiModal();
+      await reloadCutiBersamaModule(true);
+      if (document.getElementById('view-cuti_karyawan')?.classList.contains('active')) {
+        await loadCutiKaryawanData(true);
+      }
+    } else {
+      const err = await res.text();
+      alert(`⚠️ Gagal memperbarui status approval: ${err}`);
+    }
+  } catch (err) {
+    console.error('Approval submit error:', err);
+    alert(`⚠️ Terjadi kesalahan: ${err.message}`);
+  } finally {
+    if (btnSubmit) {
+      btnSubmit.disabled = false;
+      btnSubmit.innerHTML = '<i class="fa-solid fa-check-double"></i> Simpan Keputusan';
+    }
+  }
+}
+
+async function deleteCutiRequest(cutiId) {
+  if (!confirm(`Apakah Anda yakin ingin menghapus pengajuan cuti [${cutiId}]?`)) return;
+
+  try {
+    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/cuti_karyawan?cutiid=eq.${cutiId}`, {
+      method: 'DELETE',
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+      }
+    });
+
+    if (res.ok || res.status === 204) {
+      alert(`✅ Pengajuan cuti [${cutiId}] berhasil dihapus dari Supabase!`);
+      await reloadCutiBersamaModule(true);
+      if (document.getElementById('view-cuti_karyawan')?.classList.contains('active')) {
+        await loadCutiKaryawanData(true);
+      }
+    } else {
+      const err = await res.text();
+      alert(`⚠️ Gagal menghapus: ${err}`);
+    }
+  } catch (err) {
+    console.error('Delete cuti error:', err);
+    alert(`⚠️ Terjadi kesalahan: ${err.message}`);
+  }
+}
+

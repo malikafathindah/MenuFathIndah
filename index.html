@@ -134,6 +134,16 @@
           <i class="fa-solid fa-bullhorn nav-icon"></i>
           <span class="nav-label">Catalog Brosur</span>
         </a>
+
+        <a href="#cuti_karyawan" class="nav-item" data-module="mod_cuti_karyawan" data-tooltip="Pengajuan Cuti">
+          <i class="fa-solid fa-calendar-minus nav-icon"></i>
+          <span class="nav-label">Pengajuan Cuti</span>
+        </a>
+
+        <a href="#cuti_bersama" class="nav-item" data-module="mod_cuti_bersama" data-tooltip="Cuti Bersama & Matrix">
+          <i class="fa-solid fa-calendar-day nav-icon"></i>
+          <span class="nav-label">Daftar & Matrix Cuti</span>
+        </a>
       </nav>
 
       <!-- Sidebar Footer -->
@@ -526,6 +536,408 @@
                 <tbody id="cutiTableBody">
                   <tr>
                     <td colspan="5" style="text-align:center; padding:20px;">Memuat data cuti...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 5E: PENGAJUAN & RIWAYAT CUTI KARYAWAN (mod_cuti_karyawan)
+             ================================================================ -->
+        <div class="module-view" id="view-cuti_karyawan">
+          <!-- Top Card / Header Banner -->
+          <div class="cuti-top-banner">
+            <div class="cuti-banner-left">
+              <div class="cuti-icon-badge">
+                <i class="fa-solid fa-calendar-minus"></i>
+              </div>
+              <div>
+                <h3 class="cuti-banner-title">Formulir Pengajuan Cuti Karyawan</h3>
+                <p class="cuti-banner-subtitle">Pengajuan permohonan cuti tahunan, sakit, melahirkan, dan keperluan penting karyawan</p>
+              </div>
+            </div>
+            <div class="cuti-banner-right">
+              <span class="cuti-user-badge">
+                <i class="fa-solid fa-circle-user" style="color:var(--gold-light);"></i>
+                <span id="cutiUserBadgeText">Staff</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Responsive 2-Column Grid Layout -->
+          <div class="cuti-grid-layout">
+            <!-- Sisi Kiri: Form Pengajuan Cuti -->
+            <div class="content-card cuti-form-card">
+              <div class="cuti-card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-file-signature" style="color:#38bdf8;"></i>
+                  <span>Form Pengajuan Permohonan Cuti</span>
+                </div>
+                <div class="cuti-card-header-note">
+                  Terhubung ke Database <strong style="color:#38bdf8;">Supabase</strong>
+                </div>
+              </div>
+
+              <form id="formPengajuanCuti" onsubmit="handlePengajuanCutiSubmit(event)">
+                <div class="form-grid-cuti">
+                  <!-- Nama Karyawan (Admin: Select Karyawan, Staff: Readonly) -->
+                  <div class="form-group span-2">
+                    <label class="form-label" for="cutiNamaKaryawanInput">
+                      <i class="fa-solid fa-user-lock" style="color:var(--gold-light); font-size:0.8rem;"></i>
+                      <span>Nama Karyawan</span>
+                      <span class="required-star">*</span>
+                      <span id="cutiNamaModeNote" class="cuti-label-hint">(Otomatis dari Akun Login)</span>
+                    </label>
+                    <div id="cutiNamaSelectWrapper" style="display:none;">
+                      <select id="cutiNamaKaryawanSelect" class="form-input" onchange="onAdminSelectCutiEmployee()">
+                        <option value="">-- Pilih Karyawan --</option>
+                      </select>
+                    </div>
+                    <div id="cutiNamaReadonlyWrapper" class="cuti-readonly-input-wrap">
+                      <input type="text" id="cutiNamaKaryawanInput" class="form-input readonly-input" readonly placeholder="Nama karyawan...">
+                      <span class="readonly-badge"><i class="fa-solid fa-lock"></i> Auto</span>
+                    </div>
+                  </div>
+
+                  <!-- NIK & Jabatan -->
+                  <div class="form-group">
+                    <label class="form-label" for="cutiNik">NIK / Nomor Karyawan</label>
+                    <input type="text" id="cutiNik" class="form-input readonly-input" readonly placeholder="NIK karyawan">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="cutiJabatan">Jabatan / Posisi</label>
+                    <input type="text" id="cutiJabatan" class="form-input readonly-input" readonly placeholder="Jabatan">
+                  </div>
+
+                  <!-- Jenis Cuti -->
+                  <div class="form-group span-2">
+                    <label class="form-label" for="cutiTipe">
+                      <span>Jenis Cuti</span>
+                      <span class="required-star">*</span>
+                    </label>
+                    <select id="cutiTipe" class="form-input" required>
+                      <option value="Cuti Tahunan">Cuti Tahunan (Mengurangi Kuota)</option>
+                      <option value="Cuti Sakit">Cuti Sakit (Disertai Surat Dokter)</option>
+                      <option value="Cuti Melahirkan">Cuti Melahirkan (3 Bulan)</option>
+                      <option value="Cuti Umrah">Cuti Umrah / Ibadah</option>
+                      <option value="Cuti Alasan Penting">Cuti Alasan Penting (Keluarga/Menikah)</option>
+                    </select>
+                  </div>
+
+                  <!-- Tanggal Mulai & Tanggal Selesai -->
+                  <div class="form-group">
+                    <label class="form-label" for="cutiTglMulai">
+                      <span>Tanggal Mulai Cuti</span>
+                      <span class="required-star">*</span>
+                    </label>
+                    <input type="date" id="cutiTglMulai" class="form-input" required onchange="calculateCutiDurationDays()">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="cutiTglSelesai">
+                      <span>Tanggal Selesai Cuti</span>
+                      <span class="required-star">*</span>
+                    </label>
+                    <input type="date" id="cutiTglSelesai" class="form-input" required onchange="calculateCutiDurationDays()">
+                  </div>
+
+                  <!-- Durasi Hari Kerja -->
+                  <div class="form-group span-2">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                      <label class="form-label" for="cutiJumlahHari" style="margin-bottom:0;">
+                        <span>Durasi Cuti (Hari Kerja)</span>
+                        <span class="required-star">*</span>
+                      </label>
+                      <span id="cutiDurasiText" class="cuti-durasi-pill">1 Hari</span>
+                    </div>
+                    <input type="number" id="cutiJumlahHari" class="form-input" min="1" max="90" value="1" required>
+                  </div>
+
+                  <!-- Keterangan & Alasan -->
+                  <div class="form-group span-2">
+                    <label class="form-label" for="cutiKeterangan">Alasan & Detail Keperluan Cuti</label>
+                    <textarea id="cutiKeterangan" class="form-input" rows="3" placeholder="Tuliskan keperluan pengajuan cuti secara singkat dan jelas..."></textarea>
+                  </div>
+
+                  <!-- Link Dokumen Pendukung (Surat Dokter / Undangan / dll) -->
+                  <div class="form-group span-2">
+                    <label class="form-label" for="cutiLinkDokumen">
+                      <i class="fa-solid fa-paperclip" style="color:#38bdf8;"></i>
+                      <span>Link Dokumen Pendukung (Google Drive / Surat Dokter)</span>
+                      <span style="font-size:0.7rem; color:var(--text-muted); font-weight:normal;">(Opsional)</span>
+                    </label>
+                    <input type="url" id="cutiLinkDokumen" class="form-input" placeholder="https://drive.google.com/file/d/...">
+                  </div>
+                </div>
+
+                <!-- Form Action Buttons -->
+                <div class="cuti-form-actions">
+                  <button type="button" class="btn-secondary" onclick="resetFormPengajuanCuti()">
+                    <i class="fa-solid fa-arrow-rotate-left"></i>
+                    <span>Reset</span>
+                  </button>
+                  <button type="submit" id="btnSubmitPengajuanCuti" class="btn-primary">
+                    <i class="fa-solid fa-paper-plane"></i>
+                    <span>Kirim Pengajuan Cuti</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Sisi Kanan: Kuota & Riwayat Permohonan Cuti Pribadi -->
+            <div class="content-card cuti-history-card">
+              <div class="cuti-card-header">
+                <div class="card-title">
+                  <i class="fa-solid fa-clock-rotate-left" style="color:var(--gold-light);"></i>
+                  <span>Riwayat & Kuota Cuti Anda</span>
+                </div>
+                <button type="button" class="btn-refresh-cuti" onclick="loadCutiKaryawanData(true)" title="Segarkan Data">
+                  <i class="fa-solid fa-rotate-right"></i>
+                </button>
+              </div>
+
+              <!-- 3-Pillar Quota Summary -->
+              <div class="cuti-quota-box">
+                <div class="cuti-quota-item">
+                  <span class="cuti-quota-label">Hak Cuti Bersih</span>
+                  <span class="cuti-quota-val" id="cutiUserNetQuota">12 Hari</span>
+                  <span class="cuti-quota-sub">12 - Cuti Bersama</span>
+                </div>
+                <div class="cuti-quota-item used">
+                  <span class="cuti-quota-label">Terpakai</span>
+                  <span class="cuti-quota-val" id="cutiUserUsedQuota">0 Hari</span>
+                  <span class="cuti-quota-sub">Disetujui</span>
+                </div>
+                <div class="cuti-quota-item remaining">
+                  <span class="cuti-quota-label">Sisa Kuota</span>
+                  <span class="cuti-quota-val" id="cutiUserRemainingQuota">12 Hari</span>
+                  <span class="cuti-quota-sub">Sisa Periode</span>
+                </div>
+              </div>
+
+              <!-- Search Bar Riwayat -->
+              <div class="cuti-search-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="cutiHistorySearch" placeholder="Cari riwayat (ID, tipe, status...)" oninput="filterCutiKaryawanHistory()">
+              </div>
+
+              <!-- List Cards Container -->
+              <div class="cuti-history-list" id="cutiHistoryListContainer">
+                <div class="cuti-empty-state">
+                  <i class="fa-solid fa-spinner fa-spin" style="font-size:1.8rem; color:#38bdf8;"></i>
+                  <p>Memuat riwayat pengajuan cuti...</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================================================================
+             MODULE 5F: CUTI BERSAMA, APPROVAL & MATRIKS KUOTA (mod_cuti_bersama)
+             ================================================================ -->
+        <div class="module-view" id="view-cuti_bersama">
+          <!-- Top Card / Header -->
+          <div class="cuti-top-banner">
+            <div class="cuti-banner-left">
+              <div class="cuti-icon-badge" style="background:rgba(245, 158, 11, 0.15); border-color:rgba(245, 158, 11, 0.3); color:var(--gold-light);">
+                <i class="fa-solid fa-calendar-day"></i>
+              </div>
+              <div>
+                <h3 class="cuti-banner-title">Manajemen Cuti Bersama, Approval & Matriks Kuota</h3>
+                <p class="cuti-banner-subtitle">Pengaturan daftar hari libur nasional, persetujuan permohonan cuti, dan kalkulasi sisa hak cuti seluruh karyawan</p>
+              </div>
+            </div>
+            <div class="cuti-banner-right">
+              <div class="cuti-stat-pill">
+                <span class="pulse-dot"></span>
+                <span>Pending Approval:</span>
+                <strong id="badgePendingApprovalCount" style="color:var(--gold-light); font-family:monospace;">0</strong>
+              </div>
+              <button type="button" class="btn-refresh-cuti" onclick="reloadCutiBersamaModule(true)" title="Segarkan Data">
+                <i class="fa-solid fa-rotate-right"></i>
+                <span>Refresh</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 3 Horizontal Tabs Switcher -->
+          <div class="cuti-tabs-nav">
+            <button type="button" class="cuti-tab-btn active" id="tabBtnCbList" onclick="switchCutiBersamaTab('list')">
+              <i class="fa-solid fa-calendar-days"></i>
+              <span>a. Daftar Hari Cuti Bersama & Libur (<span id="cbYearLabelNav">2026</span>)</span>
+            </button>
+            <button type="button" class="cuti-tab-btn" id="tabBtnCbApproval" onclick="switchCutiBersamaTab('approval')">
+              <i class="fa-solid fa-list-check"></i>
+              <span>b. Riwayat & Approval Permohonan Cuti</span>
+              <span id="tabBadgeApprovalPending" class="tab-badge-counter" style="display:none;">0</span>
+            </button>
+            <button type="button" class="cuti-tab-btn" id="tabBtnCbMatrix" onclick="switchCutiBersamaTab('matrix')">
+              <i class="fa-solid fa-chart-pie"></i>
+              <span>c. Matriks Sisa Kuota Cuti Karyawan</span>
+            </button>
+          </div>
+
+          <!-- TAB PANE A: DAFTAR HARI CUTI BERSAMA -->
+          <div class="content-card cuti-tab-pane active" id="paneCbList">
+            <!-- Summary 3 Stats Cards -->
+            <div class="cuti-stats-row">
+              <div class="cuti-stat-card">
+                <div class="stat-icon" style="color:#60a5fa; background:rgba(96,165,250,0.1);"><i class="fa-solid fa-umbrella-beach"></i></div>
+                <div>
+                  <span class="stat-sub">Total Hari Cuti Bersama</span>
+                  <div class="stat-val" id="cbStatTotalDays">0 Hari</div>
+                </div>
+              </div>
+              <div class="cuti-stat-card highlight-gold">
+                <div class="stat-icon" style="color:var(--gold-light); background:rgba(245,158,11,0.1);"><i class="fa-solid fa-scissors"></i></div>
+                <div>
+                  <span class="stat-sub">Memotong Cuti Tahunan</span>
+                  <div class="stat-val" id="cbStatPotongDays">0 Hari</div>
+                </div>
+              </div>
+              <div class="cuti-stat-card highlight-emerald">
+                <div class="stat-icon" style="color:#10b981; background:rgba(16,185,129,0.1);"><i class="fa-solid fa-user-shield"></i></div>
+                <div>
+                  <span class="stat-sub">Hak Cuti Bersih Karyawan</span>
+                  <div class="stat-val" id="cbStatNetDays">12 Hari</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Toolbar Table -->
+            <div class="cuti-table-toolbar">
+              <div class="toolbar-left">
+                <label for="cbSelectYear" style="font-size:0.78rem; color:var(--text-muted); font-weight:600;">Tahun Periode:</label>
+                <select id="cbSelectYear" class="form-input" style="width:130px; height:34px; font-weight:700; color:var(--gold-light);" onchange="onCutiBersamaYearChange()">
+                  <option value="2025">Tahun 2025</option>
+                  <option value="2026" selected>Tahun 2026</option>
+                  <option value="2027">Tahun 2027</option>
+                  <option value="2028">Tahun 2028</option>
+                </select>
+              </div>
+              <div class="toolbar-right">
+                <button type="button" class="btn-primary" onclick="openAddCutiBersamaModal()">
+                  <i class="fa-solid fa-plus"></i>
+                  <span>Tambah Cuti Bersama</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Table Cuti Bersama -->
+            <div class="table-responsive">
+              <table class="table-brosur">
+                <thead>
+                  <tr>
+                    <th style="width:50px; text-align:center;">NO</th>
+                    <th style="width:120px;">TANGGAL</th>
+                    <th>NAMA HARI LIBUR / CUTI BERSAMA</th>
+                    <th style="width:100px; text-align:center;">DURASI</th>
+                    <th style="width:160px; text-align:center;">POTONG CUTI TAHUNAN</th>
+                    <th>KETERANGAN</th>
+                    <th style="width:100px; text-align:center;">STATUS</th>
+                    <th style="width:110px; text-align:center;">AKSI</th>
+                  </tr>
+                </thead>
+                <tbody id="cbTableBody">
+                  <tr>
+                    <td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">Memuat data cuti bersama...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- TAB PANE B: RIWAYAT & APPROVAL STATUS PENGAJUAN CUTI -->
+          <div class="content-card cuti-tab-pane" id="paneCbApproval" style="display:none;">
+            <!-- Toolbar Approval -->
+            <div class="cuti-table-toolbar">
+              <div class="toolbar-left" style="flex:1; max-width:400px;">
+                <div class="cuti-search-wrap" style="width:100%;">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" id="cutiApprovalSearch" placeholder="Cari nama karyawan, NIK, tipe cuti..." oninput="filterCutiApprovalList()">
+                </div>
+              </div>
+              <div class="toolbar-right">
+                <select id="cutiApprovalStatusFilter" class="form-input" style="width:170px; height:34px;" onchange="filterCutiApprovalList()">
+                  <option value="ALL">Semua Status</option>
+                  <option value="Pending">Menunggu Approval</option>
+                  <option value="Disetujui">Disetujui</option>
+                  <option value="Ditolak">Ditolak</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Table Approval All Employees -->
+            <div class="table-responsive">
+              <table class="table-brosur">
+                <thead>
+                  <tr>
+                    <th style="width:140px;">ID / TGL PENGAJUAN</th>
+                    <th style="width:180px;">KARYAWAN</th>
+                    <th style="width:130px;">JENIS CUTI</th>
+                    <th style="width:180px;">PERIODE CUTI</th>
+                    <th style="width:85px; text-align:center;">DURASI</th>
+                    <th>ALASAN & LAMPIRAN</th>
+                    <th style="width:120px; text-align:center;">STATUS</th>
+                    <th style="width:130px; text-align:center;">AKSI APPROVAL</th>
+                  </tr>
+                </thead>
+                <tbody id="cutiApprovalTableBody">
+                  <tr>
+                    <td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted);">Memuat pengajuan cuti...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- TAB PANE C: MATRIKS SISA KUOTA CUTI SELURUH KARYAWAN -->
+          <div class="content-card cuti-tab-pane" id="paneCbMatrix" style="display:none;">
+            <!-- Matrix Header Info -->
+            <div class="cuti-stats-row">
+              <div class="cuti-stat-card">
+                <div class="stat-icon" style="color:#60a5fa; background:rgba(96,165,250,0.1);"><i class="fa-solid fa-calendar"></i></div>
+                <div>
+                  <span class="stat-sub">Kuota Standar HR</span>
+                  <div class="stat-val">12 Hari / Tahun</div>
+                </div>
+              </div>
+              <div class="cuti-stat-card highlight-gold">
+                <div class="stat-icon" style="color:var(--gold-light); background:rgba(245,158,11,0.1);"><i class="fa-solid fa-calendar-day"></i></div>
+                <div>
+                  <span class="stat-sub">Cuti Bersama (Potong Kuota)</span>
+                  <div class="stat-val" id="matrixCbPotongVal">0 Hari</div>
+                </div>
+              </div>
+              <div class="cuti-stat-card highlight-emerald">
+                <div class="stat-icon" style="color:#10b981; background:rgba(16,185,129,0.1);"><i class="fa-solid fa-calculator"></i></div>
+                <div>
+                  <span class="stat-sub">Net Kuota Hak Cuti Tahunan</span>
+                  <div class="stat-val" id="matrixNetQuotaVal">12 Hari</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Table Matriks Kuota -->
+            <div class="table-responsive">
+              <table class="table-brosur">
+                <thead>
+                  <tr>
+                    <th style="width:110px;">NIK</th>
+                    <th>NAMA KARYAWAN</th>
+                    <th>JABATAN</th>
+                    <th style="width:100px; text-align:center;">NET KUOTA</th>
+                    <th style="width:110px; text-align:center;">TERPAKAI (TAHUNAN)</th>
+                    <th style="width:95px; text-align:center;">CUTI SAKIT</th>
+                    <th style="width:95px; text-align:center;">CUTI UMRAH</th>
+                    <th style="width:110px; text-align:center;">CUTI MELAHIRKAN</th>
+                    <th style="width:130px; text-align:center;">SISA KUOTA CUTI</th>
+                  </tr>
+                </thead>
+                <tbody id="cutiMatrixTableBody">
+                  <tr>
+                    <td colspan="9" style="text-align:center; padding:30px; color:var(--text-muted);">Memuat matriks kuota...</td>
                   </tr>
                 </tbody>
               </table>
@@ -1595,6 +2007,170 @@
           <button type="button" class="btn-secondary" onclick="closeUpdateStatusModal()">Batal</button>
           <button type="button" class="btn-gold" id="btnSaveStatusChange" onclick="saveBrochureStatus()">
             <i class="fa-solid fa-floppy-disk"></i> Simpan Perubahan Status
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================
+       MODAL 1: TAMBAH / EDIT HARI CUTI BERSAMA (mod_cuti_bersama)
+       ================================================================ -->
+  <div class="gdrive-modal-backdrop" id="modalCutiBersama" style="display:none;">
+    <div class="gdrive-modal-card" style="max-width:500px;">
+      <div class="gdrive-modal-header">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="gdrive-modal-icon" style="background:rgba(245, 158, 11, 0.15); border-color:rgba(245, 158, 11, 0.3); color:var(--gold-light);">
+            <i class="fa-solid fa-calendar-plus"></i>
+          </div>
+          <div>
+            <h3 class="gdrive-modal-title" id="modalCutiBersamaTitle">Tambah Hari Cuti Bersama</h3>
+            <p class="gdrive-modal-subtitle">Daftar hari libur nasional & cuti bersama resmi</p>
+          </div>
+        </div>
+        <button type="button" class="gdrive-modal-close" onclick="closeCutiBersamaModal()">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="gdrive-modal-body">
+        <form id="formCutiBersama" onsubmit="handleCutiBersamaSubmit(event)">
+          <input type="hidden" id="cbFormId">
+          <div class="form-grid-cuti" style="grid-template-columns:1fr 1fr;">
+            <!-- Tahun & Tanggal -->
+            <div class="form-group">
+              <label class="form-label" for="cbFormTahun">Tahun Periode *</label>
+              <input type="number" id="cbFormTahun" class="form-input" min="2020" max="2035" value="2026" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="cbFormTanggal">Tanggal Libur *</label>
+              <input type="date" id="cbFormTanggal" class="form-input" required>
+            </div>
+
+            <!-- Nama Hari Libur -->
+            <div class="form-group span-2">
+              <label class="form-label" for="cbFormNama">Nama Cuti Bersama / Hari Libur *</label>
+              <input type="text" id="cbFormNama" class="form-input" placeholder="Contoh: Cuti Bersama Hari Raya Idul Fitri..." required>
+            </div>
+
+            <!-- Jumlah Hari & Potong Cuti Tahunan -->
+            <div class="form-group">
+              <label class="form-label" for="cbFormJumlahHari">Jumlah Hari *</label>
+              <input type="number" id="cbFormJumlahHari" class="form-input" min="1" max="30" value="1" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="cbFormPotong">Potong Cuti Tahunan? *</label>
+              <select id="cbFormPotong" class="form-input" required>
+                <option value="Ya">Ya (Mengurangi Hak 12 Hari)</option>
+                <option value="Tidak">Tidak (Libur Nasional Bebas)</option>
+              </select>
+            </div>
+
+            <!-- Status & Keterangan -->
+            <div class="form-group span-2">
+              <label class="form-label" for="cbFormStatus">Status Keaktifan</label>
+              <select id="cbFormStatus" class="form-input">
+                <option value="Aktif">🟢 Aktif (Berlaku)</option>
+                <option value="Nonaktif">🔴 Nonaktif (Dibatalkan)</option>
+              </select>
+            </div>
+
+            <div class="form-group span-2">
+              <label class="form-label" for="cbFormKeterangan">Keterangan Tambahan</label>
+              <textarea id="cbFormKeterangan" class="form-input" rows="2" placeholder="Catatan opsional..."></textarea>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid var(--border-subtle); padding-top:16px;">
+            <button type="button" class="btn-secondary" onclick="closeCutiBersamaModal()">Batal</button>
+            <button type="submit" id="btnSaveCutiBersama" class="btn-primary">
+              <i class="fa-solid fa-floppy-disk"></i>
+              <span>Simpan Data</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================================================
+       MODAL 2: APPROVAL PERMOHONAN CUTI KARYAWAN (mod_cuti_bersama)
+       ================================================================ -->
+  <div class="gdrive-modal-backdrop" id="modalApprovalCuti" style="display:none;">
+    <div class="gdrive-modal-card" style="max-width:520px;">
+      <div class="gdrive-modal-header">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="gdrive-modal-icon" style="background:rgba(56, 189, 248, 0.15); border-color:rgba(56, 189, 248, 0.3); color:#38bdf8;">
+            <i class="fa-solid fa-user-check"></i>
+          </div>
+          <div>
+            <h3 class="gdrive-modal-title">Persetujuan (Approval) Cuti</h3>
+            <p class="gdrive-modal-subtitle">Keputusan Manajerial & Otorisasi Pengajuan Cuti</p>
+          </div>
+        </div>
+        <button type="button" class="gdrive-modal-close" onclick="closeApprovalCutiModal()">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="gdrive-modal-body">
+        <input type="hidden" id="approvalCutiId">
+        <!-- Info Ringkas Pengajuan -->
+        <div class="brosur-info-grid" style="grid-template-columns:1fr 1fr; margin-bottom:16px;">
+          <div class="brosur-info-item">
+            <span class="label">ID Permohonan:</span>
+            <span class="value" id="approvalInfoId" style="color:#38bdf8; font-family:monospace; font-weight:700;">-</span>
+          </div>
+          <div class="brosur-info-item">
+            <span class="label">Nama Karyawan:</span>
+            <span class="value" id="approvalInfoNama" style="color:var(--text-light); font-weight:700;">-</span>
+          </div>
+          <div class="brosur-info-item">
+            <span class="label">Jabatan / NIK:</span>
+            <span class="value" id="approvalInfoJabatan">-</span>
+          </div>
+          <div class="brosur-info-item">
+            <span class="label">Tipe Cuti / Durasi:</span>
+            <span class="value" id="approvalInfoTipe">-</span>
+          </div>
+          <div class="brosur-info-item" style="grid-column:span 2;">
+            <span class="label">Periode Cuti:</span>
+            <span class="value" id="approvalInfoPeriode">-</span>
+          </div>
+          <div class="brosur-info-item" style="grid-column:span 2;">
+            <span class="label">Alasan Pemohon:</span>
+            <span class="value" id="approvalInfoAlasan" style="color:var(--text-muted); font-style:italic;">-</span>
+          </div>
+          <div class="brosur-info-item" style="grid-column:span 2;" id="approvalInfoLinkWrapper">
+            <span class="label">Lampiran Dokumen:</span>
+            <a href="#" target="_blank" rel="noopener noreferrer" id="approvalInfoLink" style="color:#38bdf8; font-size:0.8rem; word-break:break-all;">-</a>
+          </div>
+        </div>
+
+        <!-- Keputusan Form -->
+        <div class="form-group" style="margin-top:14px;">
+          <label class="form-label" for="approvalStatusSelect">
+            <i class="fa-solid fa-stamp" style="color:var(--gold-light);"></i>
+            <span>Keputusan Approval</span>
+            <span class="required-star">*</span>
+          </label>
+          <select id="approvalStatusSelect" class="form-input" style="font-weight:700;">
+            <option value="Disetujui">🟢 Setujui Pengajuan Cuti (Disetujui)</option>
+            <option value="Ditolak">🔴 Tolak Pengajuan Cuti (Ditolak)</option>
+            <option value="Pending">🟡 Tunda / Kembalikan ke Menunggu Approval</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-top:12px;">
+          <label class="form-label" for="approvalCatatan">Catatan / Alasan Keputusan (Opsional)</label>
+          <textarea id="approvalCatatan" class="form-input" rows="2" placeholder="Tuliskan catatan otorisasi untuk karyawan bersangkutan..."></textarea>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; border-top:1px solid var(--border-subtle); padding-top:16px;">
+          <button type="button" class="btn-secondary" onclick="closeApprovalCutiModal()">Batal</button>
+          <button type="button" class="btn-primary" id="btnSubmitApprovalDecision" onclick="submitCutiApprovalDecision()">
+            <i class="fa-solid fa-check-double"></i>
+            <span>Simpan Keputusan</span>
           </button>
         </div>
       </div>
