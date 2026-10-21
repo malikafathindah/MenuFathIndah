@@ -6246,6 +6246,88 @@ function formatRupiah(amount) {
 // 13.1 DAFTAR KARYAWAN (mod_daftar_karyawan)
 // --------------------------------------------------------------------------
 
+function normalizeEmployee(e) {
+  if (!e) return null;
+  const nik = String(e.nik || e.NIK || '').trim();
+  const nama = String(e.nama_karyawan || e['Nama Karyawan'] || e.nama || e.nama_lengkap || '').trim();
+  const jabatan = String(e.jabatan || e.Jabatan || e.fungsional || e.Funsional || 'Staff').trim();
+  const divisi = String(e.divisi || e.Divisi || e.departemen || e.dept || 'Operasional').trim();
+  const kantor = String(e.kantor || e.Kantor || e.kanwil || e.lokasi_penempatan || 'Pusat').trim();
+  const statusEmp = String(e.status_emp || e.STATUSEMP || e.statuskaryawan || e.status_karyawan || 'PKWTT').trim();
+  const status = String(e.status || e.Status || 'Aktif').trim();
+  const telp = String(e.nomor_hp || e['Nomor Telephone/HP'] || e.nomortelepon || e.no_telepon || e.nohp || '-').trim();
+  const email = String(e.email || e.Email || '-').trim();
+  const tglMasuk = e.tanggal_masuk || e.TanggalMulaiTugas || e.tglmasuk || e.tanggal_input || '-';
+
+  return {
+    ...e,
+    nik: nik,
+    nama: nama,
+    nama_karyawan: nama,
+    nama_lengkap: nama,
+    jabatan: jabatan,
+    divisi: divisi,
+    departemen: divisi,
+    dept: divisi,
+    kantor: kantor,
+    kanwil: kantor,
+    status_emp: statusEmp,
+    statuskaryawan: statusEmp,
+    status_karyawan: statusEmp,
+    status: status,
+    nomor_hp: telp,
+    nomortelepon: telp,
+    email: email,
+    tanggal_masuk: tglMasuk,
+    tglmasuk: tglMasuk,
+    jenis_kelamin: e.jenis_kelamin || e['Jenis Kelamin'] || e.jeniskelamin || 'Laki-laki',
+    tempat_lahir: e.tempat_lahir || e['Tempat Lahir'] || e.tempatlahir || '',
+    tanggal_lahir: e.tanggal_lahir || e['Tanggal Lahir'] || e.tanggallahir || null,
+    golongan_darah: e.golongan_darah || e['Golongan Darah'] || e.goldarah || '-',
+    alamat: e.alamat || e['Alamat Rumah Lengkap'] || e.alamatktp || '',
+    alamatktp: e.alamat || e['Alamat Rumah Lengkap'] || e.alamatktp || '',
+    alamatdomisili: e.alamatdomisili || e.alamat || e['Alamat Rumah Lengkap'] || '',
+    kode_pos: e.kode_pos || e['Kode Pos'] || e.kodepos || '',
+    kelurahan: e.kelurahan || e['Kelurahan/Desa'] || '',
+    kecamatan: e.kecamatan || e['Kecamatan'] || '',
+    kota_kabupaten: e.kota_kabupaten || e['Kabupaten/Kota'] || e.kota || '',
+    kota: e.kota_kabupaten || e['Kabupaten/Kota'] || e.kota || '',
+    provinsi: e.provinsi || e['Provinsi'] || '',
+    no_ktp: e.no_ktp || e['Nomor Kartu Tanda Penduduk (KTP)'] || e.noktp || '',
+    no_kk: e.no_kk || e['Nomor Kartu Keluarga (KK)'] || '',
+    npwp: e.npwp || e['NPWP'] || '',
+    bpjs_kesehatan: e.bpjs_kesehatan || e['Nomor BPJS Kesehatan'] || e.bpjskes || '',
+    bpjs_ketenagakerjaan: e.bpjs_ketenagakerjaan || e['Nomor BP Ketenagakerjaan'] || e.bpjstk || '',
+    penanggung_bpjs: e.penanggung_bpjs || e['Penanggung BPJS Kesehatan'] || '',
+    nama_bank: e.nama_bank || e['Nama Bank'] || e.bank || 'BCA',
+    bank: e.nama_bank || e['Nama Bank'] || e.bank || 'BCA',
+    no_rekening: e.no_rekening || e['No Rekening'] || e.norekening || '',
+    bank_atas_nama: e.bank_atas_nama || e['Nama Di Bank'] || nama,
+    agama: e.agama || 'Islam',
+    status_nikah: e.status_nikah || e.statusnikah || 'Menikah',
+    pendidikan_terakhir: e.pendidikan_terakhir || e['Pendidikan Terakhir'] || e.pendidikan || 'S1',
+    jurusan: e.jurusan || e['Jurusan Pendidikan Terakhir'] || '',
+    lembaga_pendidikan: e.lembaga_pendidikan || e['Nama Lembaga Pendidikan'] || '',
+    nama_ibu_kandung: e.nama_ibu_kandung || e['Nama Ibu Kandung'] || '',
+    nama_pasangan: e.nama_pasangan || e['Nama Suami/Istri'] || '',
+    tgl_lahir_pasangan: e.tgl_lahir_pasangan || e['Tanggal Lahir Suami/Istri'] || null,
+    anak_1_nama: e.anak_1_nama || e['Nama Anak Kandung 1'] || '',
+    anak_2_nama: e.anak_2_nama || e['Nama Anak Kandung 2'] || '',
+    anak_3_nama: e.anak_3_nama || e['Nama Anak Kandung 3'] || '',
+    anak_4_nama: e.anak_4_nama || e['Nama Anak Kandung 4'] || '',
+    kontak_darurat_nama: e.kontak_darurat_nama || e.nama_pasangan || e.nama_ibu_kandung || '',
+    kontak_darurat_hp: e.kontak_darurat_hp || telp || '',
+    kontak_darurat_hubungan: e.kontak_darurat_hubungan || 'Keluarga',
+    foto_url: e.foto_url || e['UploadFoto'] || e.upload_foto || '',
+    upload_foto: e.foto_url || e['UploadFoto'] || e.upload_foto || '',
+    upload_ktp: e.upload_ktp || e['UploadKTP'] || '',
+    upload_npwp: e.upload_npwp || e['UploadNPWP'] || '',
+    upload_kk: e.upload_kk || e['UploadKK'] || '',
+    umur: e.umur || e['Umur'] || '',
+    masa_kerja: e.masa_kerja || e['MasaKerja'] || ''
+  };
+}
+
 async function initDaftarKaryawanView() {
   await loadDaftarKaryawanData();
 }
@@ -6257,7 +6339,7 @@ async function loadDaftarKaryawanData(forceRefresh = false) {
       <tr>
         <td colspan="8" style="text-align:center; padding:32px; color:var(--text-muted);">
           <i class="fa-solid fa-spinner fa-spin" style="color:#06b6d4; font-size:1.5rem;"></i>
-          <div style="margin-top:10px; font-size:0.85rem;">Memuat direktori data karyawan dari Supabase...</div>
+          <div style="margin-top:10px; font-size:0.85rem;">Memuat direktori data karyawan dari Supabase tabel Bio_Karyawan...</div>
         </td>
       </tr>
     `;
@@ -6265,22 +6347,34 @@ async function loadDaftarKaryawanData(forceRefresh = false) {
 
   let list = [];
 
-  // 1. Coba ambil dari Supabase REST API view "Bio Karyawan" atau tabel "Bio_Karyawan"
-  try {
-    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/Bio_Karyawan?select=*&order=nik.asc`, {
-      headers: {
-        'apikey': SUPABASE_CONFIG.anonKey,
-        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+  // 1. Prioritas Utama: Ambil langsung dari Supabase REST API (Tabel Bio_Karyawan / Bio Karyawan)
+  const candidateEndpoints = [
+    `${SUPABASE_CONFIG.url}/rest/v1/Bio_Karyawan?select=*&order=nik.asc`,
+    `${SUPABASE_CONFIG.url}/rest/v1/Bio%20Karyawan?select=*&order=nik.asc`,
+    `${SUPABASE_CONFIG.url}/rest/v1/bio_karyawan?select=*&order=nik.asc`
+  ];
+
+  for (const ep of candidateEndpoints) {
+    try {
+      const res = await fetch(ep, {
+        headers: {
+          'apikey': SUPABASE_CONFIG.anonKey,
+          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+        }
+      });
+      if (res.ok) {
+        const raw = await res.json();
+        if (Array.isArray(raw) && raw.length > 0) {
+          list = raw;
+          break;
+        }
       }
-    });
-    if (res.ok) {
-      list = await res.json();
+    } catch (err) {
+      // lanjut ke endpoint kandidat berikutnya
     }
-  } catch (err) {
-    console.warn('Supabase fetch Bio_Karyawan error:', err);
   }
 
-  // 2. Fallback jika perlu melewati Node backend
+  // 2. Fallback via Node Server API /api/bio-karyawan
   if (!list || list.length === 0) {
     try {
       const res = await fetch('/api/bio-karyawan');
@@ -6293,33 +6387,33 @@ async function loadDaftarKaryawanData(forceRefresh = false) {
     } catch (_) {}
   }
 
-  // 3. Fallback ke state cache employees yang sudah di-load
-  if (!list || list.length === 0) {
-    if (state.cuti && Array.isArray(state.cuti.employees) && state.cuti.employees.length > 0) {
-      list = state.cuti.employees.map(e => ({
-        nik: e.nik,
-        nama: e.nama,
-        jabatan: e.jabatan,
-        departemen: e.departemen || 'Operasional Umrah & Haji',
-        statuskaryawan: 'Tetap',
-        nomortelepon: '-',
-        tglmasuk: '2024-01-01'
-      }));
-    }
-  }
+  // 3. Normalisasi semua records agar seluruh properti siap diakses
+  const normalizedList = (list || []).map(normalizeEmployee).filter(Boolean);
+  state.hr.employees = normalizedList;
 
-  state.hr.employees = list || [];
   renderDaftarKaryawanTable();
   updateDaftarKaryawanStats();
   populateDaftarKaryawanFilterDepts();
+
+  // Sinkronkan juga ke state cuti agar dropdown Cuti Karyawan langsung lengkap
+  if (normalizedList.length > 0 && state.cuti) {
+    state.cuti.employees = normalizedList.map(e => ({
+      nik: e.nik,
+      nama: e.nama_karyawan,
+      jabatan: e.jabatan,
+      kanwil: e.kantor,
+      divisi: e.divisi,
+      status: e.status
+    }));
+  }
 }
 
 function updateDaftarKaryawanStats() {
   const employees = state.hr.employees || [];
   const total = employees.length;
-  const tetap = employees.filter(e => String(e.statuskaryawan || e.status_karyawan || '').toLowerCase().includes('tetap')).length;
-  const kontrak = employees.filter(e => String(e.statuskaryawan || e.status_karyawan || '').toLowerCase().includes('kontrak')).length;
-  const depts = new Set(employees.map(e => (e.departemen || e.dept || '').trim()).filter(Boolean)).size;
+  const tetap = employees.filter(e => String(e.status_emp || '').toUpperCase().includes('PKWTT') || String(e.status_emp || '').toLowerCase().includes('tetap')).length;
+  const kontrak = employees.filter(e => String(e.status_emp || '').toUpperCase().includes('PKWT') || String(e.status_emp || '').toLowerCase().includes('kontrak')).length;
+  const depts = new Set(employees.map(e => (e.divisi || e.departemen || '').trim()).filter(Boolean)).size;
 
   const elTotal = document.getElementById('statTotalKaryawanList');
   const elTetap = document.getElementById('statKaryawanTetap');
@@ -6329,7 +6423,7 @@ function updateDaftarKaryawanStats() {
   if (elTotal) elTotal.textContent = total;
   if (elTetap) elTetap.textContent = tetap;
   if (elKontrak) elKontrak.textContent = kontrak || (total - tetap);
-  if (elDepts) elDepts.textContent = depts || 4;
+  if (elDepts) elDepts.textContent = depts || 6;
 }
 
 function populateDaftarKaryawanFilterDepts() {
@@ -6338,9 +6432,9 @@ function populateDaftarKaryawanFilterDepts() {
 
   const employees = state.hr.employees || [];
   const currentVal = deptSelect.value || 'ALL';
-  const depts = [...new Set(employees.map(e => (e.departemen || e.dept || '').trim()).filter(Boolean))].sort();
+  const depts = [...new Set(employees.map(e => (e.divisi || e.departemen || '').trim()).filter(Boolean))].sort();
 
-  let html = '<option value="ALL">Semua Departemen</option>';
+  let html = '<option value="ALL">Semua Departemen / Divisi</option>';
   depts.forEach(d => {
     html += `<option value="${d}" ${d === currentVal ? 'selected' : ''}>${d}</option>`;
   });
@@ -6356,19 +6450,20 @@ function renderDaftarKaryawanTable() {
 
   const filtered = employees.filter(emp => {
     const s = (filter.search || '').toLowerCase().trim();
-    const nama = String(emp.nama || emp.nama_lengkap || '').toLowerCase();
+    const nama = String(emp.nama_karyawan || emp.nama || '').toLowerCase();
     const nik = String(emp.nik || '').toLowerCase();
     const jabatan = String(emp.jabatan || '').toLowerCase();
-    const matchSearch = !s || nama.includes(s) || nik.includes(s) || jabatan.includes(s);
+    const kantor = String(emp.kantor || '').toLowerCase();
+    const matchSearch = !s || nama.includes(s) || nik.includes(s) || jabatan.includes(s) || kantor.includes(s);
 
-    const dept = (emp.departemen || emp.dept || '').trim();
+    const dept = (emp.divisi || emp.departemen || '').trim();
     const matchDept = filter.dept === 'ALL' || dept === filter.dept;
 
-    const st = String(emp.statuskaryawan || emp.status_karyawan || '').toLowerCase();
+    const st = String(emp.status_emp || emp.statuskaryawan || '').toUpperCase();
     let matchStatus = true;
-    if (filter.status === 'Tetap') matchStatus = st.includes('tetap');
-    else if (filter.status === 'Kontrak') matchStatus = st.includes('kontrak');
-    else if (filter.status === 'Probation') matchStatus = st.includes('proba');
+    if (filter.status === 'Tetap') matchStatus = st.includes('PKWTT') || st.includes('TETAP');
+    else if (filter.status === 'Kontrak') matchStatus = st.includes('PKWT') || st.includes('KONTRAK');
+    else if (filter.status === 'Probation') matchStatus = st.includes('PROBA') || st.includes('MAGANG');
 
     return matchSearch && matchDept && matchStatus;
   });
@@ -6386,17 +6481,18 @@ function renderDaftarKaryawanTable() {
 
   tbody.innerHTML = filtered.map((emp, idx) => {
     const nik = emp.nik || `NIK-${idx + 1}`;
-    const nama = emp.nama || emp.nama_lengkap || 'Karyawan';
+    const nama = emp.nama_karyawan || emp.nama || 'Karyawan';
     const jabatan = emp.jabatan || 'Staff';
-    const dept = emp.departemen || emp.dept || 'Operasional';
-    const status = emp.statuskaryawan || emp.status_karyawan || 'Tetap';
-    const telp = emp.nomortelepon || emp.no_telepon || emp.nohp || '-';
+    const dept = emp.divisi || emp.departemen || 'Operasional';
+    const statusEmp = emp.status_emp || 'PKWTT';
+    const telp = emp.nomor_hp || '-';
     const email = emp.email || '-';
-    const tglMasuk = emp.tglmasuk || emp.tanggal_masuk || '-';
+    const tglMasuk = emp.tanggal_masuk ? String(emp.tanggal_masuk).split('T')[0] : '-';
+    const kantor = emp.kantor || 'Pusat';
 
     let statusBadgeCls = 'active';
-    if (status.toLowerCase().includes('kontrak')) statusBadgeCls = 'warning';
-    else if (status.toLowerCase().includes('proba')) statusBadgeCls = 'info';
+    if (statusEmp.toUpperCase().includes('PKWT')) statusBadgeCls = 'warning';
+    else if (statusEmp.toUpperCase().includes('PROBA')) statusBadgeCls = 'info';
 
     return `
       <tr>
@@ -6408,25 +6504,25 @@ function renderDaftarKaryawanTable() {
         </td>
         <td>
           <div style="font-weight:700; color:var(--text-light); font-size:0.88rem;">${nama}</div>
-          <div style="font-size:0.72rem; color:var(--text-dim);">${email}</div>
+          <div style="font-size:0.72rem; color:var(--text-dim);">${email !== '-' ? email : ''}</div>
         </td>
         <td>
           <div style="color:var(--text-main); font-size:0.82rem; font-weight:600;">${jabatan}</div>
-          <div style="font-size:0.72rem; color:var(--text-muted);">${dept}</div>
+          <div style="font-size:0.72rem; color:var(--text-muted);">${dept} • <span style="color:#0284c7;">${kantor}</span></div>
         </td>
         <td style="text-align:center;">
           <span class="status-pill ${statusBadgeCls}" style="font-size:0.72rem;">
-            ${status}
+            ${statusEmp}
           </span>
         </td>
         <td style="font-size:0.8rem; color:var(--text-light); font-family:monospace;">${telp}</td>
         <td style="font-size:0.8rem; color:var(--text-muted);">${tglMasuk}</td>
         <td style="text-align:center;">
           <div style="display:inline-flex; gap:6px;">
-            <button type="button" class="btn-action view" onclick="viewEmployeeDetailFromList('${nik}')" title="Cetak / Pratinjau Profil Resmi A4">
-              <i class="fa-solid fa-print"></i>
+            <button type="button" class="btn-action view" onclick="viewEmployeeDetailFromList('${nik}')" title="Cetak / Dokumen Resmi Detail A4">
+              <i class="fa-solid fa-id-card-clip"></i>
             </button>
-            <button type="button" class="btn-action edit" onclick="editEmployeeBio('${nik}')" title="Edit Biodata Lengkap">
+            <button type="button" class="btn-action edit" onclick="editEmployeeBio('${nik}')" title="Buka di Formulir Bio Karyawan">
               <i class="fa-solid fa-pen-to-square"></i>
             </button>
           </div>
@@ -6457,24 +6553,24 @@ window.exportDaftarKaryawanCSV = function() {
     return;
   }
 
-  const headers = ['NIK', 'Nama Lengkap', 'Jabatan', 'Departemen', 'Status Kepegawaian', 'No Telepon', 'Email', 'Tanggal Masuk', 'Kanwil / Penempatan'];
+  const headers = ['NIK', 'Nama Lengkap', 'Jabatan', 'Divisi / Departemen', 'Status Kepegawaian', 'No Telepon / HP', 'Email', 'Tanggal Masuk', 'Penempatan Kantor'];
   const rows = employees.map(e => [
     `"${e.nik || ''}"`,
-    `"${(e.nama || e.nama_lengkap || '').replace(/"/g, '""')}"`,
+    `"${(e.nama_karyawan || '').replace(/"/g, '""')}"`,
     `"${(e.jabatan || '').replace(/"/g, '""')}"`,
-    `"${(e.departemen || '').replace(/"/g, '""')}"`,
-    `"${(e.statuskaryawan || '').replace(/"/g, '""')}"`,
-    `"${(e.nomortelepon || '').replace(/"/g, '""')}"`,
+    `"${(e.divisi || '').replace(/"/g, '""')}"`,
+    `"${(e.status_emp || '').replace(/"/g, '""')}"`,
+    `"${(e.nomor_hp || '').replace(/"/g, '""')}"`,
     `"${(e.email || '').replace(/"/g, '""')}"`,
-    `"${(e.tglmasuk || '').replace(/"/g, '""')}"`,
-    `"${(e.kanwil || '').replace(/"/g, '""')}"`
+    `"${(e.tanggal_masuk || '').replace(/"/g, '""')}"`,
+    `"${(e.kantor || '').replace(/"/g, '""')}"`
   ]);
 
   const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement('a');
   link.setAttribute('href', encodedUri);
-  link.setAttribute('download', `Daftar_Karyawan_FathIndah_${new Date().toISOString().split('T')[0]}.csv`);
+  link.setAttribute('download', `Daftar_Karyawan_FathIndah_Supabase_${new Date().toISOString().split('T')[0]}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -6493,40 +6589,25 @@ window.editEmployeeBio = function(nik) {
 };
 
 // --------------------------------------------------------------------------
-// 13.2 BIODATA KARYAWAN (mod_bio_karyawan)
+// 13.2 FORMULIR BIO KARYAWAN (mod_bio_karyawan)
 // --------------------------------------------------------------------------
 
 function initBioKaryawanView() {
-  resetBioKaryawanForm();
-  populateBioKaryawanDropdowns();
+  if (state.hr.selectedEmployeeNik) {
+    populateBioKaryawanFormWithNik(state.hr.selectedEmployeeNik);
+  } else {
+    resetBioKaryawanForm();
+  }
 }
 
 function resetBioKaryawanForm() {
   const form = document.getElementById('formBioKaryawan');
   if (form) form.reset();
+  state.hr.selectedEmployeeNik = null;
   const nikInput = document.getElementById('bioNik');
   if (nikInput) {
     nikInput.removeAttribute('readonly');
     nikInput.style.opacity = '1';
-  }
-}
-
-function populateBioKaryawanDropdowns() {
-  // Departemen
-  const deptSelect = document.getElementById('bioDepartemen');
-  if (deptSelect && deptSelect.children.length <= 1) {
-    deptSelect.innerHTML = '<option value="">-- Pilih Departemen --</option>' +
-      HR_DEFAULT_DEPTS.map(d => `<option value="${d}">${d}</option>`).join('');
-  }
-
-  // Kanwil Penempatan
-  const kanwilSelect = document.getElementById('bioKanwil');
-  if (kanwilSelect && kanwilSelect.children.length <= 1) {
-    const kanwils = (state.data && state.data.kanwilFathIndah) || DEFAULT_KANWIL_FATH_INDAH;
-    const list = kanwils.map(k => (k.namakanwil || k.namakanwill || '').trim()).filter(Boolean);
-    const unique = [...new Set([...list, 'Pusat', 'Jabodetabek', 'Solo Raya', 'Samarinda'])].sort();
-    kanwilSelect.innerHTML = '<option value="">-- Pilih Wilayah / Kantor Cabang --</option>' +
-      unique.map(w => `<option value="${w}">${w}</option>`).join('');
   }
 }
 
@@ -6535,47 +6616,47 @@ function populateBioKaryawanFormWithNik(nik) {
   const emp = employees.find(e => String(e.nik || '').trim() === String(nik || '').trim());
   if (!emp) return;
 
-  populateBioKaryawanDropdowns();
-
-  // Helper setter
   const setVal = (id, val) => {
     const el = document.getElementById(id);
     if (el) el.value = val !== undefined && val !== null ? val : '';
   };
 
+  // 1. Pokok Kepegawaian
   setVal('bioNik', emp.nik);
-  setVal('bioNamaLengkap', emp.nama || emp.nama_lengkap);
-  setVal('bioJenisKelamin', emp.jeniskelamin || emp.jenis_kelamin || 'Laki-Laki');
-  setVal('bioTempatLahir', emp.tempatlahir || emp.tempat_lahir);
-  setVal('bioTglLahir', emp.tanggallahir ? emp.tanggallahir.split('T')[0] : '');
-  setVal('bioAgama', emp.agama || 'Islam');
-  setVal('bioStatusNikah', emp.statusnikah || emp.status_pernikahan || 'Belum Menikah');
-  setVal('bioNoKtp', emp.noktp || emp.no_ktp);
-  setVal('bioNpwp', emp.npwp);
-
-  setVal('bioNoTelepon', emp.nomortelepon || emp.no_telepon || emp.nohp);
-  setVal('bioEmail', emp.email);
-  setVal('bioAlamatKtp', emp.alamatktp || emp.alamat_ktp);
-  setVal('bioRtRw', emp.rtrw);
-  setVal('bioKelurahan', emp.kelurahan);
-  setVal('bioKecamatan', emp.kecamatan);
-  setVal('bioKota', emp.kota || emp.kabupaten_kota);
-  setVal('bioProvinsi', emp.provinsi);
-  setVal('bioKodePos', emp.kodepos || emp.kode_pos);
-  setVal('bioAlamatDomisili', emp.alamatdomisili || emp.alamat_domisili);
-
+  setVal('bioNama', emp.nama_karyawan || emp.nama);
+  setVal('bioJenisKelamin', emp.jenis_kelamin || 'Laki-laki');
   setVal('bioJabatan', emp.jabatan);
-  setVal('bioDepartemen', emp.departemen || emp.dept);
-  setVal('bioStatusKaryawan', emp.statuskaryawan || emp.status_karyawan || 'Tetap');
-  setVal('bioTglMasuk', emp.tglmasuk ? emp.tglmasuk.split('T')[0] : '');
-  setVal('bioKanwil', emp.kanwil || emp.lokasi_penempatan || 'Pusat');
+  setVal('bioDivisi', emp.divisi || emp.departemen);
+  setVal('bioKantor', emp.kantor || emp.kanwil);
+  setVal('bioStatusEmp', emp.status_emp || 'PKWTT');
+  setVal('bioTanggalMasuk', emp.tanggal_masuk ? String(emp.tanggal_masuk).split('T')[0] : '');
+  setVal('bioStatus', emp.status || 'Aktif');
 
-  setVal('bioGajiPokok', emp.gajipokok || emp.gaji_pokok || 0);
-  setVal('bioBank', emp.bank || 'BSI (Bank Syariah Indonesia)');
-  setVal('bioNoRekening', emp.norekening || emp.no_rekening);
-  setVal('bioBpjsKes', emp.bpjskes || emp.bpjs_kesehatan);
-  setVal('bioBpjsTk', emp.bpjstk || emp.bpjs_ketenagakerjaan);
+  // 2. Data Pribadi & Alamat
+  setVal('bioTempatLahir', emp.tempat_lahir);
+  setVal('bioTanggalLahir', emp.tanggal_lahir ? String(emp.tanggal_lahir).split('T')[0] : '');
+  setVal('bioAgama', emp.agama || 'Islam');
+  setVal('bioStatusNikah', emp.status_nikah || 'Menikah');
+  setVal('bioPendidikan', emp.pendidikan_terakhir || 'S1');
+  setVal('bioHp', emp.nomor_hp);
+  setVal('bioEmail', emp.email !== '-' ? emp.email : '');
+  setVal('bioAlamat', emp.alamat);
+  setVal('bioKota', emp.kota_kabupaten || emp.kota);
+  setVal('bioProvinsi', emp.provinsi);
+  setVal('bioKodePos', emp.kode_pos);
 
+  // 3. Dokumen Legalitas & Kontak Darurat
+  setVal('bioNoKtp', emp.no_ktp);
+  setVal('bioNoKk', emp.no_kk);
+  setVal('bioNpwp', emp.npwp);
+  setVal('bioBpjsKes', emp.bpjs_kesehatan);
+  setVal('bioBpjsTk', emp.bpjs_ketenagakerjaan);
+  setVal('bioFotoUrl', emp.foto_url || emp.upload_foto);
+  setVal('bioDaruratNama', emp.kontak_darurat_nama || emp.nama_pasangan || emp.nama_ibu_kandung);
+  setVal('bioDaruratHp', emp.kontak_darurat_hp || emp.nomor_hp);
+  setVal('bioDaruratHub', emp.kontak_darurat_hubungan || 'Keluarga');
+
+  // Lock NIK when editing existing employee
   const nikInput = document.getElementById('bioNik');
   if (nikInput) {
     nikInput.setAttribute('readonly', 'readonly');
@@ -6592,75 +6673,90 @@ window.handleBioKaryawanSubmit = async function(event) {
   };
 
   const nik = getVal('bioNik');
-  const nama = getVal('bioNamaLengkap');
+  const nama = getVal('bioNama');
 
   if (!nik || !nama) {
-    alert('NIK dan Nama Lengkap wajib diisi!');
+    alert('NIK dan Nama Lengkap Karyawan wajib diisi!');
     return;
   }
 
+  // Payload terstruktur sesuai kolom tabel Supabase "Bio_Karyawan" / "Bio Karyawan"
   const payload = {
     nik: nik,
-    nama: nama,
-    jeniskelamin: getVal('bioJenisKelamin') || 'Laki-Laki',
-    tempatlahir: getVal('bioTempatLahir'),
-    tanggallahir: getVal('bioTglLahir') || null,
-    agama: getVal('bioAgama') || 'Islam',
-    statusnikah: getVal('bioStatusNikah') || 'Belum Menikah',
-    noktp: getVal('bioNoKtp'),
-    npwp: getVal('bioNpwp'),
-
-    nomortelepon: getVal('bioNoTelepon'),
-    email: getVal('bioEmail'),
-    alamatktp: getVal('bioAlamatKtp'),
-    rtrw: getVal('bioRtRw'),
-    kelurahan: getVal('bioKelurahan'),
-    kecamatan: getVal('bioKecamatan'),
-    kota: getVal('bioKota'),
-    provinsi: getVal('bioProvinsi'),
-    kodepos: getVal('bioKodePos'),
-    alamatdomisili: getVal('bioAlamatDomisili'),
-
+    nama_karyawan: nama,
+    jenis_kelamin: getVal('bioJenisKelamin') || 'Laki-laki',
     jabatan: getVal('bioJabatan') || 'Staff',
-    departemen: getVal('bioDepartemen') || 'Operasional',
-    statuskaryawan: getVal('bioStatusKaryawan') || 'Tetap',
-    tglmasuk: getVal('bioTglMasuk') || null,
-    kanwil: getVal('bioKanwil') || 'Pusat',
+    divisi: getVal('bioDivisi') || 'Top Manajemen',
+    kantor: getVal('bioKantor') || 'Pusat',
+    status_emp: getVal('bioStatusEmp') || 'PKWTT',
+    tanggal_masuk: getVal('bioTanggalMasuk') || null,
+    status: getVal('bioStatus') || 'Aktif',
 
-    gajipokok: parseFloat(getVal('bioGajiPokok')) || 0,
-    bank: getVal('bioBank') || 'BSI',
-    norekening: getVal('bioNoRekening'),
-    bpjskes: getVal('bioBpjsKes'),
-    bpjstk: getVal('bioBpjsTk'),
+    tempat_lahir: getVal('bioTempatLahir') || null,
+    tanggal_lahir: getVal('bioTanggalLahir') || null,
+    agama: getVal('bioAgama') || 'Islam',
+    status_nikah: getVal('bioStatusNikah') || 'Menikah',
+    pendidikan_terakhir: getVal('bioPendidikan') || null,
+    nomor_hp: getVal('bioHp') || null,
+    email: getVal('bioEmail') || null,
+    alamat: getVal('bioAlamat') || null,
+    kota_kabupaten: getVal('bioKota') || null,
+    provinsi: getVal('bioProvinsi') || null,
+    kode_pos: getVal('bioKodePos') || null,
 
-    updatedat: new Date().toISOString()
+    no_ktp: getVal('bioNoKtp') || null,
+    no_kk: getVal('bioNoKk') || null,
+    npwp: getVal('bioNpwp') || null,
+    bpjs_kesehatan: getVal('bioBpjsKes') || null,
+    bpjs_ketenagakerjaan: getVal('bioBpjsTk') || null,
+    foto_url: getVal('bioFotoUrl') || null,
+    kontak_darurat_nama: getVal('bioDaruratNama') || null,
+    kontak_darurat_hp: getVal('bioDaruratHp') || null,
+    kontak_darurat_hubungan: getVal('bioDaruratHub') || null,
+
+    created_at: new Date().toISOString()
   };
 
-  const btnSubmit = document.getElementById('btnSaveBioKaryawan');
+  const btnSubmit = document.getElementById('btnBioSubmit');
   if (btnSubmit) {
     btnSubmit.disabled = true;
-    btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan ke Supabase...';
+    btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan ke Supabase Bio_Karyawan...';
   }
 
   try {
-    // 1. Coba REST API Supabase Upsert (on_conflict=nik)
-    const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/Bio_Karyawan`, {
-      method: 'POST',
-      headers: {
-        'apikey': SUPABASE_CONFIG.anonKey,
-        'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates,return=minimal'
-      },
-      body: JSON.stringify(payload)
-    });
+    let saved = false;
 
-    if (res.ok || res.status === 201 || res.status === 204) {
-      alert(`✅ Biodata karyawan [${nik}] ${nama} berhasil disimpan ke Supabase!`);
-      await loadDaftarKaryawanData(true);
-      switchModule('mod_daftar_karyawan');
-    } else {
-      // 2. Fallback kirim via Node Server API
+    // 1. Simpan langsung ke Supabase REST API (Upsert)
+    const candidateEndpoints = [
+      `${SUPABASE_CONFIG.url}/rest/v1/Bio_Karyawan`,
+      `${SUPABASE_CONFIG.url}/rest/v1/Bio%20Karyawan`,
+      `${SUPABASE_CONFIG.url}/rest/v1/bio_karyawan`
+    ];
+
+    for (const ep of candidateEndpoints) {
+      try {
+        const res = await fetch(ep, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_CONFIG.anonKey,
+            'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates,return=representation'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok || res.status === 201 || res.status === 200 || res.status === 204) {
+          saved = true;
+          break;
+        }
+      } catch (e) {
+        // coba endpoint berikutnya
+      }
+    }
+
+    // 2. Fallback simpan via server backend /api/bio-karyawan
+    if (!saved) {
       const srvRes = await fetch('/api/bio-karyawan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -6668,12 +6764,16 @@ window.handleBioKaryawanSubmit = async function(event) {
       });
       const srvData = await srvRes.json();
       if (srvData.success) {
-        alert(`✅ Biodata karyawan [${nik}] ${nama} berhasil disimpan via server backend!`);
-        await loadDaftarKaryawanData(true);
-        switchModule('mod_daftar_karyawan');
-      } else {
-        alert(`⚠️ Gagal menyimpan data: ${srvData.message || (await res.text())}`);
+        saved = true;
       }
+    }
+
+    if (saved) {
+      alert(`✅ Berhasil! Biodata karyawan [${nik}] ${nama} telah disimpan ke database Supabase tabel Bio_Karyawan.`);
+      await loadDaftarKaryawanData(true);
+      switchModule('mod_daftar_karyawan');
+    } else {
+      alert(`⚠️ Gagal menyimpan ke Supabase. Pastikan tabel Bio_Karyawan sudah dibuat.`);
     }
   } catch (err) {
     console.error('Error simpan biodata:', err);
@@ -6687,10 +6787,13 @@ window.handleBioKaryawanSubmit = async function(event) {
 };
 
 // --------------------------------------------------------------------------
-// 13.3 DETAIL PEGAWAI & CETAK PRESISI A4 RESMI (mod_detail_emp)
+// 13.3 DOKUMEN DETAIL PEGAWAI & CETAK PRESISI A4 RESMI (mod_detail_emp)
 // --------------------------------------------------------------------------
 
-function initEmployeeDetailView(targetNik) {
+async function initEmployeeDetailView(targetNik) {
+  if (!state.hr.employees || state.hr.employees.length === 0) {
+    await loadDaftarKaryawanData();
+  }
   populateEmployeeDetailSelect(targetNik);
 }
 
@@ -6700,7 +6803,7 @@ function populateEmployeeDetailSelect(targetNik) {
 
   const employees = state.hr.employees || [];
   if (employees.length === 0) {
-    select.innerHTML = '<option value="">-- Belum ada data karyawan --</option>';
+    select.innerHTML = '<option value="">-- Belum ada data karyawan di Supabase --</option>';
     return;
   }
 
@@ -6708,7 +6811,7 @@ function populateEmployeeDetailSelect(targetNik) {
 
   select.innerHTML = employees.map(e => {
     const isSel = String(e.nik) === String(selectedVal);
-    return `<option value="${e.nik}" ${isSel ? 'selected' : ''}>${e.nik} - ${e.nama || e.nama_lengkap} (${e.jabatan || 'Staff'})</option>`;
+    return `<option value="${e.nik}" ${isSel ? 'selected' : ''}>${e.nik} - ${e.nama_karyawan || e.nama} (${e.jabatan || 'Staff'} • ${e.kantor || 'Pusat'})</option>`;
   }).join('');
 
   onSelectEmployeeDetailChange();
@@ -6741,29 +6844,64 @@ function renderEmployeeDetailPaper(emp) {
   }
 
   const nik = emp.nik || '-';
-  const nama = emp.nama || emp.nama_lengkap || '-';
-  const gender = emp.jeniskelamin || emp.jenis_kelamin || 'Laki-Laki';
-  const ttl = `${emp.tempatlahir || '-'}, ${emp.tanggallahir ? emp.tanggallahir.split('T')[0] : '-'}`;
+  const nama = emp.nama_karyawan || emp.nama || '-';
+  const gender = emp.jenis_kelamin || 'Laki-laki';
+  const tglLahirFormatted = emp.tanggal_lahir ? String(emp.tanggal_lahir).split('T')[0] : '-';
+  const ttl = `${emp.tempat_lahir || '-'}, ${tglLahirFormatted}`;
+  const golDarah = emp.golongan_darah || '-';
   const agama = emp.agama || 'Islam';
-  const statusNikah = emp.statusnikah || emp.status_pernikahan || 'Belum Menikah';
-  const noKtp = emp.noktp || emp.no_ktp || '-';
+  const statusNikah = emp.status_nikah || 'Menikah';
+  const noKtp = emp.no_ktp || '-';
+  const noKk = emp.no_kk || '-';
   const npwp = emp.npwp || '-';
 
-  const telp = emp.nomortelepon || emp.no_telepon || emp.nohp || '-';
-  const email = emp.email || '-';
-  const alamatKtp = emp.alamatktp || emp.alamat_ktp || '-';
-  const alamatDomisili = emp.alamatdomisili || emp.alamat_domisili || alamatKtp;
+  const telp = emp.nomor_hp || '-';
+  const email = emp.email !== '-' ? emp.email : '-';
+  const alamatKtp = emp.alamat || '-';
+  const domisiliParts = [
+    emp.kelurahan ? `Kel. ${emp.kelurahan}` : '',
+    emp.kecamatan ? `Kec. ${emp.kecamatan}` : '',
+    emp.kota_kabupaten || emp.kota || '',
+    emp.provinsi || '',
+    emp.kode_pos || ''
+  ].filter(Boolean).join(', ');
+  const alamatDomisili = domisiliParts || alamatKtp;
 
   const jabatan = emp.jabatan || 'Staff';
-  const dept = emp.departemen || emp.dept || 'Operasional';
-  const statusKaryawan = emp.statuskaryawan || emp.status_karyawan || 'Tetap';
-  const tglMasuk = emp.tglmasuk || emp.tanggal_masuk || '-';
-  const kanwil = emp.kanwil || emp.lokasi_penempatan || 'Kantor Pusat Jakarta';
+  const dept = emp.divisi || emp.departemen || 'Operasional';
+  const statusKaryawan = emp.status_emp || 'PKWTT';
+  const tglMasuk = emp.tanggal_masuk ? String(emp.tanggal_masuk).split('T')[0] : '-';
+  const kanwil = emp.kantor || 'Kantor Pusat Jakarta';
+  const masaKerja = emp.masa_kerja ? `${emp.masa_kerja} Tahun` : '-';
 
-  const bank = emp.bank || 'Bank Syariah Indonesia (BSI)';
-  const noRek = emp.norekening || emp.no_rekening || '-';
-  const bpjsKes = emp.bpjskes || '-';
-  const bpjsTk = emp.bpjstk || '-';
+  const pendidikan = [emp.pendidikan_terakhir, emp.jurusan ? `(${emp.jurusan})` : '', emp.lembaga_pendidikan].filter(Boolean).join(' ');
+  const namaIbu = emp.nama_ibu_kandung || '-';
+  const pasangan = emp.nama_pasangan || '-';
+  const anakList = [emp.anak_1_nama, emp.anak_2_nama, emp.anak_3_nama, emp.anak_4_nama].filter(Boolean).join(', ') || '-';
+
+  const bank = emp.nama_bank || 'BCA';
+  const noRek = emp.no_rekening || '-';
+  const atasNama = emp.bank_atas_nama || nama;
+  const bpjsKes = emp.bpjs_kesehatan ? `${emp.bpjs_kesehatan} ${emp.penanggung_bpjs ? '(' + emp.penanggung_bpjs + ')' : ''}` : '-';
+  const bpjsTk = emp.bpjs_ketenagakerjaan || '-';
+
+  // Cek foto formal
+  const fotoUrl = emp.foto_url || emp.upload_foto;
+  let fotoHtml = `
+    <div style="width:120px; height:150px; border:2px dashed #94a3b8; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#f8fafc; color:#64748b; font-size:0.7rem; margin:auto;">
+      <i class="fa-solid fa-user" style="font-size:2.5rem; color:#cbd5e1; margin-bottom:8px;"></i>
+      <span>Pas Foto 3x4</span>
+      <span style="font-size:0.6rem; color:#94a3b8;">PT Fath Indah</span>
+    </div>
+  `;
+
+  if (fotoUrl && (fotoUrl.startsWith('http') || fotoUrl.startsWith('data:'))) {
+    fotoHtml = `
+      <div style="width:120px; height:150px; border:2px solid #0284c7; border-radius:8px; overflow:hidden; margin:auto; background:#f8fafc; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);">
+        <img src="${fotoUrl}" alt="${nama}" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.parentElement.innerHTML='<div style=\\'padding:30px 10px; font-size:0.7rem; color:#64748b; text-align:center;\\'><i class=\\'fa-solid fa-image-slash\\' style=\\'font-size:1.8rem; margin-bottom:6px;\\'></i><br>Foto Resmi</div>';">
+      </div>
+    `;
+  }
 
   const currentDateIndo = new Intl.DateTimeFormat('id-ID', { dateStyle: 'long' }).format(new Date());
 
@@ -6803,7 +6941,7 @@ function renderEmployeeDetailPaper(emp) {
         LEMBAR DATA BIODATA RESMI KARYAWAN
       </h3>
       <div style="font-size:0.75rem; color:#64748b; margin-top:3px; font-family:monospace;">
-        Nomor Induk Karyawan (NIK): <strong>${nik}</strong>
+        Nomor Induk Karyawan (NIK): <strong>${nik}</strong> • Sumber: Supabase (Bio_Karyawan)
       </div>
     </div>
 
@@ -6830,7 +6968,7 @@ function renderEmployeeDetailPaper(emp) {
           <tr>
             <td style="font-weight:600;">Tempat, Tanggal Lahir</td>
             <td style="text-align:center;">:</td>
-            <td>${ttl}</td>
+            <td>${ttl} (Gol. Darah: <strong>${golDarah}</strong>)</td>
           </tr>
           <tr>
             <td style="font-weight:600;">Agama / Keyakinan</td>
@@ -6843,9 +6981,19 @@ function renderEmployeeDetailPaper(emp) {
             <td>${statusNikah}</td>
           </tr>
           <tr>
+            <td style="font-weight:600;">Pendidikan Terakhir</td>
+            <td style="text-align:center;">:</td>
+            <td>${pendidikan || '-'}</td>
+          </tr>
+          <tr>
             <td style="font-weight:600;">Nomor KTP / NIK Kependudukan</td>
             <td style="text-align:center;">:</td>
             <td style="font-family:monospace;">${noKtp}</td>
+          </tr>
+          <tr>
+            <td style="font-weight:600;">Nomor Kartu Keluarga (KK)</td>
+            <td style="text-align:center;">:</td>
+            <td style="font-family:monospace;">${noKk}</td>
           </tr>
           <tr>
             <td style="font-weight:600;">Nomor Pokok Wajib Pajak (NPWP)</td>
@@ -6856,11 +7004,7 @@ function renderEmployeeDetailPaper(emp) {
       </div>
       <!-- PAS FOTO RESMI (3X4 RATIO) -->
       <div style="width:130px; text-align:center;">
-        <div style="width:120px; height:150px; border:2px dashed #94a3b8; border-radius:8px; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#f8fafc; color:#64748b; font-size:0.7rem; margin:auto;">
-          <i class="fa-solid fa-user" style="font-size:2.5rem; color:#cbd5e1; margin-bottom:8px;"></i>
-          <span>Pas Foto 3x4</span>
-          <span style="font-size:0.6rem; color:#94a3b8;">PT Fath Indah</span>
-        </div>
+        ${fotoHtml}
         <div style="font-size:0.65rem; color:#64748b; margin-top:6px; font-weight:600;">VERIFIED HRD</div>
       </div>
     </div>
@@ -6892,9 +7036,31 @@ function renderEmployeeDetailPaper(emp) {
       </table>
     </div>
 
-    <!-- SEKSI 3: INFORMASI JABATAN & KEPEGAWAIAN -->
+    <!-- SEKSI 3: KELUARGA & KONTAK DARURAT -->
     <div style="margin-bottom:18px;">
-      <div class="de-section-title">III. STATUS KEPEGAWAIAN DAN PENEMPATAN</div>
+      <div class="de-section-title">III. SUSUNAN KELUARGA & KONTAK DARURAT</div>
+      <table class="de-print-table">
+        <tr>
+          <td style="width:28%; font-weight:600;">Nama Ibu Kandung</td>
+          <td style="width:4%; text-align:center;">:</td>
+          <td style="width:68%;">${namaIbu}</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">Nama Suami / Istri</td>
+          <td style="text-align:center;">:</td>
+          <td>${pasangan}</td>
+        </tr>
+        <tr>
+          <td style="font-weight:600;">Nama Anak Kandung</td>
+          <td style="text-align:center;">:</td>
+          <td>${anakList}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- SEKSI 4: INFORMASI JABATAN & KEPEGAWAIAN -->
+    <div style="margin-bottom:18px;">
+      <div class="de-section-title">IV. STATUS KEPEGAWAIAN DAN PENEMPATAN</div>
       <table class="de-print-table">
         <tr>
           <td style="width:28%; font-weight:600;">Jabatan / Posisi Kerja</td>
@@ -6914,7 +7080,7 @@ function renderEmployeeDetailPaper(emp) {
         <tr>
           <td style="font-weight:600;">Tanggal Mulai Bergabung</td>
           <td style="text-align:center;">:</td>
-          <td>${tglMasuk}</td>
+          <td>${tglMasuk} (Masa Kerja: ${masaKerja})</td>
         </tr>
         <tr>
           <td style="font-weight:600;">Wilayah / Unit Kerja</td>
@@ -6924,14 +7090,14 @@ function renderEmployeeDetailPaper(emp) {
       </table>
     </div>
 
-    <!-- SEKSI 4: REKENING BANK & JAMINAN SOSIAL -->
+    <!-- SEKSI 5: REKENING BANK & JAMINAN SOSIAL -->
     <div style="margin-bottom:24px;">
-      <div class="de-section-title">IV. FASILITAS PENGGAJIAN DAN JAMINAN SOSIAL</div>
+      <div class="de-section-title">V. FASILITAS PENGGAJIAN DAN JAMINAN SOSIAL</div>
       <table class="de-print-table">
         <tr>
           <td style="width:28%; font-weight:600;">Rekening Payroll / Bank</td>
           <td style="width:4%; text-align:center;">:</td>
-          <td style="width:68%;">${bank} - No. Rek: <strong style="font-family:monospace;">${noRek}</strong> (a.n. ${nama})</td>
+          <td style="width:68%;">${bank} - No. Rek: <strong style="font-family:monospace;">${noRek}</strong> (a.n. ${atasNama})</td>
         </tr>
         <tr>
           <td style="font-weight:600;">BPJS Kesehatan</td>
@@ -6960,8 +7126,8 @@ function renderEmployeeDetailPaper(emp) {
           <div>Jakarta, ${currentDateIndo}</div>
           <div style="font-weight:600;">Mengetahui, HRD & Legal Manager</div>
           <div style="height:50px;"></div>
-          <div style="font-weight:800; border-bottom:1px solid #0f172a; padding-bottom:2px;">( Rahmat Hidayat, S.H. )</div>
-          <div style="font-size:0.7rem; color:#64748b; margin-top:2px;">Head of Human Capital PT Fath Indah</div>
+          <div style="font-weight:800; border-bottom:1px solid #0f172a; padding-bottom:2px;">( Miftahul Maulana )</div>
+          <div style="font-size:0.7rem; color:#64748b; margin-top:2px;">Head of HRD, Legal, IS & QA</div>
         </div>
       </div>
     </div>
@@ -6971,6 +7137,7 @@ function renderEmployeeDetailPaper(emp) {
 window.printEmployeeDetail = function() {
   window.print();
 };
+
 
 // --------------------------------------------------------------------------
 // 13.4 ANALYTICS KARYAWAN (mod_emp_analytics)
