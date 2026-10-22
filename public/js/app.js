@@ -8468,49 +8468,70 @@ async function loadHTRunningText() {
   if (!container || !content) return;
 
   let list = [];
-  try {
-    const res = await fetch('/api/haji-terencana/running-text');
-    if (res.ok) {
-      const json = await res.json();
-      if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-        list = json.data;
+
+  // 1. Direct Supabase REST
+  if (typeof SUPABASE_CONFIG !== 'undefined' && SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey) {
+    try {
+      const r = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/running_text?select=*&status=eq.Aktif`, {
+        headers: {
+          'apikey': SUPABASE_CONFIG.anonKey,
+          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+        }
+      });
+      if (r.ok) {
+        const data = await r.json();
+        if (Array.isArray(data) && data.length > 0) list = data;
       }
-    }
-  } catch (e) {
-    const supabaseUrl = state?.dbConfig?.supabase?.url || 'https://utqexpkwtatwzknjftpx.supabase.co';
-    const anonKey = state?.dbConfig?.supabase?.anonKey || '';
-    if (anonKey) {
-      try {
-        const r = await fetch(`${supabaseUrl}/rest/v1/running_text?select=*&status=eq.Aktif`, {
-          headers: { 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` }
-        });
-        if (r.ok) list = await r.json();
-      } catch (err) {}
-    }
+    } catch (err) {}
   }
 
+  // 2. Fallback to /api/haji-terencana/running-text
   if (!list || list.length === 0) {
     try {
-      const r = await fetch('data/running_text.json');
-      if (r.ok) list = await r.json();
+      const res = await fetch('/api/haji-terencana/running-text');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          list = json.data;
+        }
+      }
     } catch (e) {}
   }
 
-  if (list && list.length > 0) {
-    content.innerHTML = list.map(item => {
-      const iconClass = item.icon === 'whatsapp' ? 'ri-whatsapp-fill' :
-                        item.icon === 'tiktok' ? 'ri-video-fill' :
-                        item.icon === 'instagram' ? 'ri-instagram-fill' : 'ri-megaphone-fill';
-      const textHtml = escapeHtml(item.text);
-      if (item.link_url) {
-        return `<span class="ht-running-item"><i class="${iconClass}"></i> <a href="${item.link_url}" target="_blank" rel="noopener noreferrer">${textHtml}</a></span>`;
+  // 3. Fallback to local data/running_text.json
+  if (!list || list.length === 0) {
+    try {
+      const r = await fetch('data/running_text.json');
+      if (r.ok) {
+        const json = await r.json();
+        if (Array.isArray(json) && json.length > 0) list = json;
       }
-      return `<span class="ht-running-item"><i class="${iconClass}"></i> <span>${textHtml}</span></span>`;
-    }).join('');
-    container.style.display = 'flex';
-  } else {
-    container.style.display = 'none';
+    } catch (e) {}
   }
+
+  // 4. Default official announcements
+  if (!list || list.length === 0) {
+    list = [
+      { id: 1, text: "Selamat Datang di Portal Haji Terencana PT Fath Indah Travel Service", icon: "megaphone" },
+      { id: 2, text: "Segera lakukan verifikasi berkas pendaftaran dan pelunasan angsuran tepat waktu", icon: "megaphone" },
+      { id: 3, text: "Informasi & Layanan Jamaah Haji: Hubungi WhatsApp Resmi 0812-3456-7890", icon: "whatsapp", link_url: "https://wa.me/6281234567890" },
+      { id: 4, text: "Ikuti Update Manasik & Keberangkatan di Instagram @fathindahtravel", icon: "instagram", link_url: "https://instagram.com" },
+      { id: 5, text: "Kuitansi resmi diterbitkan secara otomatis setelah setoran berstatus APPROVED", icon: "megaphone" },
+      { id: 6, text: "Untuk kemudahan setoran keluarga, manfaatkan fitur Pembayaran Gabungan Mahram", icon: "megaphone" }
+    ];
+  }
+
+  content.innerHTML = list.map(item => {
+    const iconClass = item.icon === 'whatsapp' ? 'ri-whatsapp-fill' :
+                      item.icon === 'tiktok' ? 'ri-video-fill' :
+                      item.icon === 'instagram' ? 'ri-instagram-fill' : 'ri-megaphone-fill';
+    const textHtml = escapeHtml(item.text);
+    if (item.link_url) {
+      return `<span class="ht-running-item"><i class="${iconClass}"></i> <a href="${item.link_url}" target="_blank" rel="noopener noreferrer">${textHtml}</a></span>`;
+    }
+    return `<span class="ht-running-item"><i class="${iconClass}"></i> <span>${textHtml}</span></span>`;
+  }).join('');
+  container.style.display = 'flex';
 }
 
 /**
@@ -8518,25 +8539,46 @@ async function loadHTRunningText() {
  */
 async function loadHTMasterJamaah() {
   let list = [];
-  try {
-    const res = await fetch('/api/haji-terencana/jamaah');
-    if (res.ok) {
-      const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
-        list = json.data;
+
+  // 1. Direct Supabase REST (primary, universal across static/live-server/full-stack)
+  if (typeof SUPABASE_CONFIG !== 'undefined' && SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey) {
+    try {
+      const r = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/data_jamaah_haji?select=*&order=nama.asc`, {
+        headers: {
+          'apikey': SUPABASE_CONFIG.anonKey,
+          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+        }
+      });
+      if (r.ok) {
+        const data = await r.json();
+        if (Array.isArray(data) && data.length > 0) list = data;
       }
+    } catch (err) {
+      console.warn('Supabase direct fetch failed for data_jamaah_haji:', err);
     }
-  } catch (e) {
-    const supabaseUrl = state?.dbConfig?.supabase?.url || 'https://utqexpkwtatwzknjftpx.supabase.co';
-    const anonKey = state?.dbConfig?.supabase?.anonKey || '';
-    if (anonKey) {
-      try {
-        const r = await fetch(`${supabaseUrl}/rest/v1/data_jamaah_haji?select=*&order=nama.asc`, {
-          headers: { 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` }
-        });
-        if (r.ok) list = await r.json();
-      } catch (err) {}
-    }
+  }
+
+  // 2. Fallback to /api/haji-terencana/jamaah
+  if (!list || list.length === 0) {
+    try {
+      const res = await fetch('/api/haji-terencana/jamaah');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          list = json.data;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 3. Fallback to Google Sheets CSV if configured
+  if ((!list || list.length === 0) && typeof fetchSheetDataCsv === 'function') {
+    try {
+      const sheetData = await fetchSheetDataCsv('DataJamaahHaji');
+      if (Array.isArray(sheetData) && sheetData.length > 0) {
+        list = sheetData;
+      }
+    } catch (e) {}
   }
 
   htState.allJamaahList = list || [];
@@ -8546,33 +8588,42 @@ async function loadHTMasterJamaah() {
   const adminSelectorBox = document.getElementById('htAdminSelectorContainer');
   const adminSelect = document.getElementById('htAdminJamaahSelect');
 
-  if (isAdminOrStaffHaji && adminSelectorBox && adminSelect) {
-    adminSelectorBox.style.display = 'flex';
-    let opts = `<option value="ALL">-- Tampilkan Semua Jamaah (${htState.allJamaahList.length} Data) --</option>`;
-    htState.allJamaahList.forEach(j => {
-      const bpih = String(j.nobpih || '').replace(/^0+/, '');
-      opts += `<option value="${bpih}">${escapeHtml(j.nama)} (BPIH: ${bpih || '-'})</option>`;
-    });
-    adminSelect.innerHTML = opts;
+  if (adminSelectorBox && adminSelect) {
+    if (isAdminOrStaffHaji) {
+      adminSelectorBox.style.display = 'flex';
+      let opts = `<option value="ALL">-- Tampilkan Semua Jamaah (${htState.allJamaahList.length} Data) --</option>`;
+      htState.allJamaahList.forEach(j => {
+        const bpih = String(j.nobpih || '').replace(/^0+/, '');
+        opts += `<option value="${bpih}">${escapeHtml(j.nama)} (BPIH: ${bpih || '-'})</option>`;
+      });
+      adminSelect.innerHTML = opts;
+      adminSelect.value = 'ALL';
+    } else {
+      adminSelectorBox.style.display = 'none';
+    }
   }
 
-  if (!htState.currentUser) {
-    const loggedUser = state.currentUser?.username || '';
+  // Tentukan Jamaah Aktif
+  if (isAdminOrStaffHaji) {
+    // Admin default melihat semua data jamaah agregat
+    htState.currentUser = null;
+    const nameEl = document.getElementById('htDisplayNamaUser');
+    const bpihEl = document.getElementById('htDisplayNoHPUser');
+    const avatarEl = document.getElementById('htDisplayAvatar');
+    if (nameEl) nameEl.textContent = 'Semua Jamaah Haji Terencana';
+    if (bpihEl) bpihEl.textContent = `Total: ${htState.allJamaahList.length} Jamaah Terdaftar`;
+    if (avatarEl) avatarEl.src = 'assets/logo.png';
+  } else {
+    // Regular Jamaah: cari berdasarkan username / nohp / nobpih
+    const loggedUser = String(state.currentUser?.username || '').trim();
     const matched = htState.allJamaahList.find(j => {
       const bpih = String(j.nobpih || '').replace(/^0+/, '');
       const nohp = String(j.nohp || '').trim();
       return bpih === loggedUser || nohp === loggedUser;
-    });
+    }) || htState.allJamaahList[0];
 
     if (matched) {
       htSetCurrentJamaah(matched);
-      if (adminSelect) adminSelect.value = String(matched.nobpih || '').replace(/^0+/, '');
-    } else if (htState.allJamaahList.length > 0) {
-      const demoJamaah = htState.allJamaahList.find(j => String(j.nobpih || '').includes('3000956472')) || htState.allJamaahList[0];
-      htSetCurrentJamaah(demoJamaah);
-      if (adminSelect && !isAdminOrStaffHaji) {
-        adminSelect.value = String(demoJamaah.nobpih || '').replace(/^0+/, '');
-      }
     }
   }
 }
@@ -8650,34 +8701,62 @@ window.htRefreshData = async function() {
   }
 
   let list = [];
-  const bpih = htState.currentUser ? htState.currentUser.noBPIH : null;
+  const adminSelect = document.getElementById('htAdminJamaahSelect');
+  const selectedBpih = adminSelect ? adminSelect.value : (htState.currentUser ? htState.currentUser.noBPIH : null);
+  const filterByBpih = (selectedBpih && selectedBpih !== 'ALL') ? selectedBpih : null;
 
-  try {
-    let url = '/api/haji-terencana/angsuran';
-    if (bpih) url += `?noBPIH=${encodeURIComponent(bpih)}`;
-    const res = await fetch(url);
-    if (res.ok) {
-      const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
-        list = json.data;
+  // 1. Direct Supabase REST (primary, fast & universal)
+  if (typeof SUPABASE_CONFIG !== 'undefined' && SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey) {
+    try {
+      let q = `${SUPABASE_CONFIG.url}/rest/v1/entry_angsuran_haji?select=*`;
+      if (filterByBpih) {
+        const cleanBpih = String(filterByBpih).replace(/^0+/, '');
+        q += `&or=(nobpih.eq.${cleanBpih},nobpih.eq.0${cleanBpih})`;
       }
-    }
-  } catch (e) {
-    const supabaseUrl = state?.dbConfig?.supabase?.url || 'https://utqexpkwtatwzknjftpx.supabase.co';
-    const anonKey = state?.dbConfig?.supabase?.anonKey || '';
-    if (anonKey) {
-      try {
-        let q = `${supabaseUrl}/rest/v1/entry_angsuran_haji?select=*`;
-        if (bpih) {
-          q += `&or=(nobpih.eq.${bpih},nobpih.eq.0${bpih})`;
+      q += '&order=tanggal.desc,id_1.desc';
+      const r = await fetch(q, {
+        headers: {
+          'apikey': SUPABASE_CONFIG.anonKey,
+          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
         }
-        q += '&order=tanggal.desc,id_1.desc';
-        const r = await fetch(q, {
-          headers: { 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` }
-        });
-        if (r.ok) list = await r.json();
-      } catch (err) {}
+      });
+      if (r.ok) {
+        const data = await r.json();
+        if (Array.isArray(data)) list = data;
+      }
+    } catch (err) {
+      console.warn('Direct Supabase fetch failed for entry_angsuran_haji:', err);
     }
+  }
+
+  // 2. Fallback to /api/haji-terencana/angsuran
+  if (!list || list.length === 0) {
+    try {
+      let url = '/api/haji-terencana/angsuran';
+      if (filterByBpih) url += `?noBPIH=${encodeURIComponent(filterByBpih)}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          list = json.data;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // 3. Fallback to Google Sheets CSV if needed
+  if ((!list || list.length === 0) && typeof fetchSheetDataCsv === 'function') {
+    try {
+      const sheetData = await fetchSheetDataCsv('EntryAngsuranHaji');
+      if (Array.isArray(sheetData)) {
+        if (filterByBpih) {
+          const cleanBpih = String(filterByBpih).replace(/^0+/, '');
+          list = sheetData.filter(x => String(x.nobpih || '').replace(/^0+/, '') === cleanBpih);
+        } else {
+          list = sheetData;
+        }
+      }
+    } catch (e) {}
   }
 
   htState.rawAngsuranList = (list || []).map(r => {
@@ -8749,10 +8828,6 @@ window.htSwitchTab = function(tabName) {
     if (btnUpload) btnUpload.classList.add('active');
     if (viewEntry) viewEntry.style.display = 'none';
     if (viewUpload) viewUpload.style.display = 'block';
-
-    if (htState.currentUser) {
-      htSetCurrentJamaah(htState.currentUser.detail || htState.currentUser);
-    }
   }
 };
 
@@ -8849,81 +8924,90 @@ window.htOpenReceiptModal = function(index) {
   const statusClass = String(item.status).toLowerCase();
 
   body.innerHTML = `
-    <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:18px;">
-      <div style="text-align:center; border-bottom:2px dashed #cbd5e1; padding-bottom:14px; margin-bottom:14px;">
-        <img src="assets/logo.png" alt="PT. Fath Indah" style="height:36px; margin-bottom:4px;">
-        <div style="font-family:'Outfit',sans-serif; font-size:15px; font-weight:800; color:#0f766e;">PT. FATH INDAH TRAVEL SERVICE</div>
-        <div style="font-size:11px; color:#64748b;">Graha Persada 2 Lt. 5, Jl. KH. Noer Ali No. 89A, Bekasi Barat</div>
+    <div class="ht-receipt-content" id="htPrintableReceipt">
+      <div class="ht-receipt-header">
+        <img src="assets/logo.png" alt="Logo Fath Indah" class="ht-receipt-logo" onerror="this.src='assets/logo.png'">
+        <div class="ht-receipt-title">PT. FATH INDAH TRAVEL SERVICE</div>
+        <div class="ht-receipt-sub">BUKTI PEMBAYARAN ANGSURAN HAJI TERENCANA</div>
       </div>
 
-      <div style="display:flex; flex-direction:column; gap:8px; font-size:12px;">
-        <div style="display:flex; justify-content:space-between;">
-          <span style="color:#64748b;">No. Jurnal (FITS No)</span>
-          <span style="font-weight:700; color:#0f172a; font-family:monospace;">${escapeHtml(item.noJurnal)}</span>
-        </div>
-        <div style="display:flex; justify-content:space-between;">
-          <span style="color:#64748b;">ID Transaksi</span>
-          <span style="font-weight:600; color:#0f172a;">${escapeHtml(item.id)}</span>
-        </div>
-        <div style="display:flex; justify-content:space-between;">
-          <span style="color:#64748b;">No. BPIH Nasabah</span>
-          <span style="font-weight:700; color:#0f172a;">${escapeHtml(item.noBPIH)}</span>
-        </div>
-        <div style="display:flex; justify-content:space-between;">
-          <span style="color:#64748b;">Nama Nasabah</span>
-          <span style="font-weight:700; color:#0f172a;">${escapeHtml(item.namaNasabah)}</span>
-        </div>
-        <div style="display:flex; justify-content:space-between;">
-          <span style="color:#64748b;">Bank Pembayaran</span>
-          <span style="font-weight:600; color:#0f172a;">${escapeHtml(item.bank)}</span>
-        </div>
-        <div style="display:flex; justify-content:space-between;">
-          <span style="color:#64748b;">Tanggal Pembayaran</span>
-          <span style="font-weight:600; color:#0f172a;">${formatIndonesianDate(item.tanggal)}</span>
-        </div>
-        <div style="display:flex; justify-content:space-between;">
-          <span style="color:#64748b;">Metode Pembayaran</span>
-          <span style="font-weight:600; color:#0f172a;">${escapeHtml(item.metodePembayaran)}</span>
-        </div>
-        <div style="display:flex; justify-content:space-between;">
-          <span style="color:#64748b;">Status Verifikasi</span>
-          <span class="ht-badge ${statusClass}">${escapeHtml(item.status)}</span>
-        </div>
-        <div style="display:flex; justify-content:space-between;">
-          <span style="color:#64748b;">Uraian</span>
-          <span style="font-weight:600; color:#0f172a; text-align:right;">${escapeHtml(item.uraian)}</span>
-        </div>
+      <div class="ht-receipt-divider"></div>
+
+      <div class="ht-receipt-row">
+        <span class="ht-receipt-label">No. Transaksi</span>
+        <span class="ht-receipt-value" style="font-family:monospace; font-weight:800;">${escapeHtml(item.id)}</span>
+      </div>
+      <div class="ht-receipt-row">
+        <span class="ht-receipt-label">No. Jurnal</span>
+        <span class="ht-receipt-value" style="font-family:monospace; font-weight:700;">${escapeHtml(item.noJurnal)}</span>
+      </div>
+      <div class="ht-receipt-row">
+        <span class="ht-receipt-label">Tanggal Transaksi</span>
+        <span class="ht-receipt-value">${formatIndonesianDate(item.tanggal)}</span>
+      </div>
+      <div class="ht-receipt-row">
+        <span class="ht-receipt-label">Nama Nasabah</span>
+        <span class="ht-receipt-value" style="font-weight:700; color:#0f172a;">${escapeHtml(item.namaNasabah)}</span>
+      </div>
+      <div class="ht-receipt-row">
+        <span class="ht-receipt-label">No. BPIH</span>
+        <span class="ht-receipt-value">${escapeHtml(item.noBPIH || '-')}</span>
+      </div>
+      <div class="ht-receipt-row">
+        <span class="ht-receipt-label">Metode Pembayaran</span>
+        <span class="ht-receipt-value">${escapeHtml(item.metodePembayaran)}</span>
+      </div>
+      <div class="ht-receipt-row">
+        <span class="ht-receipt-label">Bank Penerima</span>
+        <span class="ht-receipt-value" style="font-weight:700;">${escapeHtml(item.bank)}</span>
+      </div>
+      <div class="ht-receipt-row">
+        <span class="ht-receipt-label">Uraian</span>
+        <span class="ht-receipt-value">${escapeHtml(item.uraian)}</span>
       </div>
 
-      <div style="margin-top:14px; padding-top:12px; border-top:2px dashed #cbd5e1; display:flex; justify-content:space-between; align-items:center;">
-        <span style="font-size:13px; font-weight:700; color:#0f172a;">TOTAL ANGSURAN</span>
-        <span style="font-family:'Outfit',sans-serif; font-size:20px; font-weight:800; color:#0f766e;">${htFormatRupiah(item.jumlah)}</span>
+      <div class="ht-receipt-divider"></div>
+
+      <div class="ht-receipt-row" style="margin:12px 0;">
+        <span class="ht-receipt-label" style="font-size:14px; font-weight:700;">Total Pembayaran</span>
+        <span class="ht-receipt-value" style="font-size:18px; font-weight:800; color:#0f766e;">${htFormatRupiah(item.jumlah)}</span>
       </div>
 
-      ${item.linkDokumen ? `
-        <div style="margin-top:12px; padding:8px 12px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; font-size:11px; display:flex; justify-content:space-between; align-items:center;">
-          <span>Bukti Pembayaran Terlampir</span>
-          <button type="button" class="btn-ht-action" style="padding:3px 8px; font-size:11px;" onclick="htViewDocument('Bukti Transfer', '${item.linkDokumen}')">Lihat Lampiran</button>
+      <div class="ht-receipt-row">
+        <span class="ht-receipt-label">Status Verifikasi</span>
+        <span class="ht-badge ${statusClass}">${escapeHtml(item.status)}</span>
+      </div>
+
+      ${item.linkDokumen && item.linkDokumen !== 'Attachment' ? `
+        <div style="margin-top:14px; padding:10px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:11px; font-weight:600; color:#475569;">Lampiran Bukti Transfer</span>
+          <button type="button" class="btn-ht-action" style="font-size:11px; padding:4px 8px;" onclick="htViewDocument('Bukti Transfer', '${item.linkDokumen}')">
+            <i class="ri-eye-line"></i> Lihat Berkas
+          </button>
         </div>
       ` : ''}
 
-      <div style="display:flex; gap:10px; margin-top:18px;">
-        <button type="button" class="btn-ht-action primary" style="flex:1; justify-content:center; padding:10px;" 
-                ${!isApproved ? 'disabled style="opacity:0.5; cursor:not-allowed; background:#64748b;" title="Kwitansi hanya dapat dicetak setelah diverifikasi & Approved"' : ''}
-                onclick="htPrintOfficialKwitansi()">
-          <i class="ri-printer-line"></i>
-          <span>Cetak Kwitansi</span>
-        </button>
-        <button type="button" class="btn-ht-action" style="padding:10px 18px;" onclick="htCloseReceiptModal()">Tutup</button>
+      <div class="ht-receipt-footer">
+        <div>Kuitansi elektronik resmi PT Fath Indah Travel Service.</div>
+        <div>Dicetak secara otomatis pada ${formatIndonesianDate(new Date())}</div>
       </div>
-
-      ${!isApproved ? `
-        <div style="font-size:11px; color:#b45309; text-align:center; margin-top:8px;">
-          <i class="ri-information-line"></i> Tombol Cetak Kwitansi aktif khusus pembayaran yang telah disetujui (Approved).
-        </div>
-      ` : ''}
     </div>
   `;
+
+  const btnKuitansi = document.getElementById('htPrintKuitansiBtn');
+  if (btnKuitansi) {
+    if (isApproved) {
+      btnKuitansi.disabled = false;
+      btnKuitansi.title = 'Cetak Kwitansi Resmi PT. Fath Indah Travel Service';
+      btnKuitansi.style.opacity = '1';
+      btnKuitansi.style.cursor = 'pointer';
+    } else {
+      btnKuitansi.disabled = true;
+      btnKuitansi.title = 'Kwitansi resmi hanya dapat dicetak setelah setoran disetujui (Approved)';
+      btnKuitansi.style.opacity = '0.5';
+      btnKuitansi.style.cursor = 'not-allowed';
+    }
+  }
 
   modal.style.display = 'flex';
 };
@@ -8933,108 +9017,118 @@ window.htCloseReceiptModal = function() {
   if (modal) modal.style.display = 'none';
 };
 
-window.htPrintOfficialKwitansi = function() {
+window.htPrintReceipt = function() {
+  const content = document.getElementById('htPrintableReceipt');
+  if (!content) return;
+
+  const printWindow = window.open('', '_blank', 'width=700,height=800');
+  if (!printWindow) {
+    window.print();
+    return;
+  }
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Struk Pembayaran Angsuran Haji Terencana</title>
+      <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #1e293b; }
+        .ht-receipt-content { max-width: 450px; margin: 0 auto; border: 1px solid #cbd5e1; padding: 20px; border-radius: 8px; }
+        .ht-receipt-header { text-align: center; margin-bottom: 15px; }
+        .ht-receipt-logo { height: 45px; margin-bottom: 5px; }
+        .ht-receipt-title { font-size: 15px; font-weight: 800; color: #0f172a; }
+        .ht-receipt-sub { font-size: 11px; color: #64748b; font-weight: 600; }
+        .ht-receipt-divider { border-top: 1px dashed #cbd5e1; margin: 12px 0; }
+        .ht-receipt-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; }
+        .ht-receipt-label { color: #64748b; }
+        .ht-receipt-value { font-weight: 600; color: #0f172a; text-align: right; }
+        .ht-receipt-footer { text-align: center; margin-top: 20px; font-size: 10px; color: #94a3b8; border-top: 1px dashed #cbd5e1; padding-top: 10px; }
+        @media print { body { padding: 0; } }
+      </style>
+    </head>
+    <body>
+      ${content.outerHTML}
+      <script>
+        window.onload = function() { window.print(); window.close(); }
+      </script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+};
+
+window.htOpenOfficialKwitansiModal = function() {
   const item = htState.currentReceiptItem;
   if (!item) return;
 
+  if (String(item.status).toLowerCase() !== 'approved') {
+    alert('Kwitansi resmi hanya dapat dicetak untuk transaksi yang sudah Approved!');
+    return;
+  }
+
   const modal = document.getElementById('htOfficialKwitansiModal');
-  const iframe = document.getElementById('htPrintKwitansiIframe');
+  const iframe = document.getElementById('htOfficialKwitansiIframe');
   if (!modal || !iframe) return;
 
-  const nominalVal = item.jumlah || 0;
-  const formattedNominal = htFormatRupiah(nominalVal);
-  const terbilangText = terbilang(nominalVal) + ' Rupiah';
-  const fitsNo = item.noJurnal || item.id;
-  const namaJamaah = item.namaNasabah || 'Jamaah Fath Indah';
-  const uraianText = item.uraian || 'Pembayaran Angsuran Haji Terencana';
+  const fitsNo = item.noJurnal || item.id || 'FITS-HT-' + Math.floor(1000 + Math.random() * 9000);
+  const namaJamaah = (item.namaNasabah || 'Nasabah Haji Fath Indah').toUpperCase();
+  const terbilangText = terbilang(item.jumlah) + ' Rupiah';
+  const uraianText = item.uraian || 'Pembayaran Angsuran Tabungan Haji Terencana PT Fath Indah Travel Service';
+  const formattedNominal = parseInt(item.jumlah, 10).toLocaleString('id-ID') + ',-';
   const tglFormatted = formatIndonesianDate(item.tanggal || new Date());
-  const logoUrl = 'https://drive.google.com/uc?export=view&id=11jFXh4ieChlQhOqoMRbL3DYHYVfRx8__';
 
   const htmlDoc = `
     <!DOCTYPE html>
     <html lang="id">
     <head>
       <meta charset="UTF-8">
-      <title>Kwitansi Resmi - ${escapeHtml(fitsNo)}</title>
+      <title>Kuitansi Resmi - PT. Fath Indah Travel Service</title>
       <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Times New Roman', Times, serif; }
-        body { padding: 25px; background: #fff; color: #000; }
-        .kuitansi-frame {
-          border: 2px solid #000;
-          padding: 24px 30px;
-          max-width: 760px;
-          margin: 0 auto;
-          position: relative;
-          background: #ffffff;
-        }
-        .header-table { width: 100%; border-bottom: 2px solid #000; padding-bottom: 12px; margin-bottom: 12px; }
-        .header-logo-cell { width: 100px; vertical-align: middle; text-align: left; }
-        .header-logo-cell img { max-width: 90px; max-height: 80px; object-fit: contain; }
-        .header-info-cell { vertical-align: middle; padding-left: 10px; }
-        .company-name { font-size: 18px; font-weight: bold; color: #000; letter-spacing: 0.5px; }
-        .company-address { font-size: 11px; line-height: 1.4; color: #000; margin-top: 4px; }
-        .title-row { display: flex; justify-content: space-between; align-items: flex-end; margin: 14px 0 16px; }
-        .kuitansi-title-text { font-size: 24px; font-weight: bold; text-decoration: underline; letter-spacing: 1px; }
-        .fits-no-box { font-size: 13px; font-weight: bold; }
+        @page { size: A4 landscape; margin: 10mm; }
+        * { box-sizing: border-box; }
+        body { font-family: "Times New Roman", Times, serif; background: #fff; color: #000; margin: 0; padding: 20px; }
+        .kuitansi-border-outer { border: 2.5px solid #000; padding: 20px 30px; max-width: 860px; margin: 0 auto; background: #fff; }
+        .header-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+        .company-title { font-size: 20px; font-weight: bold; letter-spacing: 0.5px; }
+        .company-subtitle { font-size: 11px; margin-top: 2px; }
+        .company-address { font-size: 10px; line-height: 1.3; }
+        .title-row { display: flex; justify-content: space-between; align-items: flex-end; margin: 15px 0 10px; border-bottom: 2px solid #000; padding-bottom: 6px; }
+        .kuitansi-title-text { font-size: 26px; font-weight: bold; letter-spacing: 2px; }
+        .fits-no-box { font-size: 14px; font-weight: bold; }
         .fits-no-line { border-bottom: 1px dotted #000; padding: 0 10px; }
-        .form-table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
-        .form-table td { padding: 6px 4px; vertical-align: top; font-size: 13px; }
-        .field-label { width: 150px; font-weight: normal; }
-        .field-colon { width: 12px; text-align: center; }
+        .form-table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 10px; }
+        .form-table td { padding: 6px 4px; vertical-align: top; }
+        .field-label { width: 170px; font-weight: 500; }
+        .field-colon { width: 15px; text-align: center; }
         .field-value { font-weight: bold; }
-        .striped-box {
-          background-color: #f1f5f9;
-          background-image: repeating-linear-gradient(0deg, #cbd5e1 0px, #cbd5e1 1px, transparent 1px, transparent 4px);
-          border: 1px solid #94a3b8;
-          padding: 6px 12px;
-          border-radius: 4px;
-          font-style: italic;
-          font-weight: 700;
-        }
-        .bottom-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 24px; }
+        .striped-box { background: repeating-linear-gradient(45deg, #f0f0f0, #f0f0f0 10px, #ffffff 10px, #ffffff 20px); border: 1px solid #777; padding: 6px 12px; font-style: italic; font-weight: bold; font-size: 13px; }
+        .bottom-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 20px; }
         .nominal-group { display: flex; flex-direction: column; gap: 8px; }
         .nominal-row { display: flex; align-items: center; font-size: 15px; font-weight: bold; }
-        .nominal-box {
-          background: #f1f5f9;
-          background-image: repeating-linear-gradient(0deg, #cbd5e1 0px, #cbd5e1 1px, transparent 1px, transparent 4px);
-          border: 1px solid #94a3b8;
-          padding: 6px 18px;
-          border-radius: 4px;
-          font-size: 16px;
-          font-weight: 800;
-          min-width: 180px;
-          text-align: left;
-        }
-        .signature-area { text-align: center; min-width: 240px; }
-        .date-location { font-size: 13px; font-weight: bold; margin-bottom: 55px; }
-        .company-sig-name { font-size: 13px; font-weight: bold; }
-        .footer-note-box {
-          border-top: 1px solid #000;
-          padding-top: 6px;
-          margin-top: 16px;
-          font-size: 10px;
-          font-style: italic;
-        }
+        .nominal-box { border: 2px solid #000; padding: 5px 14px; min-width: 170px; font-size: 15px; font-weight: bold; background: #fafafa; }
+        .signature-area { text-align: center; width: 260px; font-size: 13px; }
+        .date-location { margin-bottom: 60px; }
+        .company-sig-name { font-weight: bold; text-decoration: underline; }
+        .footer-note-box { border-top: 1px solid #ccc; margin-top: 15px; padding-top: 5px; font-size: 9.5px; color: #555; font-style: italic; text-align: center; }
         @media print {
-          body { padding: 0; }
           .no-print { display: none !important; }
+          body { padding: 0; }
+          .kuitansi-border-outer { border: 2px solid #000; }
         }
       </style>
     </head>
     <body>
-      <div class="kuitansi-frame">
+      <div class="kuitansi-border-outer">
         <table class="header-table">
           <tr>
-            <td class="header-logo-cell">
-              <img src="${logoUrl}" alt="Fath Indah" onerror="this.onerror=null; this.src='assets/logo.png';">
+            <td style="width: 75px; vertical-align: middle;">
+              <img src="assets/logo.png" style="width:65px; height:auto;" onerror="this.style.display='none'">
             </td>
-            <td class="header-info-cell">
-              <div class="company-name">PT. FATH INDAH TRAVEL SERVICE</div>
-              <div class="company-address">
-                Graha Persada 2, Lt. 5, Jl. KH. Noer Ali No. 89A, Kayuringin Jaya<br>
-                Kec. Bekasi Selatan, Kota Bekasi, Jawa Barat, 17144<br>
-                Phone : 0811-1075-404 • Email : info@fathindah.id
-              </div>
+            <td style="vertical-align: middle;">
+              <div class="company-title">PT. FATH INDAH TRAVEL SERVICE</div>
+              <div class="company-subtitle"><b>SK Kemenag RI No. 892 / 2017 & No. 129 / 2021</b></div>
+              <div class="company-address">Kantor Pusat: Ruko Sentra Bisnis Graha Indah Blok A1 No. 8-9, Jl. KH. Noer Ali, Jakasampurna, Bekasi Barat</div>
             </td>
           </tr>
         </table>
@@ -9217,24 +9311,53 @@ window.htHandleUploadSubmit = async function(e) {
 
   let mahramGroup = [];
   if (payload.noBPIH) {
-    try {
-      const res = await fetch(`/api/haji-terencana/mahram?noBPIH=${encodeURIComponent(payload.noBPIH)}`);
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          const kodeMahram = json.data[0].kodemahram;
-          if (kodeMahram) {
-            const groupRes = await fetch(`/api/haji-terencana/mahram`);
-            if (groupRes.ok) {
-              const groupJson = await groupRes.json();
-              if (groupJson.success && Array.isArray(groupJson.data)) {
-                mahramGroup = groupJson.data.filter(x => x.kodemahram === kodeMahram);
+    const cleanBpih = String(payload.noBPIH).replace(/^0+/, '');
+    if (typeof SUPABASE_CONFIG !== 'undefined' && SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey) {
+      try {
+        const r = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/mahram?or=(nobpih.eq.${cleanBpih},nobpih.eq.0${cleanBpih})`, {
+          headers: {
+            'apikey': SUPABASE_CONFIG.anonKey,
+            'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+          }
+        });
+        if (r.ok) {
+          const data = await r.json();
+          if (Array.isArray(data) && data.length > 0) {
+            const kodeMahram = data[0].kodemahram;
+            if (kodeMahram) {
+              const gr = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/mahram?kodemahram=eq.${kodeMahram}`, {
+                headers: {
+                  'apikey': SUPABASE_CONFIG.anonKey,
+                  'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+                }
+              });
+              if (gr.ok) mahramGroup = await gr.json();
+            }
+          }
+        }
+      } catch (err) {}
+    }
+
+    if (!mahramGroup || mahramGroup.length === 0) {
+      try {
+        const res = await fetch(`/api/haji-terencana/mahram?noBPIH=${encodeURIComponent(cleanBpih)}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+            const kodeMahram = json.data[0].kodemahram;
+            if (kodeMahram) {
+              const groupRes = await fetch(`/api/haji-terencana/mahram`);
+              if (groupRes.ok) {
+                const groupJson = await groupRes.json();
+                if (groupJson.success && Array.isArray(groupJson.data)) {
+                  mahramGroup = groupJson.data.filter(x => x.kodemahram === kodeMahram);
+                }
               }
             }
           }
         }
-      }
-    } catch (err) {}
+      } catch (err) {}
+    }
   }
 
   if (mahramGroup && mahramGroup.length > 1) {
@@ -9253,30 +9376,30 @@ function htShowMahramConfirmModal(payload, mahramGroup) {
   }));
 
   const modal = document.getElementById('htMahramConfirmModal');
-  if (!modal) return;
-
-  htRenderMahramConfirmBody();
-  modal.style.display = 'flex';
+  if (modal) {
+    htRenderMahramConfirmBody();
+    modal.style.display = 'flex';
+  }
 }
 
 function htRenderMahramConfirmBody() {
-  const body = document.getElementById('htMahramConfirmBody');
-  const payload = htState.pendingUploadPayload;
-  if (!body || !payload) return;
+  const container = document.getElementById('htModalMahramBody');
+  if (!container || !htState.pendingUploadPayload) return;
 
-  const selectedCount = htState.currentMahramGroup.filter(m => m.selected).length;
-  const splitAmount = selectedCount > 0 ? Math.floor(payload.jumlah / selectedCount) : 0;
+  const totalNominal = htState.pendingUploadPayload.jumlah;
+  const selectedMembers = htState.currentMahramGroup.filter(m => m.selected);
+  const selectedCount = selectedMembers.length;
+  const splitAmount = selectedCount > 0 ? Math.floor(totalNominal / selectedCount) : 0;
 
-  body.innerHTML = `
-    <div class="ht-split-banner">
-      <div style="font-size:12px; font-weight:700; color:#64748b; text-transform:uppercase;">Total Pembayaran Ditransfer</div>
-      <div class="ht-split-nominal">${htFormatRupiah(payload.jumlah)}</div>
-      <div style="font-size:12px; color:#0f766e; margin-top:4px;">
-        Terdeteksi grup mahram (${htState.currentMahramGroup.length} orang). Pembagian rata: <strong>${htFormatRupiah(splitAmount)} / orang</strong>.
+  container.innerHTML = `
+    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:12px; margin-bottom:16px;">
+      <div style="font-size:12px; color:#166534; font-weight:700;">INFORMASI SETORAN MAHRAN / KELUARGA</div>
+      <div style="font-size:13px; color:#15803d; margin-top:4px;">
+        Terdeteksi ${htState.currentMahramGroup.length} anggota mahram terdaftar. Total setoran <b>${htFormatRupiah(totalNominal)}</b> akan dibagi rata kepada ${selectedCount} anggota yang dipilih masing-masing <b>${htFormatRupiah(splitAmount)}</b>.
       </div>
     </div>
 
-    <table class="ht-mahram-table">
+    <table class="ht-table" style="width:100%;">
       <thead>
         <tr>
           <th style="width:40px; text-align:center;">Pilih</th>
@@ -9373,37 +9496,66 @@ async function htDoFinalSubmitAngsuran(recordsList) {
     };
   });
 
-  try {
-    const res = await fetch('/api/haji-terencana/angsuran', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payloadToPost)
-    });
+  let saved = false;
 
-    if (res.ok) {
-      alert('Setoran angsuran haji berhasil dikirim! Menunggu approval admin.');
-      document.getElementById('htUploadForm')?.reset();
-      htRemoveSelectedFile();
-      htSwitchTab('entry');
-      await htRefreshData();
-    } else {
-      const err = await res.json();
-      alert(`Gagal menyimpan: ${err.error || 'Kesalahan koneksi database'}`);
+  // 1. Direct Supabase REST POST
+  if (typeof SUPABASE_CONFIG !== 'undefined' && SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey) {
+    try {
+      const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/entry_angsuran_haji`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_CONFIG.anonKey,
+          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify(payloadToPost)
+      });
+      if (res.ok) {
+        saved = true;
+      }
+    } catch (err) {
+      console.warn('Direct Supabase insert failed:', err);
     }
-  } catch (err) {
-    alert(`Terjadi kesalahan: ${err.message}`);
-  } finally {
-    if (submitBtn) {
-      submitBtn.disabled = false;
-      submitBtn.innerHTML = '<i class="ri-send-plane-fill"></i> Kirim Bukti Angsuran';
+  }
+
+  // 2. Fallback to /api/haji-terencana/angsuran
+  if (!saved) {
+    try {
+      const res = await fetch('/api/haji-terencana/angsuran', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payloadToPost)
+      });
+      if (res.ok) {
+        saved = true;
+      } else {
+        const err = await res.json();
+        alert(`Gagal menyimpan: ${err.error || 'Kesalahan koneksi database'}`);
+      }
+    } catch (err) {
+      alert(`Terjadi kesalahan: ${err.message}`);
     }
+  }
+
+  if (saved) {
+    alert('Setoran angsuran haji berhasil dikirim! Menunggu approval admin.');
+    document.getElementById('htUploadForm')?.reset();
+    htRemoveSelectedFile();
+    htSwitchTab('entry');
+    await htRefreshData();
+  }
+
+  if (submitBtn) {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="ri-send-plane-fill"></i> Kirim Bukti Angsuran';
   }
 }
 
 window.htOpenProfileModal = function() {
   const u = htState.currentUser;
   if (!u) {
-    alert('Pilih nasabah / jamaah terlebih dahulu!');
+    alert('Pilih nasabah / jamaah pada filter terlebih dahulu untuk melihat profil personal!');
     return;
   }
 
@@ -9549,37 +9701,49 @@ window.htOpenFinanceListModal = function() {
           </tr>
         </thead>
         <tbody>
-          ${angsuran.map((item, i) => `
+          ${angsuran.map((item, idx) => `
             <tr>
-              <td style="border:1px solid #000; padding:5px; text-align:center;">${i + 1}</td>
-              <td style="border:1px solid #000; padding:5px; font-family:monospace;">${escapeHtml(item.noJurnal)}</td>
-              <td style="border:1px solid #000; padding:5px; text-align:center;">${escapeHtml(item.tanggal)}</td>
-              <td style="border:1px solid #000; padding:5px;">${escapeHtml(item.bank)}</td>
-              <td style="border:1px solid #000; padding:5px; text-align:center;">${escapeHtml(item.status)}</td>
-              <td style="border:1px solid #000; padding:5px; text-align:right; font-weight:bold;">${htFormatRupiah(item.jumlah)}</td>
+              <td style="border:1px solid #000; padding:4px 6px; text-align:center;">${idx + 1}</td>
+              <td style="border:1px solid #000; padding:4px 6px; font-family:monospace;">${escapeHtml(item.noJurnal)}</td>
+              <td style="border:1px solid #000; padding:4px 6px;">${formatIndonesianDate(item.tanggal)}</td>
+              <td style="border:1px solid #000; padding:4px 6px;">${escapeHtml(item.bank)}</td>
+              <td style="border:1px solid #000; padding:4px 6px; font-weight:bold; color:${String(item.status).toLowerCase() === 'approved' ? '#0f766e' : '#f59e0b'};">${escapeHtml(item.status)}</td>
+              <td style="border:1px solid #000; padding:4px 6px; text-align:right; font-weight:bold;">${htFormatRupiah(item.jumlah)}</td>
             </tr>
           `).join('')}
-          <tr style="background:#f8fafc; font-weight:bold;">
-            <td colspan="5" style="border:1px solid #000; padding:6px; text-align:right;">TOTAL TERBAYAR (APPROVED):</td>
-            <td style="border:1px solid #000; padding:6px; text-align:right; color:#0f766e;">${htFormatRupiah(totalBayar)}</td>
-          </tr>
         </tbody>
       </table>
 
-      <div style="display:flex; justify-content:space-between; font-size:12px; border-top:1px dashed #000; padding-top:8px;">
-        <span>Estimasi Sisa Pembayaran: <strong>${htFormatRupiah(sisa)}</strong></span>
-        <span>Bekasi, ${formatIndonesianDate(new Date())}</span>
+      <div style="display:flex; justify-content:flex-end; font-size:12px; margin-bottom:18px;">
+        <table style="width:280px; border-collapse:collapse;">
+          <tr>
+            <td style="padding:3px;">Total Estimasi Biaya</td>
+            <td style="text-align:right; font-weight:bold;">${htFormatRupiah(totalBiaya)}</td>
+          </tr>
+          <tr>
+            <td style="padding:3px; color:#0f766e;">Total Telah Disetor</td>
+            <td style="text-align:right; font-weight:bold; color:#0f766e;">${htFormatRupiah(totalBayar)}</td>
+          </tr>
+          <tr style="border-top:1px solid #000;">
+            <td style="padding:4px 3px; font-weight:bold;">Sisa Kewajiban</td>
+            <td style="text-align:right; font-weight:bold; color:${sisa > 0 ? '#b91c1c' : '#0f766e'};">${htFormatRupiah(sisa)}</td>
+          </tr>
+        </table>
       </div>
-    </div>
 
-    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
-      <button type="button" class="btn-ht-action" onclick="htDownloadFinanceCSV()">
-        <i class="ri-file-excel-line"></i> Unduh File CSV
-      </button>
-      <button type="button" class="btn-ht-action primary" onclick="window.print()">
-        <i class="ri-printer-line"></i> Cetak Dokumen
-      </button>
-      <button type="button" class="btn-ht-action" onclick="htCloseFinanceListModal()">Tutup</button>
+      <div style="display:flex; justify-content:space-between; margin-top:20px; font-size:11px;">
+        <div style="text-align:center; width:180px;">
+          <div>Nasabah Yang Bersangkutan</div>
+          <div style="height:55px;"></div>
+          <div style="font-weight:bold;">(${escapeHtml(u.namaLengkap)})</div>
+        </div>
+        <div style="text-align:center; width:180px;">
+          <div>Bekasi, ${formatIndonesianDate(new Date())}</div>
+          <div>Bagian Keuangan FATH INDAH</div>
+          <div style="height:40px;"></div>
+          <div style="font-weight:bold;">(Administrator)</div>
+        </div>
+      </div>
     </div>
   `;
 
@@ -9591,77 +9755,131 @@ window.htCloseFinanceListModal = function() {
   if (modal) modal.style.display = 'none';
 };
 
-window.htViewDocument = function(title, docUrl) {
-  const modal = document.getElementById('htDocViewerModal');
-  const titleEl = document.getElementById('htDocViewerTitle');
-  const body = document.getElementById('htDocViewerBody');
-  if (!modal || !body) return;
-
-  if (titleEl) titleEl.innerHTML = `<i class="ri-file-search-line"></i> Pratinjau Dokumen: ${escapeHtml(title)}`;
-
-  let embedUrl = docUrl;
-  if (docUrl.includes('drive.google.com/file/d/')) {
-    embedUrl = docUrl.replace(/\/view(\?.*)?$/, '/preview');
+window.htExportFinanceCsv = function() {
+  const data = htState.rawAngsuranList;
+  if (!data || data.length === 0) {
+    alert('Tidak ada data angsuran untuk diekspor!');
+    return;
   }
 
-  body.innerHTML = `
-    <iframe src="${embedUrl}" style="width:100%; height:100%; border:none; border-radius:8px; background:#fff;"></iframe>
-  `;
+  const u = htState.currentUser;
+  const header = ['No', 'ID Transaksi', 'No Jurnal', 'No BPIH', 'Nama Nasabah', 'Bank', 'Uraian', 'Nominal', 'Tanggal', 'Metode', 'Status'];
+  const rows = data.map((item, idx) => [
+    idx + 1,
+    `"${item.id}"`,
+    `"${item.noJurnal}"`,
+    `"${item.noBPIH}"`,
+    `"${item.namaNasabah}"`,
+    `"${item.bank}"`,
+    `"${item.uraian}"`,
+    item.jumlah,
+    `"${item.tanggal}"`,
+    `"${item.metodePembayaran}"`,
+    `"${item.status}"`
+  ]);
+
+  const csvContent = 'data:text/csv;charset=utf-8,' + [header.join(','), ...rows.map(e => e.join(','))].join('\n');
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement('a');
+  link.setAttribute('href', encodedUri);
+  const nameSuffix = u ? u.noBPIH : 'Semua';
+  link.setAttribute('download', `Angsuran_Haji_Terencana_${nameSuffix}_${new Date().toISOString().substring(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+window.htPrintFinancePdf = function() {
+  const body = document.getElementById('htFinanceListModalBody');
+  if (!body) return;
+
+  const printWindow = window.open('', '_blank', 'width=800,height=900');
+  if (!printWindow) {
+    window.print();
+    return;
+  }
+
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Laporan Keuangan Jamaah Haji Terencana</title>
+      <style>
+        body { font-family: "Times New Roman", Times, serif; padding: 20px; }
+        @media print { body { padding: 0; } }
+      </style>
+    </head>
+    <body>
+      ${body.innerHTML}
+      <script>
+        window.onload = function() { window.print(); window.close(); }
+      </script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
+};
+
+window.htViewDocument = function(title, docUrl) {
+  if (!docUrl || docUrl === '-') return;
+
+  const modal = document.getElementById('htDocViewerModal');
+  const titleEl = document.getElementById('htDocViewerTitle');
+  const iframe = document.getElementById('htDocViewerIframe');
+  const img = document.getElementById('htDocViewerImg');
+  const openLink = document.getElementById('htDocViewerOpenLink');
+
+  if (!modal) return;
+
+  if (titleEl) titleEl.textContent = `Pratinjau Dokumen: ${title}`;
+  if (openLink) openLink.href = docUrl;
+
+  const isDrive = docUrl.includes('drive.google.com');
+  const isImage = !isDrive && /\.(jpeg|jpg|gif|png|webp)($|\?)/i.test(docUrl);
+
+  if (isImage) {
+    if (img) {
+      img.src = docUrl;
+      img.style.display = 'block';
+    }
+    if (iframe) iframe.style.display = 'none';
+  } else {
+    let embedUrl = docUrl;
+    if (isDrive) {
+      embedUrl = docUrl.replace(/\/view(\?.*)?$/, '/preview');
+    }
+    if (iframe) {
+      iframe.src = embedUrl;
+      iframe.style.display = 'block';
+    }
+    if (img) img.style.display = 'none';
+  }
 
   modal.style.display = 'flex';
 };
 
 window.htCloseDocViewerModal = function() {
   const modal = document.getElementById('htDocViewerModal');
-  const body = document.getElementById('htDocViewerBody');
-  if (body) body.innerHTML = '';
+  const iframe = document.getElementById('htDocViewerIframe');
   if (modal) modal.style.display = 'none';
+  if (iframe) iframe.src = 'about:blank';
 };
-
-window.htExportAngsuranCSV = function() {
-  const list = htState.filteredAngsuranList;
-  if (!list || list.length === 0) {
-    alert('Tidak ada data angsuran untuk diekspor!');
-    return;
-  }
-
-  let csv = 'No;No Jurnal;ID Transaksi;No BPIH;Nama Nasabah;Bank;Tanggal;Nominal;Metode;Status;Uraian\n';
-  list.forEach((item, i) => {
-    csv += `"${i + 1}";"${item.noJurnal}";"${item.id}";"${item.noBPIH}";"${item.namaNasabah}";"${item.bank}";"${item.tanggal}";"${item.jumlah}";"${item.metodePembayaran}";"${item.status}";"${item.uraian}"\n`;
-  });
-
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `Angsuran_Haji_${htState.currentUser?.noBPIH || 'Semua'}_${new Date().toISOString().substring(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-};
-
-window.htDownloadFinanceCSV = function() {
-  htExportAngsuranCSV();
-};
-
-function htFormatRupiah(number) {
-  const n = parseInt(number, 10) || 0;
-  return 'Rp ' + n.toLocaleString('id-ID');
-}
 
 function formatDriveFileUrl(url) {
-  if (!url) return '';
-  const s = String(url).trim();
-  let fileId = '';
-  const m1 = s.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-  if (m1) fileId = m1[1];
-  else {
-    const m2 = s.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    if (m2) fileId = m2[1];
+  if (!url || typeof url !== 'string') return '';
+  url = url.trim();
+  if (url.includes('drive.google.com/file/d/')) {
+    const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (fileIdMatch && fileIdMatch[1]) {
+      return `https://drive.google.com/thumbnail?id=${fileIdMatch[1]}&sz=w400`;
+    }
   }
-  if (fileId) {
-    return `https://lh3.googleusercontent.com/d/${fileId}`;
-  }
-  return s;
+  return url;
+}
+
+function htFormatRupiah(num) {
+  const n = parseInt(num, 10) || 0;
+  return 'Rp ' + n.toLocaleString('id-ID');
 }
 
 function formatIndonesianDate(dateStr) {
