@@ -969,6 +969,7 @@ function switchModule(moduleName) {
   else if (moduleName === 'mod_data_jamaah' || moduleName === 'mod_form_input_jamaah') viewId = 'jamaah';
   else if (moduleName === 'mod_pembayaran_group' || moduleName === 'mod_pembayaran_jamaah') viewId = 'pembayaran_group';
   else if (moduleName === 'mod_kelengkapan_umrah' || moduleName === 'mod_input_kelengkapan_umrah') viewId = 'kelengkapan_umrah';
+  else if (moduleName === 'mod_upload_dok_jamaah' || moduleName === 'upload_dok_jamaah') viewId = 'upload_dok_jamaah';
   else if (moduleName === 'mod_logs') viewId = 'logs';
   else if (moduleName === 'mod_users' || moduleName === 'mod_sistem_user') viewId = 'users';
   else if (moduleName === 'mod_attendance' || moduleName === 'rekap_absensi' || moduleName === 'mod_rekap_absensi') viewId = 'rekap_absensi';
@@ -1034,6 +1035,7 @@ function switchModule(moduleName) {
     dashboard_ht: { title: 'Dashboard Haji Terencana', breadcrumb: 'Haji / Dashboard Agregasi Angsuran Khusus Jamaah Haji Terencana' },
     pembayaran_group: { title: 'Sistem Pembayaran Jamaah & Kolektif Agen', breadcrumb: 'Umrah / Transaksi Individual, Kolektif & Matriks Bulanan' },
     kelengkapan_umrah: { title: 'Input Kelengkapan Data Umrah', breadcrumb: 'Umrah / Pencatatan Dokumen Visa, Asuransi Polis & BPJS' },
+    upload_dok_jamaah: { title: 'Pusat Unggahan Dokumen Fisik Jamaah Umrah', breadcrumb: 'Umrah / Berkas KTP, Paspor, KK, Buku Nikah Jamaah' },
     settings: { title: 'Konfigurasi Database', breadcrumb: 'Sistem / Pengalihan Google Sheets & Supabase' }
   };
 
@@ -1060,6 +1062,7 @@ function switchModule(moduleName) {
   if (viewId === 'detail_emp') initEmployeeDetailView();
   if (viewId === 'emp_analytics') initEmployeeAnalyticsView();
   if (viewId === 'upload_dok') initUploadDocView();
+  if (viewId === 'upload_dok_jamaah') initUploadDokJamaahView();
   if (viewId === 'slip_gaji') initSlipGajiView();
   if (viewId === 'dashboard_ht') initDashboardHT();
   if (viewId === 'jamaah') {
@@ -9617,3 +9620,339 @@ window.initDashboardHT = initDashboardHT;
     }
   };
 })();
+
+
+// ============================================================================
+// 14. MODUL UPLOAD DOKUMEN JAMAAH UMRAH (mod_upload_dok_jamaah)
+// ============================================================================
+let stateUploadDokJamaah = {
+  documents: [],
+  jamaahList: [],
+  selectedFilePayload: null
+};
+
+async function initUploadDokJamaahView() {
+  await loadUploadDokJamaahDropdowns();
+  await loadUploadDokJamaahData();
+}
+
+async function loadUploadDokJamaahDropdowns() {
+  try {
+    const res = await fetch('/api/jamaah/all');
+    const json = await res.json();
+    const list = json.data || [];
+    stateUploadDokJamaah.jamaahList = list;
+
+    // Populate Paket Filter dropdown
+    const paketSelect = document.getElementById('udjFilterPaket');
+    if (paketSelect) {
+      const currentVal = paketSelect.value;
+      const pakets = [...new Set(list.map(j => j.jenisPaket || j.jenis_paket_umrah || j.nama_paket || '').filter(Boolean))];
+      paketSelect.innerHTML = '<option value="">-- Semua Paket Umrah --</option>' +
+        pakets.map(p => `<option value="${escapeHtml(p)}" ${p === currentVal ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('');
+    }
+
+    populateJamaahSelectOptions();
+  } catch (err) {
+    console.error('Gagal memuat daftar jamaah untuk dropdown:', err);
+  }
+}
+
+function populateJamaahSelectOptions(targetPaket = '') {
+  const select = document.getElementById('udjSelectJamaah');
+  if (!select) return;
+  const list = stateUploadDokJamaah.jamaahList || [];
+  const filtered = targetPaket 
+    ? list.filter(j => (j.jenisPaket || j.jenis_paket_umrah || j.nama_paket || '') === targetPaket)
+    : list;
+
+  select.innerHTML = '<option value="">-- Pilih Jamaah --</option>' +
+    filtered.map(j => {
+      const id = j.id || j.id_jamaah || '';
+      const nama = j.namaLengkap || j.nama_lengkap || j.nama || 'Tanpa Nama';
+      const pkt = j.jenisPaket || j.jenis_paket_umrah || '';
+      return `<option value="${escapeHtml(id)}">${escapeHtml(id)} - ${escapeHtml(nama)} (${escapeHtml(pkt)})</option>`;
+    }).join('');
+}
+
+function onUploadDokJamaahPaketFilterChange() {
+  const paket = document.getElementById('udjFilterPaket')?.value || '';
+  populateJamaahSelectOptions(paket);
+  // Clear jamaah inputs
+  if (document.getElementById('udjSelectJamaah')) document.getElementById('udjSelectJamaah').value = '';
+  if (document.getElementById('udjIdJamaahInput')) document.getElementById('udjIdJamaahInput').value = '';
+  if (document.getElementById('udjPasporInput')) document.getElementById('udjPasporInput').value = '';
+}
+
+function onUploadDokJamaahSelectChange() {
+  const id = document.getElementById('udjSelectJamaah')?.value || '';
+  const found = (stateUploadDokJamaah.jamaahList || []).find(j => (j.id || j.id_jamaah) === id);
+  const idInput = document.getElementById('udjIdJamaahInput');
+  const pasporInput = document.getElementById('udjPasporInput');
+  if (idInput) idInput.value = id;
+  if (pasporInput) pasporInput.value = found ? (found.nomorPassport || found.nomor_passport || found.noPassport || '-') : '-';
+}
+
+function handleUdjFilePick(event) {
+  const file = event.target.files && event.target.files[0];
+  const preview = document.getElementById('udjFileNamePreview');
+  if (!file) {
+    stateUploadDokJamaah.selectedFilePayload = null;
+    if (preview) preview.textContent = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    stateUploadDokJamaah.selectedFilePayload = {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      base64: e.target.result
+    };
+    if (preview) {
+      preview.textContent = `✓ ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function handleUploadDokJamaahSubmit(event) {
+  event.preventDefault();
+  const selectJamaah = document.getElementById('udjSelectJamaah');
+  const idJamaah = selectJamaah?.value;
+  if (!idJamaah) {
+    alert('Silakan pilih jamaah terlebih dahulu!');
+    return;
+  }
+  const foundJamaah = (stateUploadDokJamaah.jamaahList || []).find(j => (j.id || j.id_jamaah) === idJamaah);
+  const namaJamaah = foundJamaah ? (foundJamaah.namaLengkap || foundJamaah.nama_lengkap || idJamaah) : idJamaah;
+  const jenisDok = document.getElementById('udjJenisDok')?.value || 'Dokumen';
+  const linkFile = document.getElementById('udjLinkInput')?.value || '';
+  const keterangan = document.getElementById('udjKeteranganInput')?.value || '';
+  const filePayload = stateUploadDokJamaah.selectedFilePayload;
+
+  if (!filePayload && !linkFile) {
+    alert('Pilih file berkas atau masukkan link Google Drive dokumen!');
+    return;
+  }
+
+  const fileName = filePayload ? filePayload.name : `${idJamaah} - ${namaJamaah} - ${jenisDok}.pdf`;
+  const fileUrl = linkFile || (filePayload ? filePayload.base64 : '');
+  const fileId = 'DRV-' + Date.now().toString().slice(-8);
+  const uploader = (window.currentUser && window.currentUser.username) ? window.currentUser.username : 'Admin';
+
+  const payload = {
+    docid: 'DOCJ-' + Date.now().toString().slice(-6) + '-' + Math.floor(Math.random() * 900 + 100),
+    DocID: 'DOCJ-' + Date.now().toString().slice(-6) + '-' + Math.floor(Math.random() * 900 + 100),
+    timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+    Timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+    id_jamaah: idJamaah,
+    'ID Jamaah': idJamaah,
+    nama_lengkap: namaJamaah,
+    'Nama Lengkap': namaJamaah,
+    jenis_dokumen: jenisDok,
+    'Jenis Dokumen': jenisDok,
+    nama_file: fileName,
+    'Nama File': fileName,
+    link_file: fileUrl,
+    'Link File': fileUrl,
+    file_id: fileId,
+    'File ID': fileId,
+    uploader: uploader,
+    Uploader: uploader,
+    keterangan: keterangan || 'Diunggah via Portal Jamaah Umrah',
+    Keterangan: keterangan || 'Diunggah via Portal Jamaah Umrah'
+  };
+
+  const btn = document.getElementById('btnSubmitUploadDokJamaah');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...';
+  }
+
+  try {
+    const res = await fetch('/api/upload-dok-jamaah', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+    if (result.success) {
+      if (window.Swal) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Berkas Berhasil Diarsipkan!',
+          text: `Dokumen ${jenisDok} untuk jamaah ${namaJamaah} berhasil disimpan ke database.`,
+          timer: 2500,
+          showConfirmButton: false
+        });
+      } else {
+        alert('Dokumen berhasil disimpan!');
+      }
+      // Reset form
+      document.getElementById('formUploadDokJamaah').reset();
+      if (document.getElementById('udjIdJamaahInput')) document.getElementById('udjIdJamaahInput').value = '';
+      if (document.getElementById('udjPasporInput')) document.getElementById('udjPasporInput').value = '';
+      if (document.getElementById('udjFileNamePreview')) document.getElementById('udjFileNamePreview').textContent = '';
+      stateUploadDokJamaah.selectedFilePayload = null;
+      await loadUploadDokJamaahData();
+    } else {
+      alert('Gagal mengunggah dokumen: ' + (result.error || 'Terjadi kesalahan'));
+    }
+  } catch (err) {
+    alert('Gagal: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> <span>Simpan & Arsipkan Dokumen</span>';
+    }
+  }
+}
+
+async function loadUploadDokJamaahData(force = false) {
+  const tbody = document.getElementById('tableDokJamaahBody');
+  if (tbody && force) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Menyegarkan data berkas...</td></tr>';
+  }
+  try {
+    const res = await fetch('/api/upload-dok-jamaah');
+    const json = await res.json();
+    stateUploadDokJamaah.documents = json.data || [];
+    renderUploadDokJamaahTable();
+    if (force && window.Swal) {
+      Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Data berkas berhasil disegarkan!', timer: 2000, showConfirmButton: false });
+    }
+  } catch (err) {
+    console.error('Gagal memuat dokumen jamaah:', err);
+    if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#f43f5e; padding:20px;">Gagal memuat berkas: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function renderUploadDokJamaahTable() {
+  const tbody = document.getElementById('tableDokJamaahBody');
+  if (!tbody) return;
+
+  let docs = stateUploadDokJamaah.documents || [];
+  const keyword = (document.getElementById('searchDokJamaahInput')?.value || '').toLowerCase().trim();
+  const filterJenis = document.getElementById('filterDokJamaahJenis')?.value || '';
+
+  // Update counts
+  let totalKtp = 0;
+  let totalPaspor = 0;
+  let totalKk = 0;
+  let totalTf = 0;
+  docs.forEach(d => {
+    const jd = (d['Jenis Dokumen'] || d.jenis_dokumen || '').toLowerCase();
+    if (jd.includes('ktp')) totalKtp++;
+    if (jd.includes('paspor')) totalPaspor++;
+    if (jd.includes('keluarga') || jd.includes('kk')) totalKk++;
+    if (jd.includes('transfer') || jd.includes('bukti') || jd.includes('bayar')) totalTf++;
+  });
+
+  const statKtpEl = document.getElementById('statTotalKtpJamaah');
+  const statPasporEl = document.getElementById('statTotalPasporJamaah');
+  const statKkEl = document.getElementById('statTotalKkJamaah');
+  const statTfEl = document.getElementById('statTotalTfJamaah');
+  const badgeTotal = document.getElementById('badgeTotalDokJamaah');
+  if (statKtpEl) statKtpEl.textContent = totalKtp;
+  if (statPasporEl) statPasporEl.textContent = totalPaspor;
+  if (statKkEl) statKkEl.textContent = totalKk;
+  if (statTfEl) statTfEl.textContent = totalTf;
+  if (badgeTotal) badgeTotal.textContent = `${docs.length} Berkas`;
+
+  // Apply filters
+  if (filterJenis) {
+    docs = docs.filter(d => (d['Jenis Dokumen'] || d.jenis_dokumen || '') === filterJenis);
+  }
+  if (keyword) {
+    docs = docs.filter(d => {
+      const docId = (d.DocID || d.docid || '').toLowerCase();
+      const idJ = (d['ID Jamaah'] || d.id_jamaah || '').toLowerCase();
+      const nama = (d['Nama Lengkap'] || d.nama_lengkap || '').toLowerCase();
+      const file = (d['Nama File'] || d.nama_file || '').toLowerCase();
+      const ket = (d.Keterangan || d.keterangan || '').toLowerCase();
+      return docId.includes(keyword) || idJ.includes(keyword) || nama.includes(keyword) || file.includes(keyword) || ket.includes(keyword);
+    });
+  }
+
+  if (docs.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:28px; color:#94a3b8;">Tidak ada dokumen jamaah yang cocok dengan filter.</td></tr>';
+    return;
+  }
+
+  const badgeColorMap = {
+    'KTP': 'background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3);',
+    'Paspor': 'background:rgba(52,211,153,0.15); color:#34d399; border:1px solid rgba(52,211,153,0.3);',
+    'Kartu Keluarga': 'background:rgba(251,191,36,0.15); color:#fbbf24; border:1px solid rgba(251,191,36,0.3);',
+    'Surat Nikah': 'background:rgba(244,114,182,0.15); color:#f472b6; border:1px solid rgba(244,114,182,0.3);',
+    'Foto Jamaah': 'background:rgba(167,139,250,0.15); color:#a78bfa; border:1px solid rgba(167,139,250,0.3);',
+    'Bukti Transfer': 'background:rgba(34,197,94,0.15); color:#4ade80; border:1px solid rgba(34,197,94,0.3);'
+  };
+
+  tbody.innerHTML = docs.map((d, index) => {
+    const docId = d.DocID || d.docid || '-';
+    const idJamaah = d['ID Jamaah'] || d.id_jamaah || '-';
+    const nama = d['Nama Lengkap'] || d.nama_lengkap || '-';
+    const jenis = d['Jenis Dokumen'] || d.jenis_dokumen || 'Dokumen';
+    const file = d['Nama File'] || d.nama_file || 'file';
+    const link = d['Link File'] || d.link_file || '';
+    const ket = d.Keterangan || d.keterangan || '-';
+    const time = d.Timestamp || d.timestamp || '-';
+    const badgeStyle = badgeColorMap[jenis] || 'background:rgba(148,163,184,0.15); color:#cbd5e1; border:1px solid rgba(148,163,184,0.3);';
+
+    return `
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+        <td style="text-align:center; color:#94a3b8; font-size:12px;">${index + 1}</td>
+        <td>
+          <div style="font-family:monospace; font-weight:700; color:#38bdf8; font-size:12px;">${escapeHtml(docId)}</div>
+          <div style="font-size:10px; color:#64748b;">${escapeHtml(time)}</div>
+        </td>
+        <td>
+          <div style="font-weight:700; color:#f1f5f9; font-size:13px;">${escapeHtml(nama)}</div>
+          <div style="font-size:11px; color:#34d399; font-family:monospace;">${escapeHtml(idJamaah)}</div>
+        </td>
+        <td>
+          <span style="display:inline-block; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; ${badgeStyle}">
+            ${escapeHtml(jenis)}
+          </span>
+        </td>
+        <td>
+          <div style="font-size:12px; color:#e2e8f0; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(file)}">
+            <i class="fa-regular fa-file" style="margin-right:4px; color:#94a3b8;"></i>${escapeHtml(file)}
+          </div>
+        </td>
+        <td style="font-size:11px; color:#94a3b8; max-width:180px;">${escapeHtml(ket)}</td>
+        <td style="text-align:center;">
+          <div style="display:flex; justify-content:center; gap:6px;">
+            ${link ? `
+              <a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer" class="btn-sm" title="Buka Dokumen" style="background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3); border-radius:6px; padding:4px 8px; font-size:11px; text-decoration:none; display:inline-flex; align-items:center;">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+              </a>
+            ` : ''}
+            <button type="button" class="btn-sm" onclick="deleteUploadDokJamaahConfirm('${escapeHtml(docId)}')" title="Hapus Dokumen" style="background:rgba(244,63,94,0.15); color:#fb7185; border:1px solid rgba(244,63,94,0.3); border-radius:6px; padding:4px 8px; font-size:11px; cursor:pointer;">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function deleteUploadDokJamaahConfirm(docId) {
+  if (!confirm(`Yakin ingin menghapus dokumen ID ${docId}?`)) return;
+  try {
+    const res = await fetch('/api/upload-dok-jamaah/' + encodeURIComponent(docId), { method: 'DELETE' });
+    const json = await res.json();
+    if (json.success) {
+      if (window.Swal) {
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Dokumen berhasil dihapus!', timer: 2000, showConfirmButton: false });
+      }
+      await loadUploadDokJamaahData();
+    } else {
+      alert('Gagal menghapus: ' + (json.error || 'Terjadi kesalahan'));
+    }
+  } catch (err) {
+    alert('Gagal: ' + err.message);
+  }
+}

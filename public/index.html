@@ -131,6 +131,21 @@
           <span class="nav-label">Data Jamaah</span>
         </a>
 
+        <a href="#kelengkapan_umrah" class="nav-item" data-module="mod_kelengkapan_umrah" data-tooltip="Kelengkapan Dokumen Umrah">
+          <i class="fa-solid fa-passport nav-icon"></i>
+          <span class="nav-label">Kelengkapan Umrah</span>
+        </a>
+
+        <a href="#pembayaran_group" class="nav-item" data-module="mod_pembayaran_group" data-tooltip="Pembayaran Umrah & Kolektif">
+          <i class="fa-solid fa-users-viewfinder nav-icon"></i>
+          <span class="nav-label">Pembayaran Umrah</span>
+        </a>
+
+        <a href="#upload_dok_jamaah" class="nav-item" data-module="mod_upload_dok_jamaah" data-tooltip="Upload Dokumen Jamaah Umrah">
+          <i class="fa-solid fa-cloud-arrow-up nav-icon"></i>
+          <span class="nav-label">Upload Dokumen Jamaah</span>
+        </a>
+
         <a href="#logs" class="nav-item" data-module="logs" data-tooltip="Log Aktivitas">
           <i class="fa-solid fa-list-check nav-icon"></i>
           <span class="nav-label">Log Aktivitas</span>
@@ -7380,6 +7395,176 @@ function kelengkapanUmrahApp() {
 }
 </script>
 
+        </div>
+
+        <!-- ================================================================
+             MODULE: UPLOAD DOKUMEN JAMAAH UMRAH (mod_upload_dok_jamaah)
+             ================================================================ -->
+        <div class="module-view" id="view-upload_dok_jamaah">
+          <!-- Banner Header -->
+          <div class="hr-banner" style="background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(16, 185, 129, 0.15)); border: 1px solid rgba(16, 185, 129, 0.3);">
+            <div class="hr-banner-left">
+              <div class="hr-banner-icon" style="background:linear-gradient(135deg, #10b981, #06b6d4);">
+                <i class="fa-solid fa-cloud-arrow-up text-white text-xl"></i>
+              </div>
+              <div>
+                <h3 class="hr-banner-title">Pusat Unggahan Dokumen Fisik Jamaah Umrah</h3>
+                <p class="hr-banner-subtitle">Pengarsipan berkas dokumen resmi jamaah (KTP, Paspor, KK, Surat Nikah, Foto, Bukti TF) terhubung Supabase</p>
+              </div>
+            </div>
+            <div class="hr-banner-right" style="display:flex; gap:10px;">
+              <span class="badge" style="background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.3); padding:6px 14px; border-radius:12px; font-weight:700;">
+                <i class="fa-solid fa-database"></i> Supabase Connected
+              </span>
+            </div>
+          </div>
+
+          <!-- Main Layout Grid -->
+          <div style="display:grid; grid-template-columns:380px 1fr; gap:20px; align-items:start; margin-top:16px;">
+            <!-- Form Upload Berkas Jamaah -->
+            <div class="content-card">
+              <div class="cuti-card-header" style="border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:12px; margin-bottom:16px;">
+                <div class="card-title" style="font-size:1rem; font-weight:700; color:#f8fafc; display:flex; align-items:center; gap:8px;">
+                  <i class="fa-solid fa-file-arrow-up" style="color:#34d399;"></i>
+                  <span>Form Unggah Berkas Jamaah</span>
+                </div>
+              </div>
+
+              <form id="formUploadDokJamaah" onsubmit="handleUploadDokJamaahSubmit(event)">
+                <div class="form-group" style="margin-bottom:12px;">
+                  <label class="form-label" for="udjFilterPaket">Filter Paket Umrah</label>
+                  <select id="udjFilterPaket" class="form-input" onchange="onUploadDokJamaahPaketFilterChange()">
+                    <option value="">-- Semua Paket Umrah --</option>
+                  </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom:12px;">
+                  <label class="form-label" for="udjSelectJamaah">Pilih Jamaah <span class="required-star" style="color:#f43f5e;">*</span></label>
+                  <select id="udjSelectJamaah" class="form-input" required onchange="onUploadDokJamaahSelectChange()">
+                    <option value="">-- Pilih Jamaah --</option>
+                  </select>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
+                  <div class="form-group">
+                    <label class="form-label" for="udjIdJamaahInput">ID Jamaah</label>
+                    <input type="text" id="udjIdJamaahInput" class="form-input" readonly placeholder="ID Jamaah" style="background:rgba(0,0,0,0.25);">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label" for="udjPasporInput">No Paspor</label>
+                    <input type="text" id="udjPasporInput" class="form-input" readonly placeholder="No Paspor" style="background:rgba(0,0,0,0.25);">
+                  </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom:12px;">
+                  <label class="form-label" for="udjJenisDok">Jenis Dokumen Fisik <span class="required-star" style="color:#f43f5e;">*</span></label>
+                  <select id="udjJenisDok" class="form-input" required>
+                    <option value="KTP">Kartu Tanda Penduduk (KTP)</option>
+                    <option value="Paspor">Buku Paspor</option>
+                    <option value="Kartu Keluarga">Kartu Keluarga (KK)</option>
+                    <option value="Surat Nikah">Buku / Surat Nikah</option>
+                    <option value="Foto Jamaah">Foto Jamaah (4x6 Latar Putih)</option>
+                    <option value="Bukti Transfer">Bukti Transfer / Pembayaran</option>
+                    <option value="Vaksin">Buku Vaksin / Meningitis</option>
+                    <option value="BPJS">Kartu BPJS Kesehatan</option>
+                    <option value="Dokumen Lainnya">Dokumen Lainnya</option>
+                  </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom:12px;">
+                  <label class="form-label" for="udjFileInput">Pilih File Berkas (PNG/JPG/PDF) <span class="required-star" style="color:#f43f5e;">*</span></label>
+                  <input type="file" id="udjFileInput" class="form-input" accept=".jpg,.jpeg,.png,.pdf" onchange="handleUdjFilePick(event)" style="padding:6px 12px;">
+                  <small id="udjFileNamePreview" style="color:#94a3b8; font-size:11px; display:block; margin-top:4px;"></small>
+                </div>
+
+                <div class="form-group" style="margin-bottom:12px;">
+                  <label class="form-label" for="udjLinkInput">Link Dokumen / Google Drive (Opsional)</label>
+                  <input type="url" id="udjLinkInput" class="form-input" placeholder="https://drive.google.com/...">
+                </div>
+
+                <div class="form-group" style="margin-bottom:16px;">
+                  <label class="form-label" for="udjKeteranganInput">Keterangan / Catatan</label>
+                  <textarea id="udjKeteranganInput" class="form-input" rows="2" placeholder="Catatan tambahan dokumen jamaah..."></textarea>
+                </div>
+
+                <button type="submit" id="btnSubmitUploadDokJamaah" class="btn-emerald" style="width:100%; justify-content:center; padding:10px 16px; font-weight:700;">
+                  <i class="fa-solid fa-cloud-arrow-up"></i>
+                  <span>Simpan & Arsipkan Dokumen</span>
+                </button>
+              </form>
+            </div>
+
+            <!-- Tabel Arsip & Filter Dokumen Jamaah -->
+            <div class="content-card">
+              <div class="card-header-actions" style="margin-bottom:16px; display:flex; flex-wrap:wrap; justify-content:space-between; gap:12px;">
+                <div class="card-title" style="display:flex; align-items:center; gap:8px;">
+                  <i class="fa-solid fa-folder-open" style="color:#34d399;"></i>
+                  <span>Direktori Dokumen Jamaah Umrah</span>
+                  <span class="badge badge-success" id="badgeTotalDokJamaah" style="background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.3);">0 Berkas</span>
+                </div>
+
+                <div class="card-actions" style="display:flex; flex-wrap:wrap; gap:8px;">
+                  <div class="search-box">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="searchDokJamaahInput" placeholder="Cari nama, ID, dokumen..." oninput="renderUploadDokJamaahTable()">
+                  </div>
+
+                  <select id="filterDokJamaahJenis" class="form-input" style="width:auto; padding:7px 12px;" onchange="renderUploadDokJamaahTable()">
+                    <option value="">Semua Jenis Dokumen</option>
+                    <option value="KTP">KTP</option>
+                    <option value="Paspor">Paspor</option>
+                    <option value="Kartu Keluarga">Kartu Keluarga</option>
+                    <option value="Surat Nikah">Surat Nikah</option>
+                    <option value="Foto Jamaah">Foto Jamaah</option>
+                    <option value="Bukti Transfer">Bukti Transfer</option>
+                  </select>
+
+                  <button type="button" class="btn-secondary" onclick="loadUploadDokJamaahData(true)" title="Segarkan Data">
+                    <i class="fa-solid fa-rotate"></i>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Mini Stats Toolbar -->
+              <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:14px;">
+                <div style="background:rgba(15,23,42,0.6); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:10px 14px;">
+                  <div style="font-size:11px; color:#94a3b8;">Total KTP</div>
+                  <div style="font-size:16px; font-weight:800; color:#38bdf8;" id="statTotalKtpJamaah">0</div>
+                </div>
+                <div style="background:rgba(15,23,42,0.6); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:10px 14px;">
+                  <div style="font-size:11px; color:#94a3b8;">Total Paspor</div>
+                  <div style="font-size:16px; font-weight:800; color:#34d399;" id="statTotalPasporJamaah">0</div>
+                </div>
+                <div style="background:rgba(15,23,42,0.6); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:10px 14px;">
+                  <div style="font-size:11px; color:#94a3b8;">Kartu Keluarga</div>
+                  <div style="font-size:16px; font-weight:800; color:#fbbf24;" id="statTotalKkJamaah">0</div>
+                </div>
+                <div style="background:rgba(15,23,42,0.6); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:10px 14px;">
+                  <div style="font-size:11px; color:#94a3b8;">Bukti Bayar</div>
+                  <div style="font-size:16px; font-weight:800; color:#a78bfa;" id="statTotalTfJamaah">0</div>
+                </div>
+              </div>
+
+              <div class="table-responsive" style="max-height:540px; overflow-y:auto;">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th style="width:50px; text-align:center;">No</th>
+                      <th>Doc ID</th>
+                      <th>Jamaah</th>
+                      <th>Jenis Dokumen</th>
+                      <th>Nama File</th>
+                      <th>Keterangan</th>
+                      <th style="text-align:center; width:120px;">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tableDokJamaahBody">
+                    <tr><td colspan="7" style="text-align:center; padding:24px;">Memuat data berkas jamaah...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- ================================================================

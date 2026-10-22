@@ -938,6 +938,66 @@ app.post('/api/pembayaran-group', async (req, res) => {
   }
 });
 
+// E. UPLOAD DOKUMEN JAMAAH (mod_upload_dok_jamaah)
+app.get('/api/upload-dok-jamaah', async (req, res) => {
+  try {
+    const { idJamaah } = req.query;
+    const list = await supabase.getSupabaseUploadDokJamaah(idJamaah);
+    res.json({ success: true, count: list.length, data: list });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/upload-dok-jamaah', async (req, res) => {
+  try {
+    const record = req.body;
+    // Generate docid if not provided
+    if (!record.DocID && !record.docid) {
+      record.DocID = 'DOCJ-' + Date.now().toString().slice(-6) + '-' + Math.floor(Math.random() * 900 + 100);
+      record.docid = record.DocID;
+    }
+    if (!record.Timestamp && !record.timestamp) {
+      record.Timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+      record.timestamp = record.Timestamp;
+    }
+    const result = await supabase.insertSupabaseUploadDokJamaah(record);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/upload-dok-jamaah/:docId', async (req, res) => {
+  try {
+    const { docId } = req.params;
+    await supabase.deleteSupabaseUploadDokJamaah(docId);
+    res.json({ success: true, message: 'Dokumen jamaah berhasil dihapus' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// F. KOORDINATOR GRUP (mod_pembayaran_group)
+app.get('/api/koordinator-grup', async (req, res) => {
+  try {
+    const list = await supabase.getSupabaseKoordinatorGrup();
+    res.json({ success: true, count: list.length, data: list });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/koordinator-grup', async (req, res) => {
+  try {
+    const record = req.body;
+    const result = await supabase.insertSupabaseKoordinatorGrup(record);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
