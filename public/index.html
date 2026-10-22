@@ -419,7 +419,7 @@
   }
 </style>
 
-<div x-show="currentModule !== 'mod_view_jamaah_haji' && !currentModule.includes('haji') && (currentModule === 'mod_data_jamaah' || currentModule === 'mod_form_input_jamaah' || currentModule === 'mod_rooming_list' || currentModule === 'mod_pembayaran_jamaah' || currentModule === 'mod_input_jamaah') && !isJamaahUploadModule(currentModule, currentModuleName)" class="space-y-4" x-transition x-data="jamaahModuleApp()">
+<div class="space-y-4" x-data="jamaahModuleApp()">
 
   <!-- 3D Header Bar & Statistics Toolbar -->
   <div x-show="currentModule !== 'mod_form_input_jamaah' && currentModule !== 'mod_data_jamaah'" class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl flex flex-col lg:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden">
@@ -2379,12 +2379,24 @@
 <script>
   function jamaahModuleApp() {
     return {
+      currentModule: 'mod_data_jamaah',
+      currentModuleName: 'Data & Rekapitulasi Jamaah',
       activeSubTab: 'table', // 'form', 'table', 'rooming', 'payment'
       isLoading: false,
       isSubmitting: false,
       isSavingRoomModal: false,
+      currentUser: (window.currentUser || { username: 'Admin', role: 'Superadmin' }),
+      isJamaahUploadModule() { return false; },
+      showToast(msg, type = 'info') {
+        if (window.Swal) {
+          Swal.fire({ toast: true, position: 'top-end', icon: type === 'danger' ? 'error' : type, title: msg, timer: 3000, showConfirmButton: false });
+        } else {
+          console.log(msg);
+        }
+      },
 
       init() {
+        window.appCoreInstance = this;
         if (typeof this.$watch === 'function') {
           this.$watch(() => this.currentModule, val => {
             this.syncSubTabWithModule(val);
@@ -3606,7 +3618,321 @@
                 ${rowsHtml || '<tr><td colspan="7" style="text-align:center; padding: 15px;">Belum ada data jamaah.</td></tr>'}
               </tbody>
             </table>
-          </body>
+          
+<!-- ============================================================================ -->
+<!-- ALPINE JS CONTROLLER COMPONENT FOR KELENGKAPAN UMRAH                         -->
+<!-- ============================================================================ -->
+<script>
+function kelengkapanUmrahApp() {
+  return {
+    currentModule: 'mod_kelengkapan_umrah',
+    currentModuleName: 'Input Kelengkapan Data Umrah',
+    kelengkapanViewTab: 'form', // 'form' or 'rekap'
+    isKelengkapanLoading: false,
+    isSavingKelengkapan: false,
+
+    kelengkapanFilterPaket: '',
+    selectedKelengkapanJamaahId: '',
+    selectedKelengkapanJamaah: null,
+
+    kelengkapanPaketList: [],
+    kelengkapanJamaahMasterList: [],
+    kelengkapanUmrahList: [],
+
+    kelengkapanSearchKeyword: '',
+    kelengkapanFilterStatus: 'Semua',
+
+    kelengkapanForm: {
+      idKelengkapan: '',
+      idJamaah: '',
+      namaJamaah: '',
+      namaPaket: '',
+      agent: '',
+      noVisa: '',
+      tglBerlakuVisa: '',
+      tglAkhirVisa: '',
+      uploadVisa: '',
+      noPolis: '',
+      tglInputPolis: '',
+      tglAwalPolis: '',
+      tglAkhirPolis: '',
+      uploadAsuransi: '',
+      noBpjs: '',
+      uploadBpjs: '',
+      statusKelengkapan: 'Belum Ada Data'
+    },
+
+    filePayloadKelengkapan: {
+      visa: null,
+      asuransi: null,
+      bpjs: null
+    },
+
+    isKelengkapanUmrahModule(modId, modName = '') {
+      return true;
+    },
+
+    initKelengkapanApp() {
+      window.appKelengkapanInstance = this;
+      this.loadKelengkapanUmrahData();
+    },
+
+    async loadKelengkapanUmrahData(force = false) {
+      this.isKelengkapanLoading = true;
+      try {
+        const [kRes, jRes] = await Promise.all([
+          fetch('/api/kelengkapan-umrah').then(r => r.json()).catch(() => ({ data: [] })),
+          fetch('/api/jamaah/all').then(r => r.json()).catch(() => ({ data: [] }))
+        ]);
+
+        this.kelengkapanUmrahList = kRes.data || [];
+        this.kelengkapanJamaahMasterList = (jRes.data || []).map(j => ({
+          id: j.id_jamaah || j.id || '',
+          namaLengkap: j.nama_jamaah || j.nama || '',
+          jenisPaket: j.paket || j.nama_paket || '',
+          namaAgen: j.agent || j.nama_agen || j.referensi || '',
+          agent: j.agent || j.nama_agen || j.referensi || '',
+          noPassport: j.no_paspor || j.nomor_paspor || '-',
+          hasKelengkapan: (this.kelengkapanUmrahList || []).some(k => (k.idJamaah || k.id_jamaah) === (j.id_jamaah || j.id))
+        }));
+
+        // Build list of distinct package names
+        const pkts = new Set();
+        this.kelengkapanJamaahMasterList.forEach(j => {
+          if (j.jenisPaket) pkts.add(j.jenisPaket);
+        });
+        this.kelengkapanUmrahList.forEach(k => {
+          if (k.namaPaket) pkts.add(k.namaPaket);
+        });
+        this.kelengkapanPaketList = Array.from(pkts).filter(Boolean);
+
+        if (force && window.Swal) {
+          Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Data kelengkapan berhasil disegarkan!', timer: 2500, showConfirmButton: false });
+        }
+      } catch (err) {
+        console.error('Gagal memuat data kelengkapan:', err);
+      } finally {
+        this.isKelengkapanLoading = false;
+      }
+    },
+
+    getFilteredJamaahForKelengkapan() {
+      if (!this.kelengkapanFilterPaket) return [];
+      return (this.kelengkapanJamaahMasterList || []).filter(j => j.jenisPaket === this.kelengkapanFilterPaket);
+    },
+
+    getJamaahCountInPaket(paketName) {
+      return (this.kelengkapanJamaahMasterList || []).filter(j => j.jenisPaket === paketName).length;
+    },
+
+    getFilteredKelengkapanRecords() {
+      let list = this.kelengkapanUmrahList || [];
+      const q = (this.kelengkapanSearchKeyword || '').toLowerCase().trim();
+      if (q) {
+        list = list.filter(k => 
+          (k.namaJamaah && k.namaJamaah.toLowerCase().includes(q)) ||
+          (k.idJamaah && k.idJamaah.toLowerCase().includes(q)) ||
+          (k.namaPaket && k.namaPaket.toLowerCase().includes(q)) ||
+          (k.agent && k.agent.toLowerCase().includes(q)) ||
+          (k.noVisa && k.noVisa.toLowerCase().includes(q)) ||
+          (k.noPolis && k.noPolis.toLowerCase().includes(q)) ||
+          (k.noBpjs && k.noBpjs.toLowerCase().includes(q))
+        );
+      }
+      if (this.kelengkapanFilterStatus && this.kelengkapanFilterStatus !== 'Semua') {
+        list = list.filter(k => k.statusKelengkapan === this.kelengkapanFilterStatus);
+      }
+      return list;
+    },
+
+    getKelengkapanCountByStatus(status) {
+      return (this.kelengkapanUmrahList || []).filter(k => k.statusKelengkapan === status).length;
+    },
+
+    onKelengkapanPaketChange() {
+      this.selectedKelengkapanJamaahId = '';
+      this.selectedKelengkapanJamaah = null;
+      this.resetKelengkapanForm();
+    },
+
+    onKelengkapanJamaahSelect(id) {
+      this.selectedKelengkapanJamaahId = id;
+      if (!id) {
+        this.selectedKelengkapanJamaah = null;
+        this.resetKelengkapanForm();
+        return;
+      }
+
+      const found = (this.kelengkapanJamaahMasterList || []).find(j => j.id === id);
+      this.selectedKelengkapanJamaah = found || { id, namaLengkap: id, jenisPaket: this.kelengkapanFilterPaket, agent: '-' };
+
+      // Cari apakah sudah ada data kelengkapan tersimpan
+      const existing = (this.kelengkapanUmrahList || []).find(k => (k.idJamaah || k.id_jamaah) === id);
+      if (existing) {
+        this.kelengkapanForm = {
+          idKelengkapan: existing.idKelengkapan || existing.id_kelengkapan || '',
+          idJamaah: existing.idJamaah || existing.id_jamaah || id,
+          namaJamaah: existing.namaJamaah || existing.nama_jamaah || found.namaLengkap,
+          namaPaket: existing.namaPaket || existing.nama_paket || found.jenisPaket,
+          agent: existing.agent || found.agent || '-',
+          noVisa: existing.noVisa || existing.no_visa || '',
+          tglBerlakuVisa: existing.tglBerlakuVisa || existing.tgl_berlaku_visa || '',
+          tglAkhirVisa: existing.tglAkhirVisa || existing.tgl_akhir_visa || '',
+          uploadVisa: existing.uploadVisa || existing.upload_visa || '',
+          noPolis: existing.noPolis || existing.no_polis || '',
+          tglInputPolis: existing.tglInputPolis || existing.tgl_input_polis || '',
+          tglAwalPolis: existing.tglAwalPolis || existing.tgl_awal_polis || '',
+          tglAkhirPolis: existing.tglAkhirPolis || existing.tgl_akhir_polis || '',
+          uploadAsuransi: existing.uploadAsuransi || existing.upload_asuransi || '',
+          noBpjs: existing.noBpjs || existing.no_bpjs || '',
+          uploadBpjs: existing.uploadBpjs || existing.upload_bpjs || '',
+          statusKelengkapan: existing.statusKelengkapan || existing.status_kelengkapan || 'Lengkap'
+        };
+      } else {
+        this.resetKelengkapanForm();
+        this.kelengkapanForm.idJamaah = id;
+        this.kelengkapanForm.namaJamaah = found ? found.namaLengkap : '';
+        this.kelengkapanForm.namaPaket = found ? found.jenisPaket : this.kelengkapanFilterPaket;
+        this.kelengkapanForm.agent = found ? (found.agent || found.namaAgen || '-') : '-';
+      }
+    },
+
+    editKelengkapanRecord(item) {
+      this.kelengkapanViewTab = 'form';
+      if (item.namaPaket) this.kelengkapanFilterPaket = item.namaPaket;
+      this.onKelengkapanJamaahSelect(item.idJamaah);
+      if (window.Swal) {
+        Swal.fire({ toast: true, position: 'top-end', icon: 'info', title: 'Data kelengkapan dimuat ke formulir', timer: 2000, showConfirmButton: false });
+      }
+    },
+
+    async deleteKelengkapanConfirm(idJamaah) {
+      if (!confirm('Yakin ingin menghapus data kelengkapan jamaah ini?')) return;
+      try {
+        const res = await fetch('/api/kelengkapan-umrah/' + encodeURIComponent(idJamaah), { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+          if (window.Swal) Swal.fire('Berhasil', 'Data kelengkapan berhasil dihapus', 'success');
+          this.loadKelengkapanUmrahData();
+        } else {
+          alert('Gagal: ' + (data.error || 'Terjadi kesalahan'));
+        }
+      } catch (e) {
+        alert('Gagal: ' + e.message);
+      }
+    },
+
+    handleKelengkapanFileSelect(event, type) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        this.filePayloadKelengkapan[type] = {
+          fileName: file.name,
+          base64: e.target.result
+        };
+        if (type === 'visa') this.kelengkapanForm.uploadVisa = file.name;
+        if (type === 'asuransi') this.kelengkapanForm.uploadAsuransi = file.name;
+        if (type === 'bpjs') this.kelengkapanForm.uploadBpjs = file.name;
+      };
+      reader.readAsDataURL(file);
+    },
+
+    removeKelengkapanFile(type) {
+      this.filePayloadKelengkapan[type] = null;
+      if (type === 'visa') this.kelengkapanForm.uploadVisa = '';
+      if (type === 'asuransi') this.kelengkapanForm.uploadAsuransi = '';
+      if (type === 'bpjs') this.kelengkapanForm.uploadBpjs = '';
+    },
+
+    async submitKelengkapanUmrahForm() {
+      if (!this.kelengkapanForm.idJamaah) {
+        alert('Silakan pilih jamaah terlebih dahulu!');
+        return;
+      }
+      this.isSavingKelengkapan = true;
+
+      // Auto hitung status kelengkapan
+      const hasVisa = Boolean(this.kelengkapanForm.noVisa);
+      const hasPolis = Boolean(this.kelengkapanForm.noPolis);
+      const hasBpjs = Boolean(this.kelengkapanForm.noBpjs);
+      let status = 'Belum Ada Data';
+      if (hasVisa && hasPolis && hasBpjs) {
+        status = 'Lengkap';
+      } else if (hasVisa || hasPolis || hasBpjs) {
+        status = 'Sebagian';
+      }
+      this.kelengkapanForm.statusKelengkapan = status;
+
+      try {
+        const payload = {
+          idKelengkapan: this.kelengkapanForm.idKelengkapan || ('KUM-' + Date.now().toString().slice(-6)),
+          idJamaah: this.kelengkapanForm.idJamaah,
+          namaJamaah: this.kelengkapanForm.namaJamaah,
+          namaPaket: this.kelengkapanForm.namaPaket,
+          agent: this.kelengkapanForm.agent,
+          noVisa: this.kelengkapanForm.noVisa,
+          tglBerlakuVisa: this.kelengkapanForm.tglBerlakuVisa,
+          tglAkhirVisa: this.kelengkapanForm.tglAkhirVisa,
+          uploadVisa: this.kelengkapanForm.uploadVisa,
+          noPolis: this.kelengkapanForm.noPolis,
+          tglInputPolis: this.kelengkapanForm.tglInputPolis || new Date().toISOString().slice(0, 10),
+          tglAwalPolis: this.kelengkapanForm.tglAwalPolis,
+          tglAkhirPolis: this.kelengkapanForm.tglAkhirPolis,
+          uploadAsuransi: this.kelengkapanForm.uploadAsuransi,
+          noBpjs: this.kelengkapanForm.noBpjs,
+          uploadBpjs: this.kelengkapanForm.uploadBpjs,
+          statusKelengkapan: status
+        };
+
+        const res = await fetch('/api/kelengkapan-umrah', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          if (window.Swal) Swal.fire('Berhasil', 'Data kelengkapan berhasil disimpan ke database!', 'success');
+          await this.loadKelengkapanUmrahData();
+          this.kelengkapanViewTab = 'rekap';
+        } else {
+          alert('Gagal menyimpan: ' + (data.error || 'Terjadi kesalahan'));
+        }
+      } catch (err) {
+        alert('Gagal: ' + err.message);
+      } finally {
+        this.isSavingKelengkapan = false;
+      }
+    },
+
+    resetKelengkapanForm() {
+      this.kelengkapanForm = {
+        idKelengkapan: '',
+        idJamaah: '',
+        namaJamaah: '',
+        namaPaket: this.kelengkapanFilterPaket || '',
+        agent: '',
+        noVisa: '',
+        tglBerlakuVisa: '',
+        tglAkhirVisa: '',
+        uploadVisa: '',
+        noPolis: '',
+        tglInputPolis: '',
+        tglAwalPolis: '',
+        tglAkhirPolis: '',
+        uploadAsuransi: '',
+        noBpjs: '',
+        uploadBpjs: '',
+        statusKelengkapan: 'Belum Ada Data'
+      };
+      this.filePayloadKelengkapan = { visa: null, asuransi: null, bpjs: null };
+    }
+  };
+}
+</script>
+
+</body>
           </html>
         `;
 
@@ -4458,7 +4784,7 @@
   }
 </style>
 
-<div x-show="currentModule === 'mod_pembayaran_group' || currentModule === 'mod_pembayaran_jamaah'" class="space-y-6" x-transition x-data="unifiedPaymentApp()" x-init="initPaymentApp()">
+<div class="space-y-6" x-data="unifiedPaymentApp()" x-init="initPaymentApp()">
 
   <!-- Header Modul -->
   <div class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl flex flex-col lg:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden">
@@ -5530,7 +5856,10 @@ function unifiedPaymentApp() {
     showDashboardDetailModal: false,
     selectedDashboardJamaahDetail: null,
 
+    currentModule: 'mod_pembayaran_group',
+    currentModuleName: 'Sistem Pembayaran Terpadu',
     initPaymentApp() {
+      window.appPaymentInstance = this;
       this.$watch('currentModule', val => {
         if (val === 'mod_pembayaran_group' || val === 'mod_pembayaran_jamaah') {
           this.refreshAllData();
@@ -6319,7 +6648,7 @@ function unifiedPaymentApp() {
 <!-- ModulID: mod_kelengkapan_umrah (Kategori: Umrah) -->
 <!-- Alur: Filter Dropdown Paket Umrah -> Filter Dropdown Nama Jamaah -> Tampilkan Nama, Paket, Agent -> Input Visa, Asuransi, BPJS -->
 <!-- ============================================================================ -->
-<div x-show="isKelengkapanUmrahModule(currentModule, currentModuleName)" class="space-y-4" x-transition x-cloak>
+<div class="space-y-4" x-data="kelengkapanUmrahApp()" x-init="initKelengkapanApp()">
 
   <!-- 3D Header Bar & Statistics Toolbar -->
   <div class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl flex flex-col lg:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden">
