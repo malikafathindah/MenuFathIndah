@@ -8421,7 +8421,6 @@ const htMatrixState = {
   ymKeys: [],
   groupedMonths: {},
   chartInstance: null,
-  selectedItem: null,
   grandTotal: {
     hargaPaket: 0,
     dp: 0,
@@ -8456,7 +8455,7 @@ async function htFetchMatrixData() {
     let jamaahList = [];
     let angsuranList = [];
 
-    // 1. Direct Supabase REST API
+    // 1. Direct Supabase REST API (100% dari tabel yang teregister di Supabase)
     if (typeof SUPABASE_CONFIG !== 'undefined' && SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey) {
       try {
         const [rJ, rA] = await Promise.all([
@@ -8492,15 +8491,7 @@ async function htFetchMatrixData() {
       } catch (e) {}
     }
 
-    // 3. Fallback to Google Sheets CSV if needed
-    if ((!jamaahList || jamaahList.length === 0) && typeof fetchSheetDataCsv === 'function') {
-      try {
-        jamaahList = await fetchSheetDataCsv('DataJamaahHaji');
-        angsuranList = await fetchSheetDataCsv('EntryAngsuranHaji');
-      } catch (e) {}
-    }
-
-    // Olah data Jamaah Haji Terencana
+    // Olah data Jamaah Haji Terencana (Tabel: data_jamaah_haji)
     const htJamaahMap = {};
 
     (jamaahList || []).forEach(j => {
@@ -8524,7 +8515,7 @@ async function htFetchMatrixData() {
       }
     });
 
-    // Olah seluruh data transaksi angsuran
+    // Olah data angsuran per bulan (Tabel: entry_angsuran_haji)
     (angsuranList || []).forEach(a => {
       const noBpih = String(a.nobpih || '').trim();
       if (htJamaahMap[noBpih]) {
@@ -8735,9 +8726,7 @@ function htRenderMatrixTable() {
           <td class="ht-col-no" style="font-family:monospace; color:#64748b;">${idx + 1}</td>
           <td class="ht-col-porsi">${escapeHtml(item.noPorsi)}</td>
           <td class="ht-col-nama">
-            <button type="button" onclick="openAngsuranDetail('${escapeHtml(item.noPorsi)}')" title="Lihat rincian angsuran ${escapeHtml(item.namaJamaah)}">
-              ${escapeHtml(item.namaJamaah)}
-            </button>
+            <span style="color:#38bdf8; font-weight:600;">${escapeHtml(item.namaJamaah)}</span>
           </td>
           <td class="ht-col-kode">
             <span class="ht-kode-badge">${escapeHtml(item.kode || '-')}</span>
@@ -9009,149 +8998,6 @@ window.htExportMatrixToExcel = function() {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Data HT");
   XLSX.writeFile(wb, "Dashboard_Haji_Terencana.xlsx");
-};
-
-/**
- * Modal Detail Angsuran Jamaah
- */
-window.openAngsuranDetail = function(noPorsi) {
-  const item = htMatrixState.dataList.find(x => String(x.noPorsi) === String(noPorsi));
-  if (!item) return;
-
-  htMatrixState.selectedItem = item;
-
-  const modal = document.getElementById('htMatrixDetailModal');
-  const printArea = document.getElementById('htPrintAreaDetail');
-  if (!modal || !printArea) return;
-
-  const rincian = item.rincianTransaksi || [];
-  const sisa = Math.max(0, (item.hargaPaket || 0) - ((item.dp || 0) + (item.totalKumulatif || 0)));
-
-  printArea.innerHTML = `
-    <div style="text-align:center; margin-bottom:20px; border-bottom:2px solid #cbd5e1; padding-bottom:14px;">
-      <h2 style="font-size:20px; font-weight:800; text-transform:uppercase; margin:0 0 4px; color:#0f172a;">Laporan Angsuran Haji Terencana</h2>
-      <p style="font-size:12px; color:#64748b; margin:0;">PT. Fath Indah Travel Service • Dicetak pada: ${new Date().toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})}</p>
-    </div>
-
-    <table style="width:100%; font-size:13px; margin-bottom:20px; border-collapse:collapse;">
-      <tr>
-        <td style="font-weight:700; width:130px; padding:3px 0;">Nama Jamaah</td>
-        <td style="width:15px;">:</td>
-        <td style="font-weight:800; font-size:14px; text-transform:uppercase; color:#0369a1;">${escapeHtml(item.namaJamaah)}</td>
-      </tr>
-      <tr>
-        <td style="font-weight:700; padding:3px 0;">No. Porsi / BPIH</td>
-        <td>:</td>
-        <td style="font-family:monospace; font-weight:700;">${escapeHtml(item.noPorsi)}</td>
-      </tr>
-      <tr>
-        <td style="font-weight:700; padding:3px 0;">Kode Paket</td>
-        <td>:</td>
-        <td>${escapeHtml(item.kode || '-')}</td>
-      </tr>
-      <tr>
-        <td style="font-weight:700; padding:3px 0;">Harga Paket</td>
-        <td>:</td>
-        <td style="font-family:monospace; font-weight:700;">Rp ${htFormatMatrixNumber(item.hargaPaket)}</td>
-      </tr>
-      <tr>
-        <td style="font-weight:700; padding:3px 0;">Down Payment (DP)</td>
-        <td>:</td>
-        <td style="font-family:monospace; font-weight:700;">Rp ${htFormatMatrixNumber(item.dp)}</td>
-      </tr>
-      <tr>
-        <td style="font-weight:700; padding:3px 0;">Angsuran / Bulan</td>
-        <td>:</td>
-        <td style="font-family:monospace; font-weight:700; color:#d97706;">Rp ${htFormatMatrixNumber(item.angsuranBulan)}</td>
-      </tr>
-    </table>
-
-    <h3 style="font-size:14px; font-weight:800; margin-bottom:8px; color:#0f172a;">Rincian Pembayaran per Bulan</h3>
-    <table style="width:100%; border-collapse:collapse; font-size:12px; margin-bottom:14px;">
-      <thead>
-        <tr style="background:#f1f5f9;">
-          <th style="border:1px solid #cbd5e1; padding:8px; text-align:center; width:45px;">No</th>
-          <th style="border:1px solid #cbd5e1; padding:8px; text-align:left;">Tanggal Setor</th>
-          <th style="border:1px solid #cbd5e1; padding:8px; text-align:center; width:100px;">Status</th>
-          <th style="border:1px solid #cbd5e1; padding:8px; text-align:right; width:160px;">Jumlah Angsuran</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rincian.length === 0 ? `
-          <tr>
-            <td colspan="4" style="border:1px solid #cbd5e1; padding:16px; text-align:center; color:#94a3b8;">Belum ada catatan angsuran</td>
-          </tr>
-        ` : rincian.map((t, i) => `
-          <tr style="${String(t.status).toLowerCase() === 'pending' ? 'background:#fef9c3;' : ''}">
-            <td style="border:1px solid #cbd5e1; padding:6px; text-align:center; font-family:monospace;">${i + 1}</td>
-            <td style="border:1px solid #cbd5e1; padding:6px;">${formatIndonesianDate(t.tanggal)}</td>
-            <td style="border:1px solid #cbd5e1; padding:6px; text-align:center; font-weight:700; font-size:10.5px; text-transform:uppercase; color:${String(t.status).toLowerCase() === 'approved' ? '#0f766e' : '#b45309'};">
-              ${escapeHtml(t.status)}
-            </td>
-            <td style="border:1px solid #cbd5e1; padding:6px; text-align:right; font-family:monospace; font-weight:700;">
-              Rp ${htFormatMatrixNumber(t.jumlah)}
-            </td>
-          </tr>
-        `).join('')}
-        <tr style="background:#f8fafc; font-weight:800;">
-          <td colspan="3" style="border:1px solid #cbd5e1; padding:8px; text-align:right;">Total Angsuran Masuk:</td>
-          <td style="border:1px solid #cbd5e1; padding:8px; text-align:right; font-family:monospace; color:#059669; font-size:13px;">
-            Rp ${htFormatMatrixNumber(item.totalKumulatif)}
-          </td>
-        </tr>
-        <tr style="background:#f8fafc; font-weight:800;">
-          <td colspan="3" style="border:1px solid #cbd5e1; padding:8px; text-align:right; color:#b91c1c;">Sisa Pembayaran:</td>
-          <td style="border:1px solid #cbd5e1; padding:8px; text-align:right; font-family:monospace; color:#b91c1c; font-size:13px;">
-            Rp ${htFormatMatrixNumber(sisa)}
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  `;
-
-  modal.style.display = 'flex';
-};
-
-window.htCloseMatrixDetailModal = function() {
-  const modal = document.getElementById('htMatrixDetailModal');
-  if (modal) modal.style.display = 'none';
-};
-
-window.htPrintMatrixDetail = function() {
-  if (!htMatrixState.selectedItem) return;
-  const printContents = document.getElementById('htPrintAreaDetail')?.innerHTML;
-  if (!printContents) return;
-
-  const printWindow = window.open('', '_blank', 'width=900,height=750');
-  if (!printWindow) {
-    window.print();
-    return;
-  }
-
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>Cetak Angsuran - ${escapeHtml(htMatrixState.selectedItem.namaJamaah)}</title>
-        <style>
-          @page { size: A4 portrait; margin: 15mm; }
-          body { font-family: 'Plus Jakarta Sans', Arial, sans-serif; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; padding: 15px; }
-        </style>
-      </head>
-      <body>
-        ${printContents}
-        <script>
-          window.onload = function() {
-            setTimeout(function() {
-              window.print();
-              window.close();
-            }, 300);
-          }
-        </script>
-      </body>
-    </html>
-  `);
-  printWindow.document.close();
 };
 
 function formatIndonesianDate(dateStr) {
