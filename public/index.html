@@ -1494,21 +1494,76 @@
                     </select>
                   </div>
 
-                  <div class="form-group">
-                    <label class="form-label" for="bioFotoUrl">URL Pas Foto Formal Karyawan</label>
-                    <input type="url" id="bioFotoUrl" class="form-input" placeholder="https://drive.google.com/... atau URL foto">
+                  <!-- 1. Pas Foto Formal Karyawan -->
+                  <div class="form-group bio-upload-group">
+                    <label class="form-label" for="bioFotoFile">
+                      <span><i class="fa-solid fa-camera" style="color:var(--gold-light);"></i> Pas Foto Formal Karyawan</span>
+                    </label>
+                    <div class="bio-upload-box" id="boxBioFoto">
+                      <input type="file" id="bioFotoFile" accept="image/*" class="bio-file-input" onchange="handleBioDocFileSelect(this, 'FOTO')">
+                      <div class="bio-upload-actions">
+                        <label for="bioFotoFile" class="btn-file-browse">
+                          <i class="fa-solid fa-folder-open"></i> Cari Foto Lokal
+                        </label>
+                        <span class="bio-file-name" id="nameBioFoto">Belum ada file dipilih</span>
+                      </div>
+                      <div class="bio-upload-status" id="statusBioFoto"></div>
+                      <input type="hidden" id="bioFotoUrl">
+                    </div>
                   </div>
-                  <div class="form-group">
-                    <label class="form-label" for="bioUploadKtp">URL Berkas Upload KTP</label>
-                    <input type="url" id="bioUploadKtp" class="form-input" placeholder="https://drive.google.com/...">
+
+                  <!-- 2. Berkas KTP -->
+                  <div class="form-group bio-upload-group">
+                    <label class="form-label" for="bioKtpFile">
+                      <span><i class="fa-solid fa-id-card" style="color:#38bdf8;"></i> Berkas Upload KTP</span>
+                    </label>
+                    <div class="bio-upload-box" id="boxBioKtp">
+                      <input type="file" id="bioKtpFile" accept="image/*,.pdf" class="bio-file-input" onchange="handleBioDocFileSelect(this, 'KTP')">
+                      <div class="bio-upload-actions">
+                        <label for="bioKtpFile" class="btn-file-browse">
+                          <i class="fa-solid fa-folder-open"></i> Cari Berkas KTP
+                        </label>
+                        <span class="bio-file-name" id="nameBioKtp">Belum ada file dipilih</span>
+                      </div>
+                      <div class="bio-upload-status" id="statusBioKtp"></div>
+                      <input type="hidden" id="bioUploadKtp">
+                    </div>
                   </div>
-                  <div class="form-group">
-                    <label class="form-label" for="bioUploadNpwp">URL Berkas Upload NPWP</label>
-                    <input type="url" id="bioUploadNpwp" class="form-input" placeholder="https://drive.google.com/...">
+
+                  <!-- 3. Berkas NPWP -->
+                  <div class="form-group bio-upload-group">
+                    <label class="form-label" for="bioNpwpFile">
+                      <span><i class="fa-solid fa-file-invoice" style="color:#fbbf24;"></i> Berkas Upload NPWP</span>
+                    </label>
+                    <div class="bio-upload-box" id="boxBioNpwp">
+                      <input type="file" id="bioNpwpFile" accept="image/*,.pdf" class="bio-file-input" onchange="handleBioDocFileSelect(this, 'NPWP')">
+                      <div class="bio-upload-actions">
+                        <label for="bioNpwpFile" class="btn-file-browse">
+                          <i class="fa-solid fa-folder-open"></i> Cari Berkas NPWP
+                        </label>
+                        <span class="bio-file-name" id="nameBioNpwp">Belum ada file dipilih</span>
+                      </div>
+                      <div class="bio-upload-status" id="statusBioNpwp"></div>
+                      <input type="hidden" id="bioUploadNpwp">
+                    </div>
                   </div>
-                  <div class="form-group span-3">
-                    <label class="form-label" for="bioUploadKk">URL Berkas Upload Kartu Keluarga</label>
-                    <input type="url" id="bioUploadKk" class="form-input" placeholder="https://drive.google.com/...">
+
+                  <!-- 4. Berkas Kartu Keluarga -->
+                  <div class="form-group span-3 bio-upload-group">
+                    <label class="form-label" for="bioKkFile">
+                      <span><i class="fa-solid fa-users" style="color:#a78bfa;"></i> Berkas Upload Kartu Keluarga</span>
+                    </label>
+                    <div class="bio-upload-box" id="boxBioKk">
+                      <input type="file" id="bioKkFile" accept="image/*,.pdf" class="bio-file-input" onchange="handleBioDocFileSelect(this, 'KK')">
+                      <div class="bio-upload-actions">
+                        <label for="bioKkFile" class="btn-file-browse">
+                          <i class="fa-solid fa-folder-open"></i> Cari Berkas KK
+                        </label>
+                        <span class="bio-file-name" id="nameBioKk">Belum ada file dipilih</span>
+                      </div>
+                      <div class="bio-upload-status" id="statusBioKk"></div>
+                      <input type="hidden" id="bioUploadKk">
+                    </div>
                   </div>
 
                   <div class="form-group">

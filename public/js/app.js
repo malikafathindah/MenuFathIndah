@@ -6873,6 +6873,119 @@ function initBioKaryawanView() {
   }
 }
 
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+}
+
+const BIO_DOC_CONFIG = {
+  FOTO: { label: 'Pas Foto', fieldId: 'bioFotoUrl', nameId: 'nameBioFoto', statusId: 'statusBioFoto', prefix: 'FOTO' },
+  KTP: { label: 'Berkas KTP', fieldId: 'bioUploadKtp', nameId: 'nameBioKtp', statusId: 'statusBioKtp', prefix: 'KTP' },
+  NPWP: { label: 'Berkas NPWP', fieldId: 'bioUploadNpwp', nameId: 'nameBioNpwp', statusId: 'statusBioNpwp', prefix: 'NPWP' },
+  KK: { label: 'Berkas Kartu Keluarga', fieldId: 'bioUploadKk', nameId: 'nameBioKk', statusId: 'statusBioKk', prefix: 'KK' }
+};
+
+window._pendingBioFiles = {};
+
+window.updateBioDocStatusBadge = function(docType, url, label) {
+  const cfg = BIO_DOC_CONFIG[docType];
+  if (!cfg) return;
+  const statusEl = document.getElementById(cfg.statusId);
+  const nameEl = document.getElementById(cfg.nameId);
+  if (!statusEl) return;
+
+  if (url) {
+    statusEl.innerHTML = `<span class="status-success"><i class="fa-solid fa-circle-check"></i> <a href="${url}" target="_blank" style="color:#34d399; text-decoration:underline; font-weight:600;"><i class="fa-solid fa-arrow-up-right-from-square"></i> Lihat ${label || cfg.label} di Google Drive</a></span>`;
+    if (nameEl) nameEl.textContent = 'Berkas tersimpan di Drive';
+  } else {
+    statusEl.innerHTML = '';
+    if (nameEl) nameEl.textContent = 'Belum ada file dipilih';
+  }
+};
+
+window.handleBioDocFileSelect = async function(fileInput, docType) {
+  const file = fileInput.files && fileInput.files[0];
+  const cfg = BIO_DOC_CONFIG[docType];
+  if (!cfg) return;
+
+  const nameEl = document.getElementById(cfg.nameId);
+  const statusEl = document.getElementById(cfg.statusId);
+  const targetInput = document.getElementById(cfg.fieldId);
+
+  if (!file) {
+    if (nameEl) nameEl.textContent = 'Belum ada file dipilih';
+    delete window._pendingBioFiles[docType];
+    return;
+  }
+
+  if (nameEl) nameEl.textContent = file.name;
+  window._pendingBioFiles[docType] = file;
+
+  // Nama file spesifik dengan unsur Nama Karyawan dan Jenis Dokumen
+  const rawNama = (document.getElementById('bioNama')?.value || 'Karyawan').trim();
+  const rawNik = (document.getElementById('bioNik')?.value || '').trim();
+  const cleanNama = rawNama.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
+  const cleanNik = rawNik.replace(/[^a-zA-Z0-9]/g, '_');
+  const ext = file.name.split('.').pop() || (docType === 'FOTO' ? 'jpg' : 'pdf');
+  const specificFileName = `${cfg.prefix}_${cleanNama}${cleanNik ? '_' + cleanNik : ''}.${ext}`;
+
+  // Ambil Webhook Google Drive
+  const webhookUrl = getGDriveWebhookUrl();
+
+  if (!webhookUrl) {
+    if (statusEl) {
+      statusEl.innerHTML = `<span style="color:#fbbf24; font-size:0.75rem;"><i class="fa-solid fa-file-circle-check"></i> File <strong>"${specificFileName}"</strong> dipilih. <a href="javascript:void(0)" onclick="openGDriveConfigModal()" style="color:#38bdf8; text-decoration:underline;">Pasang Webhook Drive</a> agar terunggah otomatis ke Google Drive.</span>`;
+    }
+    return;
+  }
+
+  // Upload langsung ke Google Drive folder 1cHGrQ2cOzcAJ_MYq8MLi96droVIMPvcr
+  if (statusEl) {
+    statusEl.innerHTML = `<span class="status-uploading"><i class="fa-solid fa-spinner fa-spin text-cyan"></i> Mengunggah ${specificFileName} ke Google Drive...</span>`;
+  }
+
+  try {
+    const base64Data = await readFileAsBase64(file);
+    const scriptPayload = {
+      folderId: '1cHGrQ2cOzcAJ_MYq8MLi96droVIMPvcr',
+      fileName: specificFileName,
+      mimeType: file.type || 'application/octet-stream',
+      base64: base64Data
+    };
+
+    const res = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(scriptPayload)
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    if (data.success && (data.directLink || data.fileUrl)) {
+      const driveUrl = data.directLink || data.fileUrl;
+      if (targetInput) targetInput.value = driveUrl;
+      delete window._pendingBioFiles[docType];
+      if (statusEl) {
+        statusEl.innerHTML = `<span class="status-success"><i class="fa-solid fa-circle-check"></i> <a href="${driveUrl}" target="_blank" style="color:#34d399; text-decoration:underline; font-weight:600;"><i class="fa-solid fa-arrow-up-right-from-square"></i> Tersimpan di Google Drive: ${specificFileName}</a></span>`;
+      }
+    } else {
+      throw new Error(data.message || 'Gagal upload');
+    }
+  } catch (err) {
+    console.warn(`Upload ${docType} gagal:`, err);
+    if (statusEl) {
+      statusEl.innerHTML = `<span class="status-error"><i class="fa-solid fa-circle-exclamation"></i> Gagal upload: ${err.message}. File akan tetap diunggah saat tombol Simpan ditekan.</span>`;
+    }
+  }
+};
+
 function resetBioKaryawanForm() {
   const form = document.getElementById('formBioKaryawan');
   if (form) form.reset();
@@ -6884,6 +6997,25 @@ function resetBioKaryawanForm() {
   }
   const feedback = document.getElementById('kodeposFeedback');
   if (feedback) feedback.innerHTML = '';
+  const dl = document.getElementById('bioKelurahanList');
+  if (dl) dl.innerHTML = '';
+
+  ['FOTO', 'KTP', 'NPWP', 'KK'].forEach(dt => {
+    updateBioDocStatusBadge(dt, null);
+    const fileInp = document.getElementById(
+      dt === 'FOTO' ? 'bioFotoFile' :
+      dt === 'KTP' ? 'bioKtpFile' :
+      dt === 'NPWP' ? 'bioNpwpFile' : 'bioKkFile'
+    );
+    if (fileInp) fileInp.value = '';
+    const nameEl = document.getElementById(
+      dt === 'FOTO' ? 'nameBioFoto' :
+      dt === 'KTP' ? 'nameBioKtp' :
+      dt === 'NPWP' ? 'nameBioNpwp' : 'nameBioKk'
+    );
+    if (nameEl) nameEl.textContent = 'Belum ada file dipilih';
+  });
+  window._pendingBioFiles = {};
 }
 
 function populateBioKaryawanFormWithNik(nik) {
@@ -6948,13 +7080,19 @@ function populateBioKaryawanFormWithNik(nik) {
   setVal('bioBpjsTk', emp.bpjs_ketenagakerjaan || emp['Nomor BP Ketenagakerjaan'] || emp.bpjstk);
   setVal('bioBpjsKes', emp.bpjs_kesehatan || emp['Nomor BPJS Kesehatan'] || emp.bpjskes);
   setVal('bioPenanggungBpjs', emp.penanggung_bpjs || emp['Penanggung BPJS Kesehatan'] || 'Perusahaan');
-  setVal('bioFotoUrl', emp.upload_foto || emp.foto_url || emp['UploadFoto']);
-  setVal('bioUploadKtp', emp.upload_ktp || emp['UploadKTP']);
-  setVal('bioUploadNpwp', emp.upload_npwp || emp['UploadNPWP']);
-  setVal('bioUploadKk', emp.upload_kk || emp['UploadKK']);
+  setVal('bioFotoUrl', emp.upload_foto || emp.foto_url || emp['UploadFoto'] || '');
+  setVal('bioUploadKtp', emp.upload_ktp || emp['UploadKTP'] || '');
+  setVal('bioUploadNpwp', emp.upload_npwp || emp['UploadNPWP'] || '');
+  setVal('bioUploadKk', emp.upload_kk || emp['UploadKK'] || '');
   setVal('bioDaruratNama', emp.kontak_darurat_nama || emp.nama_pasangan || emp.nama_ibu_kandung);
   setVal('bioDaruratHp', emp.kontak_darurat_hp || emp.nomor_hp);
   setVal('bioDaruratHub', emp.kontak_darurat_hubungan || 'Keluarga');
+
+  // Perbarui lencana status dokumen tersimpan
+  updateBioDocStatusBadge('FOTO', emp.upload_foto || emp.foto_url || emp['UploadFoto'], 'Pas Foto');
+  updateBioDocStatusBadge('KTP', emp.upload_ktp || emp['UploadKTP'], 'KTP');
+  updateBioDocStatusBadge('NPWP', emp.upload_npwp || emp['UploadNPWP'], 'NPWP');
+  updateBioDocStatusBadge('KK', emp.upload_kk || emp['UploadKK'], 'Kartu Keluarga');
 
   // CLUSTER 6: Informasi Rekening Bank
   setVal('bioBankAtasNama', emp.bank_atas_nama || emp['Nama Di Bank'] || emp.nama_karyawan || emp.nama);
@@ -6977,6 +7115,12 @@ window.handleBioKaryawanSubmit = async function(event) {
     return el ? el.value.trim() : '';
   };
 
+  const getDateVal = (id) => {
+    const el = document.getElementById(id);
+    const val = el ? el.value.trim() : '';
+    return val ? val : null;
+  };
+
   const nik = getVal('bioNik');
   const nama = getVal('bioNama');
 
@@ -6987,24 +7131,68 @@ window.handleBioKaryawanSubmit = async function(event) {
     return;
   }
 
-  // Payload lengkap terpadu mencakup seluruh 6 Cluster
-  const payload = {
+  const btnSubmit = document.getElementById('btnBioSubmit');
+  if (btnSubmit) {
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mempersiapkan Dokumen...';
+  }
+
+  // 1. Auto-upload pending files jika ada Webhook Apps Script
+  const webhookUrl = getGDriveWebhookUrl();
+  const pendingDocTypes = Object.keys(window._pendingBioFiles || {});
+  if (pendingDocTypes.length > 0 && webhookUrl) {
+    for (const dt of pendingDocTypes) {
+      const fileInp = document.getElementById(
+        dt === 'FOTO' ? 'bioFotoFile' :
+        dt === 'KTP' ? 'bioKtpFile' :
+        dt === 'NPWP' ? 'bioNpwpFile' : 'bioKkFile'
+      );
+      if (fileInp && fileInp.files && fileInp.files[0]) {
+        if (btnSubmit) btnSubmit.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Mengunggah berkas ${dt} ke Google Drive...`;
+        await window.handleBioDocFileSelect(fileInp, dt);
+      }
+    }
+  }
+
+  if (btnSubmit) {
+    btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan ke Supabase Bio_Karyawan...';
+  }
+
+  // VALID SCHEMA COLUMNS OF Supabase Bio_Karyawan (Strict 54 columns)
+  const VALID_BIO_COLS = new Set([
+    'nik', 'nama_karyawan', 'jenis_kelamin', 'tempat_lahir', 'tanggal_lahir', 'golongan_darah',
+    'alamat', 'kode_pos', 'kelurahan', 'kecamatan', 'kota_kabupaten', 'provinsi',
+    'nomor_hp', 'email', 'pendidikan_terakhir', 'jurusan', 'lembaga_pendidikan',
+    'nama_ibu_kandung', 'nama_pasangan', 'tgl_lahir_pasangan',
+    'anak_1_nama', 'anak_1_tgl_lahir', 'anak_2_nama', 'anak_2_tgl_lahir',
+    'anak_3_nama', 'anak_3_tgl_lahir', 'anak_4_nama', 'anak_4_tgl_lahir',
+    'no_kk', 'no_ktp', 'npwp', 'bpjs_ketenagakerjaan', 'bpjs_kesehatan', 'penanggung_bpjs',
+    'bank_atas_nama', 'nama_bank', 'no_rekening', 'status', 'status_emp',
+    'tanggal_input', 'tanggal_masuk', 'keterangan', 'divisi', 'jabatan', 'fungsional',
+    'kantor', 'upload_ktp', 'upload_npwp', 'upload_kk', 'upload_foto', 'umur', 'evaluasi', 'masa_kerja'
+  ]);
+
+  // Bangun keterangan dengan info ekstra agar data lengkap tetap tercatat
+  const extras = [];
+  if (getVal('bioAgama')) extras.push(`Agama: ${getVal('bioAgama')}`);
+  if (getVal('bioStatusNikah')) extras.push(`Status Nikah: ${getVal('bioStatusNikah')}`);
+  if (getVal('bioDaruratNama')) extras.push(`Kontak Darurat: ${getVal('bioDaruratNama')} (${getVal('bioDaruratHp') || '-'}, ${getVal('bioDaruratHub') || '-'})`);
+
+  const rawPayload = {
     // CLUSTER 1: Data Pribadi Karyawan
     nik: nik,
     nama_karyawan: nama,
     jenis_kelamin: getVal('bioJenisKelamin') || 'Laki-laki',
     golongan_darah: getVal('bioGolDarah') || '-',
     tempat_lahir: getVal('bioTempatLahir') || null,
-    tanggal_lahir: getVal('bioTanggalLahir') || null,
-    agama: getVal('bioAgama') || 'Islam',
-    status_nikah: getVal('bioStatusNikah') || 'Menikah',
+    tanggal_lahir: getDateVal('bioTanggalLahir'),
     status_emp: getVal('bioStatusEmp') || 'PKWTT',
     status: getVal('bioStatus') || 'Aktif',
     divisi: getVal('bioDivisi') || 'Top Manajemen',
     jabatan: getVal('bioJabatan') || 'Staff',
     fungsional: getVal('bioFungsional') || null,
     kantor: getVal('bioKantor') || 'Pusat',
-    tanggal_masuk: getVal('bioTanggalMasuk') || null,
+    tanggal_masuk: getDateVal('bioTanggalMasuk'),
 
     // CLUSTER 2: Alamat Lengkap Karyawan
     alamat: getVal('bioAlamat') || null,
@@ -7024,15 +7212,15 @@ window.handleBioKaryawanSubmit = async function(event) {
     // CLUSTER 4: Data Keluarga & Tanggungan
     nama_ibu_kandung: getVal('bioNamaIbuKandung') || null,
     nama_pasangan: getVal('bioNamaPasangan') || null,
-    tgl_lahir_pasangan: getVal('bioTglLahirPasangan') || null,
+    tgl_lahir_pasangan: getDateVal('bioTglLahirPasangan'),
     anak_1_nama: getVal('bioAnak1Nama') || null,
-    anak_1_tgl_lahir: getVal('bioAnak1TglLahir') || null,
+    anak_1_tgl_lahir: getDateVal('bioAnak1TglLahir'),
     anak_2_nama: getVal('bioAnak2Nama') || null,
-    anak_2_tgl_lahir: getVal('bioAnak2TglLahir') || null,
+    anak_2_tgl_lahir: getDateVal('bioAnak2TglLahir'),
     anak_3_nama: getVal('bioAnak3Nama') || null,
-    anak_3_tgl_lahir: getVal('bioAnak3TglLahir') || null,
+    anak_3_tgl_lahir: getDateVal('bioAnak3TglLahir'),
     anak_4_nama: getVal('bioAnak4Nama') || null,
-    anak_4_tgl_lahir: getVal('bioAnak4TglLahir') || null,
+    anak_4_tgl_lahir: getDateVal('bioAnak4TglLahir'),
 
     // CLUSTER 5: Dokumen Kependudukan & BPJS
     no_ktp: getVal('bioNoKtp') || null,
@@ -7042,13 +7230,9 @@ window.handleBioKaryawanSubmit = async function(event) {
     bpjs_kesehatan: getVal('bioBpjsKes') || null,
     penanggung_bpjs: getVal('bioPenanggungBpjs') || 'Perusahaan',
     upload_foto: getVal('bioFotoUrl') || null,
-    foto_url: getVal('bioFotoUrl') || null,
     upload_ktp: getVal('bioUploadKtp') || null,
     upload_npwp: getVal('bioUploadNpwp') || null,
     upload_kk: getVal('bioUploadKk') || null,
-    kontak_darurat_nama: getVal('bioDaruratNama') || null,
-    kontak_darurat_hp: getVal('bioDaruratHp') || null,
-    kontak_darurat_hubungan: getVal('bioDaruratHub') || 'Keluarga',
 
     // CLUSTER 6: Informasi Rekening Bank
     bank_atas_nama: getVal('bioBankAtasNama') || nama,
@@ -7057,17 +7241,20 @@ window.handleBioKaryawanSubmit = async function(event) {
 
     // Sistem Metadata
     tanggal_input: new Date().toISOString().split('T')[0],
-    updated_at: new Date().toISOString()
+    keterangan: extras.length > 0 ? extras.join(' | ') : null
   };
 
-  const btnSubmit = document.getElementById('btnBioSubmit');
-  if (btnSubmit) {
-    btnSubmit.disabled = true;
-    btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan ke Supabase Bio_Karyawan...';
+  // Filter ketat agar HANYA kolom resmi Supabase yang dikirimkan
+  const cleanPayload = {};
+  for (const [k, v] of Object.entries(rawPayload)) {
+    if (VALID_BIO_COLS.has(k)) {
+      cleanPayload[k] = v;
+    }
   }
 
   try {
     let saved = false;
+    let lastError = '';
 
     // 1. Simpan langsung ke Supabase REST API (Upsert)
     const candidateEndpoints = [
@@ -7086,15 +7273,18 @@ window.handleBioKaryawanSubmit = async function(event) {
             'Content-Type': 'application/json',
             'Prefer': 'resolution=merge-duplicates,return=representation'
           },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(cleanPayload)
         });
 
         if (res.ok || res.status === 201 || res.status === 200 || res.status === 204) {
           saved = true;
           break;
+        } else {
+          lastError = await res.text();
+          console.warn(`Supabase save endpoint ${ep} failed:`, res.status, lastError);
         }
       } catch (e) {
-        // Coba endpoint alternatif berikutnya
+        lastError = e.message;
       }
     }
 
@@ -7104,7 +7294,7 @@ window.handleBioKaryawanSubmit = async function(event) {
         const srvRes = await fetch('/api/bio-karyawan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(cleanPayload)
         });
         if (srvRes.ok) {
           const srvData = await srvRes.json();
@@ -7118,12 +7308,17 @@ window.handleBioKaryawanSubmit = async function(event) {
     }
 
     if (saved) {
-      alert(`✅ Berhasil! Data Karyawan [${nik}] ${nama} telah berhasil disimpan ke database Bio_Karyawan dengan 6 Cluster Lengkap.`);
+      alert(`✅ Berhasil! Data Karyawan [${nik}] ${nama} telah berhasil disimpan ke database Bio_Karyawan Supabase lengkap beserta tautan dokumen Google Drive.`);
       resetBioKaryawanForm();
       await loadDaftarKaryawanData(true);
       switchModule('mod_daftar_karyawan');
     } else {
-      alert(`⚠️ Gagal menyimpan ke Supabase. Pastikan tabel Bio_Karyawan sudah tersedia atau jalankan script SQL bio_karyawan_supabase.sql.`);
+      let friendlyError = lastError;
+      try {
+        const parsed = JSON.parse(lastError);
+        if (parsed.message) friendlyError = parsed.message;
+      } catch (e) {}
+      alert(`⚠️ Gagal menyimpan ke Supabase: ${friendlyError || 'Koneksi terputus'}. Pastikan tabel Bio_Karyawan sudah tersedia dan izin RLS terbuka.`);
     }
   } catch (err) {
     console.error('Error simpan biodata:', err);

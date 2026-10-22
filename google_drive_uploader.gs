@@ -3,27 +3,28 @@
  * GOOGLE APPS SCRIPT: AUTO-UPLOADER BROSUR PT. FATH INDAH TRAVEL SERVICE
  * ============================================================================
  * Folder Target Google Drive:
- * https://drive.google.com/drive/folders/1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc
- * Folder ID: 1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc
+ * https://drive.google.com/drive/folders/1cHGrQ2cOzcAJ_MYq8MLi96droVIMPvcr?usp=drive_link
+ * Folder ID: 1cHGrQ2cOzcAJ_MYq8MLi96droVIMPvcr
  * ============================================================================
  * 
  * CARA PEMASANGAN (Hanya 1 Menit):
  * 1. Buka https://script.google.com dengan akun Google yang memiliki akses folder di atas.
- * 2. Klik "New project" / "Proyek baru", beri nama "Uploader Brosur Fath Indah".
+ * 2. Klik "New project" / "Proyek baru", beri nama "Uploader Dokumen Fath Indah".
  * 3. Hapus kode default, tempel (paste) seluruh isi skrip ini.
  * 4. Klik ikon Save (Disket).
  * 5. Klik tombol "Deploy" (Terapkan) di kanan atas -> pilih "New deployment" (Penerapan baru).
  * 6. Klik ikon gerigi (Settings) di sebelah "Select type" -> pilih "Web app" (Aplikasi web).
  * 7. Atur konfigurasi berikut:
- *    - Description: Uploader Brosur Fath Indah
+ *    - Description: Uploader Dokumen Fath Indah
  *    - Execute as: Me (email-anda@gmail.com)
  *    - Who has access: Anyone (Siapa saja)  <-- PENTING agar web app bisa upload
  * 8. Klik "Deploy", izinkan otorisasi akses Google Drive (klik Advanced -> Go to ... (unsafe) -> Allow).
  * 9. Salin "Web app URL" (format: https://script.google.com/macros/s/AKfycb.../exec).
- * 10. Tempel URL tersebut di menu "Konfigurasi DB" atau pada tombol "⚙️ Pasang Auto-Upload" di modul Launching Brosur!
+ * 10. Tempel URL tersebut di menu "Konfigurasi DB" atau pada form Upload Dokumen Karyawan!
+ * ============================================================================
  */
 
-const TARGET_FOLDER_ID = "1nDoE-UPkzVwt6m_OwOpP6G-1O8w4T9wc";
+const TARGET_FOLDER_ID = "1cHGrQ2cOzcAJ_MYq8MLi96droVIMPvcr";
 
 function doPost(e) {
   try {
