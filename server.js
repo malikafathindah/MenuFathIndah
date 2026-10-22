@@ -404,14 +404,42 @@ app.post('/api/bio-karyawan', async (req, res) => {
   }
 });
 
-// 6a.0 KODEPOS LOOKUP API (mod_bio_karyawan)
+// 6a.0 KODEPOS LOOKUP API (mod_bio_karyawan - Sumber Utama: Supabase Tabel Kodepos)
 app.get('/api/kodepos', async (req, res) => {
   const kodepos = String(req.query.q || req.query.kodepos || '').trim();
   if (!kodepos) {
     return res.status(400).json({ success: false, message: 'Parameter q (kodepos) wajib diisi.' });
   }
 
+  // 1. Ambil dari Tabel Supabase (Tabel "Kodepos" / "kodepos")
+  try {
+    const list = await supabase.getSupabaseKodepos(kodepos);
+    if (list && list.length > 0) {
+      const first = list[0];
+      // Jika data dari Supabase lengkap (memiliki kecamatan/kota/kelurahan)
+      if (first.kelurahan || first.kecamatan || first.kota) {
+        return res.json({
+          success: true,
+          source: 'supabase',
+          data: {
+            kelurahan: first.kelurahan || '',
+            kecamatan: first.kecamatan || '',
+            kota: first.kota || '',
+            provinsi: first.provinsi || ''
+          },
+          all: list
+        });
+      }
+    }
+  } catch (err) {
+    console.warn('Supabase Kodepos query error:', err.message);
+  }
+
+  // 2. Fallback Kamus Cepat Internal
   const internalDb = {
+    '15419': { kelurahan: 'Pisangan', kecamatan: 'Ciputat Timur', kota: 'Kota Tangerang Selatan', provinsi: 'Banten' },
+    '15411': { kelurahan: 'Ciputat', kecamatan: 'Ciputat', kota: 'Kota Tangerang Selatan', provinsi: 'Banten' },
+    '15412': { kelurahan: 'Cipayung', kecamatan: 'Ciputat', kota: 'Kota Tangerang Selatan', provinsi: 'Banten' },
     '10110': { kelurahan: 'Petojo Selatan', kecamatan: 'Gambir', kota: 'Kota Jakarta Pusat', provinsi: 'DKI Jakarta' },
     '10120': { kelurahan: 'Gambir', kecamatan: 'Gambir', kota: 'Kota Jakarta Pusat', provinsi: 'DKI Jakarta' },
     '12110': { kelurahan: 'Gunung', kecamatan: 'Kebayoran Baru', kota: 'Kota Jakarta Selatan', provinsi: 'DKI Jakarta' },
@@ -440,6 +468,7 @@ app.get('/api/kodepos', async (req, res) => {
     return res.json({ success: true, source: 'internal', data: internalDb[kodepos] });
   }
 
+  // 3. Fallback External Public API
   try {
     const fetchRes = await fetch(`https://kodepos-266e6.firebaseapp.com/search?q=${kodepos}`);
     if (fetchRes.ok) {

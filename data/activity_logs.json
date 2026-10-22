@@ -1,5 +1,16 @@
 [
   {
+    "LogID": "LOG-K2G674AX",
+    "Timestamp": "2026-10-22 09:04:40",
+    "Username": "admin",
+    "IP_Address": "127.0.0.1 (Localhost)",
+    "Maps_URL": "https://www.google.com/maps?q=-6.247817403173885,106.98035958580076",
+    "Location": "Lagoon, Jakasampurna, Bekasi",
+    "Action": "LOGIN_SUCCESS (User ADMINISTRATOR UTAMA berhasil login pada 2026-10-22 09:04:40)",
+    "Module": "Auth",
+    "isNewSessionLog": true
+  },
+  {
     "LogID": "LOG-L06OCRN5",
     "Timestamp": "2026-10-21 20:04:50",
     "Username": "admin",

@@ -6692,6 +6692,9 @@ const INTERNAL_KODEPOS_DB = {
   '10110': { kelurahan: 'Petojo Selatan', kecamatan: 'Gambir', kota: 'Kota Jakarta Pusat', provinsi: 'DKI Jakarta' },
   '10120': { kelurahan: 'Gambir', kecamatan: 'Gambir', kota: 'Kota Jakarta Pusat', provinsi: 'DKI Jakarta' },
   '12110': { kelurahan: 'Gunung', kecamatan: 'Kebayoran Baru', kota: 'Kota Jakarta Selatan', provinsi: 'DKI Jakarta' },
+  '15419': { kelurahan: 'Pisangan', kecamatan: 'Ciputat Timur', kota: 'Kota Tangerang Selatan', provinsi: 'Banten' },
+  '15411': { kelurahan: 'Ciputat', kecamatan: 'Ciputat', kota: 'Kota Tangerang Selatan', provinsi: 'Banten' },
+  '15412': { kelurahan: 'Cipayung', kecamatan: 'Ciputat', kota: 'Kota Tangerang Selatan', provinsi: 'Banten' },
   '15111': { kelurahan: 'Tangerang', kecamatan: 'Tangerang', kota: 'Kota Tangerang', provinsi: 'Banten' },
   '16111': { kelurahan: 'Gudang', kecamatan: 'Bogor Tengah', kota: 'Kota Bogor', provinsi: 'Jawa Barat' },
   '16411': { kelurahan: 'Depok', kecamatan: 'Pancasari', kota: 'Kota Depok', provinsi: 'Jawa Barat' },
@@ -6737,16 +6740,72 @@ window.triggerKodePosLookup = function() {
 window.lookupKodepos = async function(kodepos) {
   const clean = String(kodepos || '').trim();
   const feedback = document.getElementById('kodeposFeedback');
-  if (feedback) feedback.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan"></i> Mencari alamat...';
+  if (feedback) feedback.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-cyan"></i> Mencari alamat dari Supabase Kodepos...';
 
-  // 1. Cek kamus lokal
+  const mapItem = (item) => ({
+    kodepos: item.kodepos || item.Kodepos || item.KodePos || clean,
+    kelurahan: item.kelurahan || item.Kelurahan || item.urban || '',
+    kecamatan: item.kecamatan || item.Kecamatan || item.subdistrict || '',
+    kota: item.kota || item.Kota || item.kabupaten || item.Kabupaten || item.city || '',
+    provinsi: item.provinsi || item.Provinsi || item.province || ''
+  });
+
+  // 1. Prioritas Utama: Ambil langsung dari Supabase REST API (Tabel "Kodepos" atau "kodepos")
+  try {
+    if (typeof SUPABASE_CONFIG !== 'undefined' && SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey) {
+      const endpoints = [
+        `Kodepos?Kodepos=eq.${encodeURIComponent(clean)}`,
+        `Kodepos?KodePos=eq.${encodeURIComponent(clean)}`,
+        `Kodepos?kodepos=eq.${encodeURIComponent(clean)}`,
+        `kodepos?kodepos=eq.${encodeURIComponent(clean)}`,
+        `KodePos?KodePos=eq.${encodeURIComponent(clean)}`
+      ];
+      for (const ep of endpoints) {
+        try {
+          const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/${ep}&select=*`, {
+            headers: {
+              'apikey': SUPABASE_CONFIG.anonKey,
+              'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
+            }
+          });
+          if (res.ok) {
+            const raw = await res.json();
+            if (Array.isArray(raw) && raw.length > 0) {
+              const list = raw.map(mapItem);
+              // Pastikan data memiliki kelurahan/kecamatan/kota (bukan row kosong/null)
+              if (list.some(it => it.kelurahan || it.kecamatan || it.kota)) {
+                applyKodeposData(list[0], clean, 'Supabase (Tabel Kodepos)', list);
+                return;
+              }
+            }
+          }
+        } catch (eInner) {}
+      }
+    }
+  } catch (errSb) {
+    console.warn('Supabase direct Kodepos fetch error:', errSb);
+  }
+
+  // 2. Prioritas Kedua: Query melalui Backend Server /api/kodepos (yang terhubung ke Supabase)
+  try {
+    const res = await fetch(`/api/kodepos?q=${encodeURIComponent(clean)}`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json && json.success && json.data) {
+        applyKodeposData(json.data, clean, json.source === 'supabase' ? 'Supabase (Tabel Kodepos)' : json.source, json.all);
+        return;
+      }
+    }
+  } catch (errSrv) {}
+
+  // 3. Fallback Kamus Cepat Internal
   if (INTERNAL_KODEPOS_DB[clean]) {
     const data = INTERNAL_KODEPOS_DB[clean];
     applyKodeposData(data, clean, 'Database Internal');
     return;
   }
 
-  // 2. Cek API Public Kodepos
+  // 4. Fallback Public Kodepos API
   try {
     const res = await fetch(`https://kodepos-266e6.firebaseapp.com/search?q=${clean}`);
     if (res.ok) {
@@ -6769,11 +6828,11 @@ window.lookupKodepos = async function(kodepos) {
 
   // Jika tidak ditemukan
   if (feedback) {
-    feedback.innerHTML = `<span style="color:#fbbf24;"><i class="fa-solid fa-circle-exclamation"></i> Kodepos ${clean} tidak ditemukan di database otomatis. Silakan isi Kelurahan/Kecamatan/Kota secara manual.</span>`;
+    feedback.innerHTML = `<span style="color:#fbbf24;"><i class="fa-solid fa-circle-exclamation"></i> Kodepos ${clean} tidak ditemukan di tabel Supabase. Silakan isi Kelurahan/Kecamatan/Kota secara manual.</span>`;
   }
 };
 
-function applyKodeposData(data, kodepos, sourceName) {
+function applyKodeposData(data, kodepos, sourceName, allList) {
   const setEl = (id, val) => {
     const el = document.getElementById(id);
     if (el && val) el.value = val;
@@ -6784,9 +6843,25 @@ function applyKodeposData(data, kodepos, sourceName) {
   setEl('bioKota', data.kota);
   setEl('bioProvinsi', data.provinsi);
 
+  // Jika terdapat beberapa kelurahan untuk 1 kodepos, siapkan datalist opsi pilihan
+  if (Array.isArray(allList) && allList.length > 1) {
+    let dl = document.getElementById('bioKelurahanList');
+    if (!dl) {
+      dl = document.createElement('datalist');
+      dl.id = 'bioKelurahanList';
+      document.body.appendChild(dl);
+      const kelInput = document.getElementById('bioKelurahan');
+      if (kelInput) kelInput.setAttribute('list', 'bioKelurahanList');
+    }
+    dl.innerHTML = allList.map(item => `<option value="${item.kelurahan}">${item.kelurahan} - ${item.kecamatan}</option>`).join('');
+  }
+
   const feedback = document.getElementById('kodeposFeedback');
   if (feedback) {
-    feedback.innerHTML = `<span style="color:#34d399;"><i class="fa-solid fa-circle-check"></i> Alamat terdeteksi: <strong>${data.kelurahan}, ${data.kecamatan}, ${data.kota}, ${data.provinsi}</strong> (${sourceName})</span>`;
+    const multipleNote = (Array.isArray(allList) && allList.length > 1)
+      ? ` <span style="font-size:0.7rem; color:#a5f3fc;">(${allList.length} Kelurahan tersedia, pilih di opsi Kelurahan)</span>`
+      : '';
+    feedback.innerHTML = `<span style="color:#34d399;"><i class="fa-solid fa-circle-check"></i> Alamat terdeteksi: <strong>${data.kelurahan}, ${data.kecamatan}, ${data.kota}, ${data.provinsi}</strong> (${sourceName})${multipleNote}</span>`;
   }
 }
 
