@@ -8400,6 +8400,17 @@ window.initSlipGajiView = initSlipGajiView;
 // Matrix Pemetaan Pembayaran Angsuran Per Bulan (Exact Match to Lampiran 1)
 // ==========================================================================
 
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+window.escapeHtml = escapeHtml;
+
 const htMatrixState = {
   initialized: false,
   isLoading: false,
