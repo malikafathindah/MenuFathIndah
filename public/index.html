@@ -16,8 +16,12 @@
   <!-- FontAwesome 6 Free Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
+  <!-- Remix Icon CDN for Haji Terencana -->
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+
   <!-- Custom Styling -->
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/dashboard_ht.css">
   <link rel="icon" type="image/png" href="assets/logo.png">
 </head>
 
@@ -174,6 +178,12 @@
         <a href="#slip_gaji" class="nav-item" data-module="mod_slip_gaji" data-tooltip="Lihat Slip Gaji Karyawan">
           <i class="fa-solid fa-file-invoice-dollar nav-icon"></i>
           <span class="nav-label">Lihat Slip Gaji</span>
+        </a>
+
+        <!-- Modul Haji Terencana (mod_dashboard_ht) -->
+        <a href="#dashboard_ht" class="nav-item" data-module="mod_dashboard_ht" data-tooltip="Dashboard Haji Terencana">
+          <i class="fa-solid fa-kaaba nav-icon"></i>
+          <span class="nav-label">Dashboard Haji Terencana</span>
         </a>
       </nav>
 
@@ -2954,6 +2964,233 @@
         </div>
 
         <!-- ================================================================
+             MODUL: DASHBOARD HAJI TERENCANA (mod_dashboard_ht)
+             ================================================================ -->
+        <div class="module-view" id="view-dashboard_ht">
+          <div class="ht-app-wrapper">
+
+            <!-- 1. Running Text Banner (Marquee Pengumuman) -->
+            <div class="ht-running-text-container" id="htRunningTextContainer" style="display:none;">
+              <div class="ht-running-text-badge">
+                <i class="fa-solid fa-bullhorn"></i> INFO HAJI
+              </div>
+              <div class="ht-running-text-content" id="htRunningTextContent"></div>
+            </div>
+
+            <!-- 2. Top Control Bar (Pilih Jamaah & Profil) -->
+            <div class="ht-control-bar">
+              <div class="ht-jamaah-selector-box">
+                <img src="assets/logo.png" alt="Foto Jamaah" class="ht-avatar-img" id="htDisplayAvatar">
+                <div class="ht-user-meta">
+                  <h4 id="htDisplayNamaUser">Nasabah Haji Fath Indah</h4>
+                  <span id="htDisplayNoHPUser">No. BPIH: -</span>
+                </div>
+              </div>
+
+              <!-- Selector Jamaah untuk Admin & StaffHaji -->
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <div id="htAdminSelectorContainer" style="display:none; align-items:center; gap:6px;">
+                  <span style="font-size:12px; font-weight:600; color:#64748b;">Filter Jamaah:</span>
+                  <select id="htAdminJamaahSelect" class="form-input" style="height:34px; font-size:12px; padding:4px 8px; width:220px; border-radius:6px;" onchange="htHandleAdminJamaahChange(this.value)">
+                    <option value="ALL">-- Tampilkan Semua Jamaah (82 Data) --</option>
+                  </select>
+                </div>
+
+                <div class="ht-actions-group">
+                  <button type="button" class="btn-ht-action" id="htBtnOpenProfile" onclick="htOpenProfileModal()" title="Lihat Profil Jamaah & Dokumen">
+                    <i class="ri-user-search-line"></i>
+                    <span>Profil Jamaah</span>
+                  </button>
+                  <button type="button" class="btn-ht-action primary" id="htBtnRefresh" onclick="htRefreshData()" title="Segarkan Data Real-time">
+                    <i class="ri-refresh-line" id="htRefreshIcon"></i>
+                    <span>Refresh</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. KPI Summary Cards -->
+            <div class="ht-kpi-grid">
+              <div class="ht-kpi-card teal">
+                <div class="ht-kpi-label">
+                  <span>Total Terbayar</span>
+                  <i class="fa-solid fa-wallet" style="color:#0f766e;"></i>
+                </div>
+                <div class="ht-kpi-val teal" id="htStatTotalTerbayar">Rp 0</div>
+                <div class="ht-kpi-sub" id="htStatSubTerbayar">Akumulasi seluruh setoran disetujui</div>
+              </div>
+
+              <div class="ht-kpi-card blue">
+                <div class="ht-kpi-label">
+                  <span>Total Transaksi</span>
+                  <i class="fa-solid fa-list-check" style="color:#0284c7;"></i>
+                </div>
+                <div class="ht-kpi-val blue" id="htStatTotalTransaksi">0 Kali</div>
+                <div class="ht-kpi-sub" id="htStatSubTransaksi">Riwayat catatan angsuran</div>
+              </div>
+
+              <div class="ht-kpi-card green">
+                <div class="ht-kpi-label">
+                  <span>Status Approved</span>
+                  <i class="fa-solid fa-circle-check" style="color:#10b981;"></i>
+                </div>
+                <div class="ht-kpi-val green" id="htStatApprovedCount">0 Transaksi</div>
+                <div class="ht-kpi-sub">Kwitansi resmi dapat dicetak</div>
+              </div>
+
+              <div class="ht-kpi-card amber">
+                <div class="ht-kpi-label">
+                  <span>Status Pending</span>
+                  <i class="fa-solid fa-clock" style="color:#f59e0b;"></i>
+                </div>
+                <div class="ht-kpi-val amber" id="htStatPendingCount">0 Transaksi</div>
+                <div class="ht-kpi-sub">Menunggu verifikasi admin</div>
+              </div>
+            </div>
+
+            <!-- 4. Tab Navigation -->
+            <div class="ht-tabs-bar">
+              <button type="button" class="ht-tab-btn active" id="htTabBtnEntry" onclick="htSwitchTab('entry')">
+                <i class="ri-file-list-3-line"></i>
+                <span>Entry Angsuran Haji</span>
+              </button>
+              <button type="button" class="ht-tab-btn" id="htTabBtnUpload" onclick="htSwitchTab('upload')">
+                <i class="ri-upload-cloud-line"></i>
+                <span>Upload Setoran Angsuran</span>
+              </button>
+            </div>
+
+            <!-- 5. Tab View 1: Entry Angsuran Haji -->
+            <div id="htTabViewEntry">
+              <!-- Filter Row -->
+              <div class="ht-filter-row">
+                <div class="ht-search-box">
+                  <i class="ri-search-line ht-search-icon"></i>
+                  <input type="text" id="htSearchInput" class="ht-search-input" placeholder="Cari ID, Bank, No. Jurnal, Uraian, Tanggal, Jamaah..." oninput="htFilterAngsuran()">
+                </div>
+                <select id="htStatusFilterSelect" class="ht-select-filter" onchange="htFilterAngsuran()">
+                  <option value="all">Semua Status</option>
+                  <option value="Approved">Approved (Disetujui)</option>
+                  <option value="Pending">Pending (Menunggu)</option>
+                  <option value="Cancle">Cancle (Dibatalkan)</option>
+                </select>
+                <button type="button" class="btn-ht-action" onclick="htExportAngsuranCSV()" title="Ekspor Data ke CSV">
+                  <i class="ri-file-excel-line"></i> Ekspor CSV
+                </button>
+              </div>
+
+              <!-- List Container -->
+              <div id="htAngsuranDataList">
+                <div style="text-align:center; padding:30px; color:#64748b;">
+                  <i class="ri-loader-4-line spinner" style="font-size:24px; color:#0f766e;"></i>
+                  <p style="margin-top:8px;">Memuat data angsuran Haji Terencana...</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- 6. Tab View 2: Upload Setoran Angsuran -->
+            <div id="htTabViewUpload" style="display:none;">
+              <div class="ht-upload-card">
+                <div style="margin-bottom:18px; border-bottom:1px solid #e2e8f0; padding-bottom:12px;">
+                  <h3 style="font-size:16px; font-weight:700; color:#0f172a; margin:0 0 4px;">Konfirmasi & Unggah Setoran Angsuran</h3>
+                  <p style="font-size:12px; color:#64748b; margin:0;">Isi formulir setoran dan lampirkan bukti pembayaran resmi untuk diverifikasi.</p>
+                </div>
+
+                <form id="htUploadForm" onsubmit="htHandleUploadSubmit(event)">
+                  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px; margin-bottom:14px;">
+                    <div class="form-group">
+                      <label class="form-label" for="htUploadNamaNasabah">Nama Nasabah</label>
+                      <input type="text" id="htUploadNamaNasabah" class="form-input" readonly style="background:#f1f5f9; color:#475569; font-weight:600;">
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" for="htUploadNoHP">Nomor HP / User ID</label>
+                      <input type="text" id="htUploadNoHP" class="form-input" readonly style="background:#f1f5f9; color:#475569;">
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" for="htUploadNoBPIH">Nomor BPIH</label>
+                      <input type="text" id="htUploadNoBPIH" class="form-input" readonly style="background:#f1f5f9; color:#475569;">
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" for="htUploadBank">Rekening Bank Tujuan <span class="required-star">*</span></label>
+                      <select id="htUploadBank" class="form-input" required>
+                        <option value="" disabled selected>-- Pilih Rekening Bank Tujuan --</option>
+                        <option value="Bank Danamon Syariah - 003606999710">Bank Danamon Syariah - 003606999710 (PT. Fath Indah Travel Service)</option>
+                        <option value="BSI (Bank Syariah Indonesia) - 7111223344">BSI (Bank Syariah Indonesia) - 7111223344 (Fath Indah Haji)</option>
+                        <option value="Bank Mandiri - 1560009988776">Bank Mandiri - 1560009988776 (PT Fath Indah)</option>
+                        <option value="BCA - 0663118899">BCA - 0663118899 (PT Fath Indah Travel)</option>
+                        <option value="Bank Muamalat - 3010099887">Bank Muamalat - 3010099887 (Haji Terencana Fath)</option>
+                        <option value="Lainnya">Rekening Resmi Lainnya</option>
+                      </select>
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" for="htUploadJumlah">Jumlah Setoran Angsuran <span class="required-star">*</span></label>
+                      <input type="text" inputmode="numeric" id="htUploadJumlah" class="form-input" placeholder="Contoh: Rp 5.000.000" required oninput="htFormatRupiahInput(this)" style="font-weight:700; color:#0f766e; font-size:15px;">
+                      <span style="font-size:11px; color:#64748b; margin-top:2px;">Tersimpan otomatis sebagai nominal numerik utuh tanpa kesalahan format ribuan.</span>
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" for="htUploadTanggal">Tanggal Pembayaran <span class="required-star">*</span></label>
+                      <input type="date" id="htUploadTanggal" class="form-input" required>
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" for="htUploadMetode">Metode Pembayaran</label>
+                      <select id="htUploadMetode" class="form-input">
+                        <option value="Transfer Bank" selected>Transfer Antar Bank / Mobile Banking</option>
+                        <option value="Setoran Tunai Teller">Setoran Tunai Teller Bank</option>
+                        <option value="Tunai Kantor">Pembayaran Tunai di Kantor Fath Indah</option>
+                        <option value="EDC / Kartu Debit">EDC / Kartu Debit Kantor</option>
+                      </select>
+                    </div>
+
+                    <div class="form-group">
+                      <label class="form-label" for="htUploadUraian">Catatan / Uraian Setoran</label>
+                      <input type="text" id="htUploadUraian" class="form-input" value="Angsuran Haji Terencana" required>
+                    </div>
+                  </div>
+
+                  <!-- Upload Dropzone (Lampiran 3: Support JPG, PNG, PDF up to 5MB) -->
+                  <div class="form-group" style="margin-top:6px;">
+                    <label class="form-label">Unggah Bukti Setoran / Transfer <span class="required-star">*</span></label>
+                    <div class="ht-dropzone" id="htDropzone" onclick="document.getElementById('htFileUploadInput').click()">
+                      <i class="ri-upload-cloud-2-line ht-dropzone-icon"></i>
+                      <div class="ht-dropzone-text" id="htDropzoneText">Klik atau seret foto / PDF bukti transfer di sini</div>
+                      <div class="ht-dropzone-sub">Mendukung format gambar (JPG, PNG, JPEG) dan dokumen PDF hingga 5 MB</div>
+                    </div>
+                    <input type="file" id="htFileUploadInput" accept="image/*,application/pdf" style="display:none;" onchange="htHandleFileChange(event)">
+
+                    <!-- Preview Container -->
+                    <div id="htPreviewBox" class="ht-preview-box">
+                      <img id="htPreviewImg" src="" alt="Pratinjau Bukti" class="ht-preview-img" style="display:none;">
+                      <div id="htPreviewPdf" class="ht-preview-pdf" style="display:none;">
+                        <i class="ri-file-pdf-fill" style="font-size:42px; color:#ef4444;"></i>
+                        <div style="font-size:13px; font-weight:700; color:#0f172a; margin-top:6px;" id="htPreviewPdfName">dokumen.pdf</div>
+                        <div style="font-size:11px; color:#64748b;" id="htPreviewPdfSize">Berkas Dokumen PDF</div>
+                      </div>
+                      <button type="button" class="btn-ht-remove-file" onclick="htRemoveSelectedFile()" title="Hapus Berkas">
+                        <i class="ri-close-line"></i>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style="margin-top:22px; display:flex; justify-content:flex-end;">
+                    <button type="submit" id="htBtnSubmitUpload" class="btn-ht-action primary" style="padding:12px 24px; font-size:14px; font-weight:700;">
+                      <i class="ri-send-plane-fill"></i>
+                      <span>Kirim Bukti Angsuran</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ================================================================
              DYNAMIC MODULE VIEW (Untuk Seluruh Modul dari Supabase Modules)
              ================================================================ -->
         <div class="module-view" id="view-dynamic-module">
@@ -3347,6 +3584,88 @@
             <span>Simpan Keputusan</span>
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================================
+       MODALS: HAJI TERENCANA (mod_dashboard_ht)
+       ====================================================================== -->
+
+  <!-- 1. Struk Angsuran Haji (Lampiran 2) -->
+  <div id="htReceiptModal" class="ht-modal-overlay">
+    <div class="ht-modal-box" style="max-width: 520px;">
+      <div class="ht-modal-header">
+        <span class="ht-modal-title"><i class="ri-file-list-3-line"></i> Struk Angsuran Haji</span>
+        <button type="button" class="btn-ht-close-modal" onclick="htCloseReceiptModal()">&times;</button>
+      </div>
+      <div class="ht-modal-body" id="htModalReceiptBody">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. Kuitansi Resmi Cetak (Lampiran 1) -->
+  <div id="htOfficialKwitansiModal" class="ht-modal-overlay">
+    <div class="ht-modal-box" style="max-width: 820px; width: 95%; height: 90vh;">
+      <div class="ht-modal-header teal">
+        <span class="ht-modal-title"><i class="ri-printer-line"></i> Kuitansi Resmi PT. Fath Indah Travel Service</span>
+        <button type="button" class="btn-ht-close-modal" onclick="htCloseOfficialKwitansiModal()">&times;</button>
+      </div>
+      <div class="ht-modal-body" style="padding: 12px; height: calc(100% - 60px);">
+        <iframe id="htPrintKwitansiIframe" style="width: 100%; height: 100%; border: none;"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Konfirmasi Split Pembayaran Mahram (Poin 5) -->
+  <div id="htMahramConfirmModal" class="ht-modal-overlay">
+    <div class="ht-modal-box" style="max-width: 540px;">
+      <div class="ht-modal-header" style="background:#0f766e; color:#ffffff;">
+        <span class="ht-modal-title" style="color:#ffffff;"><i class="ri-group-line"></i> Konfirmasi Pembagian Mahram</span>
+        <button type="button" class="btn-ht-close-modal" style="color:#ffffff;" onclick="htCloseMahramConfirmModal()">&times;</button>
+      </div>
+      <div class="ht-modal-body" id="htMahramConfirmBody" style="padding: 18px 20px;">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Profile Jamaah Modal (Lampiran 5 & Dokumen) -->
+  <div id="htProfileModal" class="ht-modal-overlay">
+    <div class="ht-modal-box" style="max-width: 580px;">
+      <div class="ht-modal-header" style="background:#0284c7; color:#ffffff;">
+        <span class="ht-modal-title" style="color:#ffffff;"><i class="ri-user-smile-line"></i> Profil Jamaah Haji</span>
+        <button type="button" class="btn-ht-close-modal" style="color:#ffffff;" onclick="htCloseProfileModal()">&times;</button>
+      </div>
+      <div class="ht-modal-body" id="htModalProfileBody" style="padding: 18px 20px;">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. Financial List Statement Modal (List Keuangan Jamaah) -->
+  <div id="htFinanceListModal" class="ht-modal-overlay">
+    <div class="ht-modal-box" style="max-width: 720px; width: 95%;">
+      <div class="ht-modal-header teal">
+        <span class="ht-modal-title"><i class="ri-file-chart-line"></i> List Rekapitulasi Keuangan Jamaah</span>
+        <button type="button" class="btn-ht-close-modal" onclick="htCloseFinanceListModal()">&times;</button>
+      </div>
+      <div class="ht-modal-body" id="htFinanceListModalBody" style="padding: 20px;">
+        <!-- Rendered by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. Document Viewer Modal (Lampiran Dokumen Drive) -->
+  <div id="htDocViewerModal" class="ht-modal-overlay">
+    <div class="ht-modal-box" style="max-width: 780px; width: 95%; height: 85vh;">
+      <div class="ht-modal-header" style="background:#0f172a; color:#ffffff;">
+        <span class="ht-modal-title" id="htDocViewerTitle" style="color:#ffffff;"><i class="ri-file-search-line"></i> Pratinjau Dokumen</span>
+        <button type="button" class="btn-ht-close-modal" style="color:#ffffff;" onclick="htCloseDocViewerModal()">&times;</button>
+      </div>
+      <div class="ht-modal-body" id="htDocViewerBody" style="padding: 12px; height: calc(100% - 60px);">
+        <!-- Rendered by JS -->
       </div>
     </div>
   </div>

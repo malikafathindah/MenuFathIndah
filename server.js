@@ -747,6 +747,80 @@ app.post('/api/brosur/delete', async (req, res) => {
   }
 });
 
+// --------------------------------------------------------------------------
+// MODUL DASHBOARD HAJI TERENCANA (mod_dashboard_ht)
+// --------------------------------------------------------------------------
+
+app.get('/api/haji-terencana/jamaah', async (req, res) => {
+  try {
+    const { noBPIH, noHP, idJamaah, search, limit } = req.query;
+    let list = await supabase.getSupabaseDataJamaahHaji({ noBPIH, noHP, idJamaah, limit });
+    if (search && typeof search === 'string' && search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(item => 
+        (item.nama && item.nama.toLowerCase().includes(q)) ||
+        (item.nobpih && item.nobpih.toLowerCase().includes(q)) ||
+        (item.nohp && item.nohp.toLowerCase().includes(q)) ||
+        (item.idjamaah && item.idjamaah.toLowerCase().includes(q))
+      );
+    }
+    res.json({ success: true, data: list });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/haji-terencana/angsuran', async (req, res) => {
+  try {
+    const { noBPIH, noHP, status, search } = req.query;
+    let list = await supabase.getSupabaseEntryAngsuranHaji({ noBPIH, noHP, status });
+    if (search && typeof search === 'string' && search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter(item => 
+        (item.namanasabah && item.namanasabah.toLowerCase().includes(q)) ||
+        (item.nobpih && item.nobpih.toLowerCase().includes(q)) ||
+        (item.id_1 && item.id_1.toLowerCase().includes(q)) ||
+        (item.nojurnal && item.nojurnal.toLowerCase().includes(q)) ||
+        (item.bank && item.bank.toLowerCase().includes(q)) ||
+        (item.uraian && item.uraian.toLowerCase().includes(q)) ||
+        (item.tanggal && item.tanggal.toLowerCase().includes(q))
+      );
+    }
+    res.json({ success: true, data: list });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/haji-terencana/angsuran', async (req, res) => {
+  try {
+    const records = req.body;
+    const result = await supabase.insertSupabaseEntryAngsuranHaji(records);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/haji-terencana/mahram', async (req, res) => {
+  try {
+    const { noBPIH } = req.query;
+    const list = await supabase.getSupabaseMahram(noBPIH);
+    res.json({ success: true, data: list });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/haji-terencana/running-text', async (req, res) => {
+  try {
+    const list = await supabase.getSupabaseRunningText();
+    res.json({ success: true, data: list });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Fallback to index.html for SPA
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
