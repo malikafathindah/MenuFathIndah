@@ -8397,1403 +8397,721 @@ window.initSlipGajiView = initSlipGajiView;
 
 // ==========================================================================
 // 12. MODUL DASHBOARD HAJI TERENCANA (mod_dashboard_ht)
+// Matrix Pemetaan Pembayaran Angsuran Per Bulan (Exact Match to Lampiran 1)
 // ==========================================================================
 
-const htState = {
+const htMatrixState = {
   initialized: false,
-  currentUser: null,
-  allJamaahList: [],
-  rawAngsuranList: [],
-  filteredAngsuranList: [],
-  selectedFileBase64: null,
-  selectedFileName: '',
-  selectedFileType: '',
-  currentReceiptItem: null,
-  activeTab: 'entry',
-  currentMahramGroup: []
+  isLoading: false,
+  showChart: false,
+  searchQuery: '',
+  dataList: [],
+  filteredDataList: [],
+  ymKeys: [],
+  groupedMonths: {},
+  chartInstance: null,
+  selectedItem: null,
+  grandTotal: {
+    hargaPaket: 0,
+    dp: 0,
+    angsuranBulan: 0,
+    kumulatif: 0,
+    transaksi: {}
+  }
 };
 
 /**
  * Inisialisasi Modul Dashboard Haji Terencana
  */
 async function initDashboardHT() {
-  if (!htState.initialized) {
-    setupHTEventListeners();
-    htState.initialized = true;
-  }
-
-  // Muat running text pengumuman
-  loadHTRunningText();
-
-  // Muat data master jamaah
-  await loadHTMasterJamaah();
-
-  // Muat data angsuran untuk nasabah / jamaah aktif
-  await htRefreshData();
+  htFetchMatrixData();
 }
 
 /**
- * Event Listeners untuk Modul Dashboard Haji Terencana
+ * Ambil data dari Supabase dan olah matrix pemetaan per bulan
  */
-function setupHTEventListeners() {
-  const dropzone = document.getElementById('htDropzone');
-  if (dropzone) {
-    ['dragenter', 'dragover'].forEach(name => {
-      dropzone.addEventListener(name, (e) => {
-        e.preventDefault();
-        dropzone.classList.add('dragover');
-      });
-    });
-    ['dragleave', 'drop'].forEach(name => {
-      dropzone.addEventListener(name, (e) => {
-        e.preventDefault();
-        dropzone.classList.remove('dragover');
-      });
-    });
-    dropzone.addEventListener('drop', (e) => {
-      const files = e.dataTransfer?.files;
-      if (files && files.length > 0) {
-        processHTFile(files[0]);
-      }
-    });
-  }
-}
+async function htFetchMatrixData() {
+  const loadingEl = document.getElementById('htMatrixLoading');
+  const scrollEl = document.getElementById('htMatrixTableScroll');
+  const refreshIcon = document.getElementById('htRefreshMatrixIcon');
 
-/**
- * Muat Running Text Marquee
- */
-async function loadHTRunningText() {
-  const container = document.getElementById('htRunningTextContainer');
-  const content = document.getElementById('htRunningTextContent');
-  if (!container || !content) return;
+  if (loadingEl) loadingEl.style.display = 'flex';
+  if (scrollEl) scrollEl.style.opacity = '0.3';
+  if (refreshIcon) refreshIcon.classList.add('fa-spin');
 
-  let list = [];
+  htMatrixState.isLoading = true;
 
-  // 1. Direct Supabase REST
-  if (typeof SUPABASE_CONFIG !== 'undefined' && SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey) {
-    try {
-      const r = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/running_text?select=*&status=eq.Aktif`, {
-        headers: {
-          'apikey': SUPABASE_CONFIG.anonKey,
-          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
-        }
-      });
-      if (r.ok) {
-        const data = await r.json();
-        if (Array.isArray(data) && data.length > 0) list = data;
-      }
-    } catch (err) {}
-  }
+  try {
+    let jamaahList = [];
+    let angsuranList = [];
 
-  // 2. Fallback to /api/haji-terencana/running-text
-  if (!list || list.length === 0) {
-    try {
-      const res = await fetch('/api/haji-terencana/running-text');
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          list = json.data;
-        }
-      }
-    } catch (e) {}
-  }
-
-  // 3. Fallback to local data/running_text.json
-  if (!list || list.length === 0) {
-    try {
-      const r = await fetch('data/running_text.json');
-      if (r.ok) {
-        const json = await r.json();
-        if (Array.isArray(json) && json.length > 0) list = json;
-      }
-    } catch (e) {}
-  }
-
-  // 4. Default official announcements
-  if (!list || list.length === 0) {
-    list = [
-      { id: 1, text: "Selamat Datang di Portal Haji Terencana PT Fath Indah Travel Service", icon: "megaphone" },
-      { id: 2, text: "Segera lakukan verifikasi berkas pendaftaran dan pelunasan angsuran tepat waktu", icon: "megaphone" },
-      { id: 3, text: "Informasi & Layanan Jamaah Haji: Hubungi WhatsApp Resmi 0812-3456-7890", icon: "whatsapp", link_url: "https://wa.me/6281234567890" },
-      { id: 4, text: "Ikuti Update Manasik & Keberangkatan di Instagram @fathindahtravel", icon: "instagram", link_url: "https://instagram.com" },
-      { id: 5, text: "Kuitansi resmi diterbitkan secara otomatis setelah setoran berstatus APPROVED", icon: "megaphone" },
-      { id: 6, text: "Untuk kemudahan setoran keluarga, manfaatkan fitur Pembayaran Gabungan Mahram", icon: "megaphone" }
-    ];
-  }
-
-  content.innerHTML = list.map(item => {
-    const iconClass = item.icon === 'whatsapp' ? 'ri-whatsapp-fill' :
-                      item.icon === 'tiktok' ? 'ri-video-fill' :
-                      item.icon === 'instagram' ? 'ri-instagram-fill' : 'ri-megaphone-fill';
-    const textHtml = escapeHtml(item.text);
-    if (item.link_url) {
-      return `<span class="ht-running-item"><i class="${iconClass}"></i> <a href="${item.link_url}" target="_blank" rel="noopener noreferrer">${textHtml}</a></span>`;
-    }
-    return `<span class="ht-running-item"><i class="${iconClass}"></i> <span>${textHtml}</span></span>`;
-  }).join('');
-  container.style.display = 'flex';
-}
-
-/**
- * Muat Master 82 Jamaah Haji dari Database Supabase
- */
-async function loadHTMasterJamaah() {
-  let list = [];
-
-  // 1. Direct Supabase REST (primary, universal across static/live-server/full-stack)
-  if (typeof SUPABASE_CONFIG !== 'undefined' && SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey) {
-    try {
-      const r = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/data_jamaah_haji?select=*&order=nama.asc`, {
-        headers: {
-          'apikey': SUPABASE_CONFIG.anonKey,
-          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
-        }
-      });
-      if (r.ok) {
-        const data = await r.json();
-        if (Array.isArray(data) && data.length > 0) list = data;
-      }
-    } catch (err) {
-      console.warn('Supabase direct fetch failed for data_jamaah_haji:', err);
-    }
-  }
-
-  // 2. Fallback to /api/haji-terencana/jamaah
-  if (!list || list.length === 0) {
-    try {
-      const res = await fetch('/api/haji-terencana/jamaah');
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-          list = json.data;
-        }
-      }
-    } catch (e) {}
-  }
-
-  // 3. Fallback to Google Sheets CSV if configured
-  if ((!list || list.length === 0) && typeof fetchSheetDataCsv === 'function') {
-    try {
-      const sheetData = await fetchSheetDataCsv('DataJamaahHaji');
-      if (Array.isArray(sheetData) && sheetData.length > 0) {
-        list = sheetData;
-      }
-    } catch (e) {}
-  }
-
-  htState.allJamaahList = list || [];
-
-  const currentRole = state.currentUser?.role || 'Admin';
-  const isAdminOrStaffHaji = ['admin', 'staffhaji', 'manager'].includes(currentRole.toLowerCase());
-  const adminSelectorBox = document.getElementById('htAdminSelectorContainer');
-  const adminSelect = document.getElementById('htAdminJamaahSelect');
-
-  if (adminSelectorBox && adminSelect) {
-    if (isAdminOrStaffHaji) {
-      adminSelectorBox.style.display = 'flex';
-      let opts = `<option value="ALL">-- Tampilkan Semua Jamaah (${htState.allJamaahList.length} Data) --</option>`;
-      htState.allJamaahList.forEach(j => {
-        const bpih = String(j.nobpih || '').replace(/^0+/, '');
-        opts += `<option value="${bpih}">${escapeHtml(j.nama)} (BPIH: ${bpih || '-'})</option>`;
-      });
-      adminSelect.innerHTML = opts;
-      adminSelect.value = 'ALL';
-    } else {
-      adminSelectorBox.style.display = 'none';
-    }
-  }
-
-  // Tentukan Jamaah Aktif
-  if (isAdminOrStaffHaji) {
-    // Admin default melihat semua data jamaah agregat
-    htState.currentUser = null;
-    const nameEl = document.getElementById('htDisplayNamaUser');
-    const bpihEl = document.getElementById('htDisplayNoHPUser');
-    const avatarEl = document.getElementById('htDisplayAvatar');
-    if (nameEl) nameEl.textContent = 'Semua Jamaah Haji Terencana';
-    if (bpihEl) bpihEl.textContent = `Total: ${htState.allJamaahList.length} Jamaah Terdaftar`;
-    if (avatarEl) avatarEl.src = 'assets/logo.png';
-  } else {
-    // Regular Jamaah: cari berdasarkan username / nohp / nobpih
-    const loggedUser = String(state.currentUser?.username || '').trim();
-    const matched = htState.allJamaahList.find(j => {
-      const bpih = String(j.nobpih || '').replace(/^0+/, '');
-      const nohp = String(j.nohp || '').trim();
-      return bpih === loggedUser || nohp === loggedUser;
-    }) || htState.allJamaahList[0];
-
-    if (matched) {
-      htSetCurrentJamaah(matched);
-    }
-  }
-}
-
-/**
- * Atur Jamaah Aktif
- */
-function htSetCurrentJamaah(j) {
-  if (!j) return;
-  const cleanBpih = String(j.nobpih || '').replace(/^0+/, '');
-  htState.currentUser = {
-    idNasabah: j.idjamaah || '-',
-    namaLengkap: j.nama || 'Nasabah Haji Fath Indah',
-    noBPIH: cleanBpih,
-    noHP: j.nohp || j.telp || '-',
-    foto: j.foto || '',
-    detail: j
-  };
-
-  const nameEl = document.getElementById('htDisplayNamaUser');
-  const bpihEl = document.getElementById('htDisplayNoHPUser');
-  const avatarEl = document.getElementById('htDisplayAvatar');
-
-  if (nameEl) nameEl.textContent = htState.currentUser.namaLengkap;
-  if (bpihEl) bpihEl.textContent = `No. BPIH: ${cleanBpih || '-'} • ID: ${j.idjamaah || '-'}`;
-  if (avatarEl) {
-    const photoUrl = formatDriveFileUrl(j.foto);
-    avatarEl.src = photoUrl || 'assets/logo.png';
-  }
-
-  const uploadNama = document.getElementById('htUploadNamaNasabah');
-  const uploadNoHP = document.getElementById('htUploadNoHP');
-  const uploadNoBPIH = document.getElementById('htUploadNoBPIH');
-  const uploadTanggal = document.getElementById('htUploadTanggal');
-
-  if (uploadNama) uploadNama.value = htState.currentUser.namaLengkap;
-  if (uploadNoHP) uploadNoHP.value = htState.currentUser.noHP;
-  if (uploadNoBPIH) uploadNoBPIH.value = cleanBpih;
-  if (uploadTanggal && !uploadTanggal.value) {
-    uploadTanggal.value = new Date().toISOString().substring(0, 10);
-  }
-}
-
-window.htHandleAdminJamaahChange = function(val) {
-  if (val === 'ALL') {
-    htState.currentUser = null;
-    const nameEl = document.getElementById('htDisplayNamaUser');
-    const bpihEl = document.getElementById('htDisplayNoHPUser');
-    const avatarEl = document.getElementById('htDisplayAvatar');
-    if (nameEl) nameEl.textContent = 'Semua Jamaah Haji Terencana';
-    if (bpihEl) bpihEl.textContent = `Total: ${htState.allJamaahList.length} Jamaah Terdaftar`;
-    if (avatarEl) avatarEl.src = 'assets/logo.png';
-    htRefreshData();
-  } else {
-    const found = htState.allJamaahList.find(j => String(j.nobpih || '').replace(/^0+/, '') === val);
-    if (found) {
-      htSetCurrentJamaah(found);
-      htRefreshData();
-    }
-  }
-};
-
-window.htRefreshData = async function() {
-  const icon = document.getElementById('htRefreshIcon');
-  if (icon) icon.classList.add('spinner');
-
-  const listContainer = document.getElementById('htAngsuranDataList');
-  if (listContainer) {
-    listContainer.innerHTML = `
-      <div style="text-align:center; padding:35px; color:#0f766e;">
-        <i class="ri-loader-4-line spinner" style="font-size:28px;"></i>
-        <p style="margin-top:10px; font-weight:600;">Memuat riwayat angsuran dari Supabase...</p>
-      </div>
-    `;
-  }
-
-  let list = [];
-  const adminSelect = document.getElementById('htAdminJamaahSelect');
-  const selectedBpih = adminSelect ? adminSelect.value : (htState.currentUser ? htState.currentUser.noBPIH : null);
-  const filterByBpih = (selectedBpih && selectedBpih !== 'ALL') ? selectedBpih : null;
-
-  // 1. Direct Supabase REST (primary, fast & universal)
-  if (typeof SUPABASE_CONFIG !== 'undefined' && SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey) {
-    try {
-      let q = `${SUPABASE_CONFIG.url}/rest/v1/entry_angsuran_haji?select=*`;
-      if (filterByBpih) {
-        const cleanBpih = String(filterByBpih).replace(/^0+/, '');
-        q += `&or=(nobpih.eq.${cleanBpih},nobpih.eq.0${cleanBpih})`;
-      }
-      q += '&order=tanggal.desc,id_1.desc';
-      const r = await fetch(q, {
-        headers: {
-          'apikey': SUPABASE_CONFIG.anonKey,
-          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
-        }
-      });
-      if (r.ok) {
-        const data = await r.json();
-        if (Array.isArray(data)) list = data;
-      }
-    } catch (err) {
-      console.warn('Direct Supabase fetch failed for entry_angsuran_haji:', err);
-    }
-  }
-
-  // 2. Fallback to /api/haji-terencana/angsuran
-  if (!list || list.length === 0) {
-    try {
-      let url = '/api/haji-terencana/angsuran';
-      if (filterByBpih) url += `?noBPIH=${encodeURIComponent(filterByBpih)}`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data)) {
-          list = json.data;
-        }
-      }
-    } catch (e) {}
-  }
-
-  // 3. Fallback to Google Sheets CSV if needed
-  if ((!list || list.length === 0) && typeof fetchSheetDataCsv === 'function') {
-    try {
-      const sheetData = await fetchSheetDataCsv('EntryAngsuranHaji');
-      if (Array.isArray(sheetData)) {
-        if (filterByBpih) {
-          const cleanBpih = String(filterByBpih).replace(/^0+/, '');
-          list = sheetData.filter(x => String(x.nobpih || '').replace(/^0+/, '') === cleanBpih);
-        } else {
-          list = sheetData;
-        }
-      }
-    } catch (e) {}
-  }
-
-  htState.rawAngsuranList = (list || []).map(r => {
-    const rawJumlah = parseFloat(String(r.jumlah || '0').replace(/[^0-9.-]+/g, '')) || 0;
-    return {
-      id: r.id_1 || r.id || '-',
-      noJurnal: r.nojurnal || '-',
-      idJamaah: r.idjamaah || '-',
-      noBPIH: r.nobpih || '-',
-      namaNasabah: r.namanasabah || '-',
-      bank: r.bank || '-',
-      uraian: r.uraian || 'Angsuran Haji Terencana',
-      jumlah: rawJumlah,
-      nilaiKurs: r.nilaikurs || '-',
-      user: r.user_entry || '-',
-      tanggal: r.tanggal || '-',
-      metodePembayaran: r.metodepembayaran || 'Transfer',
-      status: r.status || 'Pending',
-      typeHaji: r.typehaji || 'Haji Terencana',
-      noHP: r.nohp || '-',
-      linkDokumen: r.linkdokumen || '',
-      createdAt: r.createdat || r.created_at || '-'
-    };
-  });
-
-  htState.rawAngsuranList.sort((a, b) => {
-    const dateStrA = String(a.tanggal || a.createdAt || '').trim();
-    const dateStrB = String(b.tanggal || b.createdAt || '').trim();
-    if (dateStrB !== dateStrA) return dateStrB.localeCompare(dateStrA);
-    return String(b.id).localeCompare(String(a.id));
-  });
-
-  updateHTSummaryKPI();
-  htFilterAngsuran();
-
-  if (icon) icon.classList.remove('spinner');
-};
-
-function updateHTSummaryKPI() {
-  const approvedItems = htState.rawAngsuranList.filter(x => String(x.status).toLowerCase() === 'approved');
-  const pendingItems = htState.rawAngsuranList.filter(x => String(x.status).toLowerCase() === 'pending');
-  const totalApprovedRupiah = approvedItems.reduce((acc, curr) => acc + (curr.jumlah || 0), 0);
-
-  const elTotal = document.getElementById('htStatTotalTerbayar');
-  const elTrx = document.getElementById('htStatTotalTransaksi');
-  const elApp = document.getElementById('htStatApprovedCount');
-  const elPend = document.getElementById('htStatPendingCount');
-
-  if (elTotal) elTotal.textContent = htFormatRupiah(totalApprovedRupiah);
-  if (elTrx) elTrx.textContent = `${htState.rawAngsuranList.length} Kali`;
-  if (elApp) elApp.textContent = `${approvedItems.length} Transaksi`;
-  if (elPend) elPend.textContent = `${pendingItems.length} Transaksi`;
-}
-
-window.htSwitchTab = function(tabName) {
-  htState.activeTab = tabName;
-  const btnEntry = document.getElementById('htTabBtnEntry');
-  const btnUpload = document.getElementById('htTabBtnUpload');
-  const viewEntry = document.getElementById('htTabViewEntry');
-  const viewUpload = document.getElementById('htTabViewUpload');
-
-  if (tabName === 'entry') {
-    if (btnEntry) btnEntry.classList.add('active');
-    if (btnUpload) btnUpload.classList.remove('active');
-    if (viewEntry) viewEntry.style.display = 'block';
-    if (viewUpload) viewUpload.style.display = 'none';
-  } else {
-    if (btnEntry) btnEntry.classList.remove('active');
-    if (btnUpload) btnUpload.classList.add('active');
-    if (viewEntry) viewEntry.style.display = 'none';
-    if (viewUpload) viewUpload.style.display = 'block';
-  }
-};
-
-window.htFilterAngsuran = function() {
-  const searchInput = document.getElementById('htSearchInput');
-  const statusSelect = document.getElementById('htStatusFilterSelect');
-  const query = (searchInput?.value || '').toLowerCase().trim();
-  const statusVal = statusSelect?.value || 'all';
-
-  htState.filteredAngsuranList = htState.rawAngsuranList.filter(item => {
-    const matchStatus = statusVal === 'all' || item.status.toLowerCase() === statusVal.toLowerCase();
-    const matchQuery = !query ||
-      item.id.toLowerCase().includes(query) ||
-      item.noJurnal.toLowerCase().includes(query) ||
-      item.bank.toLowerCase().includes(query) ||
-      item.uraian.toLowerCase().includes(query) ||
-      item.namaNasabah.toLowerCase().includes(query) ||
-      item.noBPIH.toLowerCase().includes(query) ||
-      item.tanggal.toLowerCase().includes(query);
-    return matchStatus && matchQuery;
-  });
-
-  renderHTAngsuranCards();
-};
-
-function renderHTAngsuranCards() {
-  const container = document.getElementById('htAngsuranDataList');
-  if (!container) return;
-
-  if (htState.filteredAngsuranList.length === 0) {
-    container.innerHTML = `
-      <div style="text-align:center; padding:40px 20px; background:#ffffff; border-radius:12px; border:1px dashed #cbd5e1; color:#94a3b8;">
-        <i class="ri-inbox-line" style="font-size:42px; color:#cbd5e1;"></i>
-        <h4 style="margin:10px 0 4px; color:#475569; font-weight:700;">Tidak Ada Data Transaksi</h4>
-        <p style="font-size:12px; margin:0;">Tidak ditemukan catatan angsuran dengan kriteria pencarian saat ini.</p>
-      </div>
-    `;
-    return;
-  }
-
-  container.innerHTML = htState.filteredAngsuranList.map((item, idx) => {
-    const statusClass = String(item.status || '').toLowerCase();
-    const badgeText = item.status || 'Pending';
-    const isApproved = statusClass === 'approved';
-
-    return `
-      <div class="ht-angsuran-card">
-        <div class="ht-card-top">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span class="ht-jurnal-tag">${escapeHtml(item.noJurnal)}</span>
-            <span style="font-size:11px; color:#64748b; font-weight:600;">ID: ${escapeHtml(item.id)}</span>
-          </div>
-          <span class="ht-badge ${statusClass}">
-            <i class="${isApproved ? 'ri-check-line' : statusClass === 'pending' ? 'ri-time-line' : 'ri-close-line'}"></i>
-            ${escapeHtml(badgeText)}
-          </span>
-        </div>
-
-        <div style="margin:8px 0;">
-          <div style="font-size:14px; font-weight:700; color:#0f172a;">${escapeHtml(item.namaNasabah)}</div>
-          <div style="font-size:12px; color:#64748b; margin-top:2px;">${escapeHtml(item.uraian)}</div>
-        </div>
-
-        <div class="ht-card-body-row">
-          <div class="ht-card-info-sub">
-            <span><i class="ri-bank-line" style="color:#0f766e;"></i> ${escapeHtml(item.bank)}</span>
-            <span><i class="ri-calendar-line" style="color:#0284c7;"></i> ${formatIndonesianDate(item.tanggal)}</span>
-            <span><i class="ri-exchange-dollar-line" style="color:#f59e0b;"></i> ${escapeHtml(item.metodePembayaran)}</span>
-          </div>
-
-          <div style="display:flex; align-items:center; gap:12px;">
-            <div class="ht-card-nominal">${htFormatRupiah(item.jumlah)}</div>
-            <button type="button" class="btn-ht-receipt" onclick="htOpenReceiptModal(${idx})" title="Buka Struk & Cetak Kwitansi">
-              <i class="ri-file-text-line"></i>
-              <span>Struk</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-window.htOpenReceiptModal = function(index) {
-  const item = htState.filteredAngsuranList[index];
-  if (!item) return;
-
-  htState.currentReceiptItem = item;
-  const modal = document.getElementById('htReceiptModal');
-  const body = document.getElementById('htModalReceiptBody');
-  if (!modal || !body) return;
-
-  const isApproved = String(item.status).toLowerCase() === 'approved';
-  const statusClass = String(item.status).toLowerCase();
-
-  body.innerHTML = `
-    <div class="ht-receipt-content" id="htPrintableReceipt">
-      <div class="ht-receipt-header">
-        <img src="assets/logo.png" alt="Logo Fath Indah" class="ht-receipt-logo" onerror="this.src='assets/logo.png'">
-        <div class="ht-receipt-title">PT. FATH INDAH TRAVEL SERVICE</div>
-        <div class="ht-receipt-sub">BUKTI PEMBAYARAN ANGSURAN HAJI TERENCANA</div>
-      </div>
-
-      <div class="ht-receipt-divider"></div>
-
-      <div class="ht-receipt-row">
-        <span class="ht-receipt-label">No. Transaksi</span>
-        <span class="ht-receipt-value" style="font-family:monospace; font-weight:800;">${escapeHtml(item.id)}</span>
-      </div>
-      <div class="ht-receipt-row">
-        <span class="ht-receipt-label">No. Jurnal</span>
-        <span class="ht-receipt-value" style="font-family:monospace; font-weight:700;">${escapeHtml(item.noJurnal)}</span>
-      </div>
-      <div class="ht-receipt-row">
-        <span class="ht-receipt-label">Tanggal Transaksi</span>
-        <span class="ht-receipt-value">${formatIndonesianDate(item.tanggal)}</span>
-      </div>
-      <div class="ht-receipt-row">
-        <span class="ht-receipt-label">Nama Nasabah</span>
-        <span class="ht-receipt-value" style="font-weight:700; color:#0f172a;">${escapeHtml(item.namaNasabah)}</span>
-      </div>
-      <div class="ht-receipt-row">
-        <span class="ht-receipt-label">No. BPIH</span>
-        <span class="ht-receipt-value">${escapeHtml(item.noBPIH || '-')}</span>
-      </div>
-      <div class="ht-receipt-row">
-        <span class="ht-receipt-label">Metode Pembayaran</span>
-        <span class="ht-receipt-value">${escapeHtml(item.metodePembayaran)}</span>
-      </div>
-      <div class="ht-receipt-row">
-        <span class="ht-receipt-label">Bank Penerima</span>
-        <span class="ht-receipt-value" style="font-weight:700;">${escapeHtml(item.bank)}</span>
-      </div>
-      <div class="ht-receipt-row">
-        <span class="ht-receipt-label">Uraian</span>
-        <span class="ht-receipt-value">${escapeHtml(item.uraian)}</span>
-      </div>
-
-      <div class="ht-receipt-divider"></div>
-
-      <div class="ht-receipt-row" style="margin:12px 0;">
-        <span class="ht-receipt-label" style="font-size:14px; font-weight:700;">Total Pembayaran</span>
-        <span class="ht-receipt-value" style="font-size:18px; font-weight:800; color:#0f766e;">${htFormatRupiah(item.jumlah)}</span>
-      </div>
-
-      <div class="ht-receipt-row">
-        <span class="ht-receipt-label">Status Verifikasi</span>
-        <span class="ht-badge ${statusClass}">${escapeHtml(item.status)}</span>
-      </div>
-
-      ${item.linkDokumen && item.linkDokumen !== 'Attachment' ? `
-        <div style="margin-top:14px; padding:10px; background:#f8fafc; border-radius:8px; border:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center;">
-          <span style="font-size:11px; font-weight:600; color:#475569;">Lampiran Bukti Transfer</span>
-          <button type="button" class="btn-ht-action" style="font-size:11px; padding:4px 8px;" onclick="htViewDocument('Bukti Transfer', '${item.linkDokumen}')">
-            <i class="ri-eye-line"></i> Lihat Berkas
-          </button>
-        </div>
-      ` : ''}
-
-      <div class="ht-receipt-footer">
-        <div>Kuitansi elektronik resmi PT Fath Indah Travel Service.</div>
-        <div>Dicetak secara otomatis pada ${formatIndonesianDate(new Date())}</div>
-      </div>
-    </div>
-  `;
-
-  const btnKuitansi = document.getElementById('htPrintKuitansiBtn');
-  if (btnKuitansi) {
-    if (isApproved) {
-      btnKuitansi.disabled = false;
-      btnKuitansi.title = 'Cetak Kwitansi Resmi PT. Fath Indah Travel Service';
-      btnKuitansi.style.opacity = '1';
-      btnKuitansi.style.cursor = 'pointer';
-    } else {
-      btnKuitansi.disabled = true;
-      btnKuitansi.title = 'Kwitansi resmi hanya dapat dicetak setelah setoran disetujui (Approved)';
-      btnKuitansi.style.opacity = '0.5';
-      btnKuitansi.style.cursor = 'not-allowed';
-    }
-  }
-
-  modal.style.display = 'flex';
-};
-
-window.htCloseReceiptModal = function() {
-  const modal = document.getElementById('htReceiptModal');
-  if (modal) modal.style.display = 'none';
-};
-
-window.htPrintReceipt = function() {
-  const content = document.getElementById('htPrintableReceipt');
-  if (!content) return;
-
-  const printWindow = window.open('', '_blank', 'width=700,height=800');
-  if (!printWindow) {
-    window.print();
-    return;
-  }
-
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Struk Pembayaran Angsuran Haji Terencana</title>
-      <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #1e293b; }
-        .ht-receipt-content { max-width: 450px; margin: 0 auto; border: 1px solid #cbd5e1; padding: 20px; border-radius: 8px; }
-        .ht-receipt-header { text-align: center; margin-bottom: 15px; }
-        .ht-receipt-logo { height: 45px; margin-bottom: 5px; }
-        .ht-receipt-title { font-size: 15px; font-weight: 800; color: #0f172a; }
-        .ht-receipt-sub { font-size: 11px; color: #64748b; font-weight: 600; }
-        .ht-receipt-divider { border-top: 1px dashed #cbd5e1; margin: 12px 0; }
-        .ht-receipt-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px; }
-        .ht-receipt-label { color: #64748b; }
-        .ht-receipt-value { font-weight: 600; color: #0f172a; text-align: right; }
-        .ht-receipt-footer { text-align: center; margin-top: 20px; font-size: 10px; color: #94a3b8; border-top: 1px dashed #cbd5e1; padding-top: 10px; }
-        @media print { body { padding: 0; } }
-      </style>
-    </head>
-    <body>
-      ${content.outerHTML}
-      <script>
-        window.onload = function() { window.print(); window.close(); }
-      </script>
-    </body>
-    </html>
-  `);
-  printWindow.document.close();
-};
-
-window.htOpenOfficialKwitansiModal = function() {
-  const item = htState.currentReceiptItem;
-  if (!item) return;
-
-  if (String(item.status).toLowerCase() !== 'approved') {
-    alert('Kwitansi resmi hanya dapat dicetak untuk transaksi yang sudah Approved!');
-    return;
-  }
-
-  const modal = document.getElementById('htOfficialKwitansiModal');
-  const iframe = document.getElementById('htOfficialKwitansiIframe');
-  if (!modal || !iframe) return;
-
-  const fitsNo = item.noJurnal || item.id || 'FITS-HT-' + Math.floor(1000 + Math.random() * 9000);
-  const namaJamaah = (item.namaNasabah || 'Nasabah Haji Fath Indah').toUpperCase();
-  const terbilangText = terbilang(item.jumlah) + ' Rupiah';
-  const uraianText = item.uraian || 'Pembayaran Angsuran Tabungan Haji Terencana PT Fath Indah Travel Service';
-  const formattedNominal = parseInt(item.jumlah, 10).toLocaleString('id-ID') + ',-';
-  const tglFormatted = formatIndonesianDate(item.tanggal || new Date());
-
-  const htmlDoc = `
-    <!DOCTYPE html>
-    <html lang="id">
-    <head>
-      <meta charset="UTF-8">
-      <title>Kuitansi Resmi - PT. Fath Indah Travel Service</title>
-      <style>
-        @page { size: A4 landscape; margin: 10mm; }
-        * { box-sizing: border-box; }
-        body { font-family: "Times New Roman", Times, serif; background: #fff; color: #000; margin: 0; padding: 20px; }
-        .kuitansi-border-outer { border: 2.5px solid #000; padding: 20px 30px; max-width: 860px; margin: 0 auto; background: #fff; }
-        .header-table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
-        .company-title { font-size: 20px; font-weight: bold; letter-spacing: 0.5px; }
-        .company-subtitle { font-size: 11px; margin-top: 2px; }
-        .company-address { font-size: 10px; line-height: 1.3; }
-        .title-row { display: flex; justify-content: space-between; align-items: flex-end; margin: 15px 0 10px; border-bottom: 2px solid #000; padding-bottom: 6px; }
-        .kuitansi-title-text { font-size: 26px; font-weight: bold; letter-spacing: 2px; }
-        .fits-no-box { font-size: 14px; font-weight: bold; }
-        .fits-no-line { border-bottom: 1px dotted #000; padding: 0 10px; }
-        .form-table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 10px; }
-        .form-table td { padding: 6px 4px; vertical-align: top; }
-        .field-label { width: 170px; font-weight: 500; }
-        .field-colon { width: 15px; text-align: center; }
-        .field-value { font-weight: bold; }
-        .striped-box { background: repeating-linear-gradient(45deg, #f0f0f0, #f0f0f0 10px, #ffffff 10px, #ffffff 20px); border: 1px solid #777; padding: 6px 12px; font-style: italic; font-weight: bold; font-size: 13px; }
-        .bottom-section { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 20px; }
-        .nominal-group { display: flex; flex-direction: column; gap: 8px; }
-        .nominal-row { display: flex; align-items: center; font-size: 15px; font-weight: bold; }
-        .nominal-box { border: 2px solid #000; padding: 5px 14px; min-width: 170px; font-size: 15px; font-weight: bold; background: #fafafa; }
-        .signature-area { text-align: center; width: 260px; font-size: 13px; }
-        .date-location { margin-bottom: 60px; }
-        .company-sig-name { font-weight: bold; text-decoration: underline; }
-        .footer-note-box { border-top: 1px solid #ccc; margin-top: 15px; padding-top: 5px; font-size: 9.5px; color: #555; font-style: italic; text-align: center; }
-        @media print {
-          .no-print { display: none !important; }
-          body { padding: 0; }
-          .kuitansi-border-outer { border: 2px solid #000; }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="kuitansi-border-outer">
-        <table class="header-table">
-          <tr>
-            <td style="width: 75px; vertical-align: middle;">
-              <img src="assets/logo.png" style="width:65px; height:auto;" onerror="this.style.display='none'">
-            </td>
-            <td style="vertical-align: middle;">
-              <div class="company-title">PT. FATH INDAH TRAVEL SERVICE</div>
-              <div class="company-subtitle"><b>SK Kemenag RI No. 892 / 2017 & No. 129 / 2021</b></div>
-              <div class="company-address">Kantor Pusat: Ruko Sentra Bisnis Graha Indah Blok A1 No. 8-9, Jl. KH. Noer Ali, Jakasampurna, Bekasi Barat</div>
-            </td>
-          </tr>
-        </table>
-
-        <div class="title-row">
-          <div class="kuitansi-title-text">KUITANSI</div>
-          <div class="fits-no-box">FITS No : <span class="fits-no-line">${escapeHtml(fitsNo)}</span></div>
-        </div>
-
-        <table class="form-table">
-          <tr>
-            <td class="field-label">Telah terima dari</td>
-            <td class="field-colon">:</td>
-            <td class="field-value">${escapeHtml(namaJamaah)}</td>
-          </tr>
-          <tr>
-            <td class="field-label">Uang Sejumlah</td>
-            <td class="field-colon">:</td>
-            <td class="field-value">
-              <div class="striped-box">${escapeHtml(terbilangText)}</div>
-            </td>
-          </tr>
-          <tr>
-            <td class="field-label">Untuk Pembayaran</td>
-            <td class="field-colon">:</td>
-            <td class="field-value">${escapeHtml(uraianText)}</td>
-          </tr>
-        </table>
-
-        <div class="bottom-section">
-          <div class="nominal-group">
-            <div class="nominal-row">
-              <span style="width:45px;">Rp.</span>
-              <span style="width:12px; text-align:center;">:</span>
-              <div class="nominal-box">${formattedNominal}</div>
-            </div>
-            <div class="nominal-row">
-              <span style="width:45px;">USD</span>
-              <span style="width:12px; text-align:center;">:</span>
-              <div class="nominal-box">-</div>
-            </div>
-          </div>
-
-          <div class="signature-area">
-            <div class="date-location">Bekasi, ${escapeHtml(tglFormatted)}</div>
-            <div class="company-sig-name">PT. Fath Indah Travel Service</div>
-          </div>
-        </div>
-
-        <div class="footer-note-box">
-          Catatan: Kuitansi ini diterbitkan secara elektronik sebagai bukti sah penerimaan pembayaran angsuran Haji Terencana.
-        </div>
-      </div>
-
-      <div style="text-align:center; margin-top:20px;" class="no-print">
-        <button onclick="window.print()" style="padding:10px 24px; background:#0f766e; color:white; border:none; border-radius:8px; cursor:pointer; font-size:14px; font-weight:700; display:inline-flex; align-items:center; gap:8px;">
-          <svg style="width:16px;height:16px;fill:currentColor;" viewBox="0 0 24 24"><path d="M6 19H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h3V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v4h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-3v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-2zm0-2v-3h12v3h2v-8H4v8h2zm2-12v2h8V5H8zm0 12v3h8v-3H8z"/></svg>
-          Cetak / Simpan PDF
-        </button>
-      </div>
-    </body>
-    </html>
-  `;
-
-  modal.style.display = 'flex';
-  setTimeout(() => {
-    if (iframe && iframe.contentWindow) {
-      const doc = iframe.contentWindow.document;
-      doc.open();
-      doc.write(htmlDoc);
-      doc.close();
-    }
-  }, 100);
-};
-
-window.htCloseOfficialKwitansiModal = function() {
-  const modal = document.getElementById('htOfficialKwitansiModal');
-  if (modal) modal.style.display = 'none';
-};
-
-window.htHandleFileChange = function(e) {
-  const files = e.target.files;
-  if (files && files.length > 0) {
-    processHTFile(files[0]);
-  }
-};
-
-function processHTFile(file) {
-  if (file.size > 5 * 1024 * 1024) {
-    alert('Ukuran berkas melebihi batas maksimum 5 MB!');
-    return;
-  }
-
-  htState.selectedFileName = file.name;
-  htState.selectedFileType = file.type;
-
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    htState.selectedFileBase64 = event.target.result;
-    const previewBox = document.getElementById('htPreviewBox');
-    const previewImg = document.getElementById('htPreviewImg');
-    const previewPdf = document.getElementById('htPreviewPdf');
-    const pdfName = document.getElementById('htPreviewPdfName');
-    const pdfSize = document.getElementById('htPreviewPdfSize');
-    const dropzoneText = document.getElementById('htDropzoneText');
-
-    if (previewBox) previewBox.style.display = 'block';
-
-    if (file.type.startsWith('image/')) {
-      if (previewImg) {
-        previewImg.src = htState.selectedFileBase64;
-        previewImg.style.display = 'block';
-      }
-      if (previewPdf) previewPdf.style.display = 'none';
-    } else {
-      if (previewImg) previewImg.style.display = 'none';
-      if (previewPdf) previewPdf.style.display = 'block';
-      if (pdfName) pdfName.textContent = file.name;
-      if (pdfSize) pdfSize.textContent = `${(file.size / 1024).toFixed(1)} KB (PDF Document)`;
-    }
-
-    if (dropzoneText) dropzoneText.textContent = `Berkas dipilih: ${file.name}`;
-  };
-  reader.readAsDataURL(file);
-}
-
-window.htRemoveSelectedFile = function() {
-  htState.selectedFileBase64 = null;
-  htState.selectedFileName = '';
-  htState.selectedFileType = '';
-
-  const input = document.getElementById('htFileUploadInput');
-  const previewBox = document.getElementById('htPreviewBox');
-  const dropzoneText = document.getElementById('htDropzoneText');
-
-  if (input) input.value = '';
-  if (previewBox) previewBox.style.display = 'none';
-  if (dropzoneText) dropzoneText.textContent = 'Klik atau seret foto / PDF bukti transfer di sini';
-};
-
-window.htFormatRupiahInput = function(input) {
-  let val = String(input.value).replace(/[^0-9]/g, '');
-  if (!val) {
-    input.value = '';
-    return;
-  }
-  const formatted = parseInt(val, 10).toLocaleString('id-ID');
-  input.value = `Rp ${formatted}`;
-};
-
-window.htHandleUploadSubmit = async function(e) {
-  e.preventDefault();
-
-  const jumlahRaw = document.getElementById('htUploadJumlah')?.value || '';
-  const cleanNumber = String(jumlahRaw).replace(/[^0-9]/g, '');
-  const jumlahClean = parseInt(cleanNumber, 10) || 0;
-
-  if (jumlahClean <= 0) {
-    alert('Nominal setoran angsuran harus lebih dari Rp 0!');
-    return;
-  }
-
-  const payload = {
-    namaNasabah: document.getElementById('htUploadNamaNasabah')?.value || '',
-    noHP: document.getElementById('htUploadNoHP')?.value || '',
-    noBPIH: document.getElementById('htUploadNoBPIH')?.value || '',
-    bank: document.getElementById('htUploadBank')?.value || '',
-    jumlah: jumlahClean,
-    tanggal: document.getElementById('htUploadTanggal')?.value || new Date().toISOString().substring(0, 10),
-    metodePembayaran: document.getElementById('htUploadMetode')?.value || 'Transfer Bank',
-    uraian: document.getElementById('htUploadUraian')?.value || 'Angsuran Haji Terencana',
-    fileData: htState.selectedFileBase64 || null,
-    fileName: htState.selectedFileName || null
-  };
-
-  if (!payload.namaNasabah || !payload.bank) {
-    alert('Silakan lengkapi formulir sebelum mengirim!');
-    return;
-  }
-
-  let mahramGroup = [];
-  if (payload.noBPIH) {
-    const cleanBpih = String(payload.noBPIH).replace(/^0+/, '');
+    // 1. Direct Supabase REST API
     if (typeof SUPABASE_CONFIG !== 'undefined' && SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey) {
       try {
-        const r = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/mahram?or=(nobpih.eq.${cleanBpih},nobpih.eq.0${cleanBpih})`, {
-          headers: {
-            'apikey': SUPABASE_CONFIG.anonKey,
-            'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
-          }
-        });
-        if (r.ok) {
-          const data = await r.json();
-          if (Array.isArray(data) && data.length > 0) {
-            const kodeMahram = data[0].kodemahram;
-            if (kodeMahram) {
-              const gr = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/mahram?kodemahram=eq.${kodeMahram}`, {
-                headers: {
-                  'apikey': SUPABASE_CONFIG.anonKey,
-                  'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`
-                }
-              });
-              if (gr.ok) mahramGroup = await gr.json();
-            }
-          }
-        }
-      } catch (err) {}
+        const [rJ, rA] = await Promise.all([
+          fetch(`${SUPABASE_CONFIG.url}/rest/v1/data_jamaah_haji?select=*`, {
+            headers: { 'apikey': SUPABASE_CONFIG.anonKey, 'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}` }
+          }),
+          fetch(`${SUPABASE_CONFIG.url}/rest/v1/entry_angsuran_haji?select=*`, {
+            headers: { 'apikey': SUPABASE_CONFIG.anonKey, 'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}` }
+          })
+        ]);
+        if (rJ.ok) jamaahList = await rJ.json();
+        if (rA.ok) angsuranList = await rA.json();
+      } catch (err) {
+        console.warn('Direct Supabase fetch error:', err);
+      }
     }
 
-    if (!mahramGroup || mahramGroup.length === 0) {
+    // 2. Fallback to /api/ endpoints if needed
+    if (!jamaahList || jamaahList.length === 0) {
       try {
-        const res = await fetch(`/api/haji-terencana/mahram?noBPIH=${encodeURIComponent(cleanBpih)}`);
-        if (res.ok) {
-          const json = await res.json();
-          if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-            const kodeMahram = json.data[0].kodemahram;
-            if (kodeMahram) {
-              const groupRes = await fetch(`/api/haji-terencana/mahram`);
-              if (groupRes.ok) {
-                const groupJson = await groupRes.json();
-                if (groupJson.success && Array.isArray(groupJson.data)) {
-                  mahramGroup = groupJson.data.filter(x => x.kodemahram === kodeMahram);
-                }
-              }
-            }
-          }
+        const [rJ, rA] = await Promise.all([
+          fetch('/api/haji-terencana/jamaah'),
+          fetch('/api/haji-terencana/angsuran')
+        ]);
+        if (rJ.ok) {
+          const jJson = await rJ.json();
+          if (jJson.success) jamaahList = jJson.data;
         }
-      } catch (err) {}
+        if (rA.ok) {
+          const aJson = await rA.json();
+          if (aJson.success) angsuranList = aJson.data;
+        }
+      } catch (e) {}
     }
-  }
 
-  if (mahramGroup && mahramGroup.length > 1) {
-    htShowMahramConfirmModal(payload, mahramGroup);
-    return;
-  }
+    // 3. Fallback to Google Sheets CSV if needed
+    if ((!jamaahList || jamaahList.length === 0) && typeof fetchSheetDataCsv === 'function') {
+      try {
+        jamaahList = await fetchSheetDataCsv('DataJamaahHaji');
+        angsuranList = await fetchSheetDataCsv('EntryAngsuranHaji');
+      } catch (e) {}
+    }
 
-  await htDoFinalSubmitAngsuran([payload]);
-};
+    // Olah data Jamaah Haji Terencana
+    const htJamaahMap = {};
 
-function htShowMahramConfirmModal(payload, mahramGroup) {
-  htState.pendingUploadPayload = payload;
-  htState.currentMahramGroup = mahramGroup.map(m => ({
-    ...m,
-    selected: true
-  }));
+    (jamaahList || []).forEach(j => {
+      const jh = String(j.jenishaji || '').toLowerCase();
+      if (jh.includes('haji terencana') || jh.includes('ht') || jh === 'terencana') {
+        const bpih = String(j.nobpih || j.noporsi || '').trim();
+        if (!bpih || bpih === '-') return;
 
-  const modal = document.getElementById('htMahramConfirmModal');
-  if (modal) {
-    htRenderMahramConfirmBody();
-    modal.style.display = 'flex';
+        htJamaahMap[bpih] = {
+          noPorsi: bpih,
+          namaJamaah: j.nama || 'Jamaah Haji Terencana',
+          kode: j.bulanpendaftaran || '',
+          hargaPaket: parseFloat(String(j.hargabpih || 0).replace(/[^0-9.-]/g, '')) || 225000000,
+          dp: parseFloat(String(j.dpangsuran || 0).replace(/[^0-9.-]/g, '')) || 0,
+          angsuranBulan: parseFloat(String(j.blangsuran || 0).replace(/[^0-9.-]/g, '')) || 0,
+          transaksi: {},
+          rincianTransaksi: [],
+          totalKumulatif: 0,
+          pendingMonths: {}
+        };
+      }
+    });
+
+    // Olah seluruh data transaksi angsuran
+    (angsuranList || []).forEach(a => {
+      const noBpih = String(a.nobpih || '').trim();
+      if (htJamaahMap[noBpih]) {
+        let rawDate = a.tanggal || a.createdat || '';
+        const cleanDate = String(rawDate).trim().substring(0, 10);
+        const parts = cleanDate.split(/[-/]/);
+        let dateObj = null;
+
+        if (parts.length === 3) {
+          if (parts[0].length === 4) dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+          else dateObj = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        } else dateObj = new Date(rawDate);
+
+        if (!dateObj || isNaN(dateObj.getTime())) dateObj = new Date();
+
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const ymKey = `${year}-${month}`;
+        const jml = parseFloat(String(a.jumlah || 0).replace(/[^0-9.-]/g, '')) || 0;
+        const statusVal = String(a.status || '').trim().toLowerCase();
+
+        htJamaahMap[noBpih].transaksi[ymKey] = (htJamaahMap[noBpih].transaksi[ymKey] || 0) + jml;
+        htJamaahMap[noBpih].totalKumulatif += jml;
+
+        if (statusVal === 'pending') {
+          htJamaahMap[noBpih].pendingMonths[ymKey] = true;
+        }
+
+        htJamaahMap[noBpih].rincianTransaksi.push({
+          tanggal: dateObj.toISOString(),
+          jumlah: jml,
+          status: a.status || 'Approved'
+        });
+      }
+    });
+
+    const resultArr = Object.values(htJamaahMap);
+    resultArr.sort((a, b) => String(a.noPorsi).localeCompare(String(b.noPorsi)));
+
+    // Generate Rentang Bulan Kontinu
+    const allYmKeys = new Set();
+    resultArr.forEach(j => {
+      Object.keys(j.transaksi).forEach(k => allYmKeys.add(k));
+    });
+
+    const sortedKeys = Array.from(allYmKeys).sort();
+    let continuousYmKeys = [];
+
+    if (sortedKeys.length > 0) {
+      const minKey = sortedKeys[0];
+      const maxKey = sortedKeys[sortedKeys.length - 1];
+      let [currY, currM] = minKey.split('-').map(Number);
+      const [maxY, maxM] = maxKey.split('-').map(Number);
+
+      while (currY < maxY || (currY === maxY && currM <= maxM)) {
+        continuousYmKeys.push(`${currY}-${String(currM).padStart(2, '0')}`);
+        currM++;
+        if (currM > 12) {
+          currM = 1;
+          currY++;
+        }
+      }
+    } else {
+      continuousYmKeys = ['2024-12', '2025-01', '2025-02', '2025-03'];
+    }
+
+    htMatrixState.ymKeys = continuousYmKeys;
+    htMatrixState.groupedMonths = {};
+    continuousYmKeys.forEach(ym => {
+      const [y, m] = ym.split('-');
+      if (!htMatrixState.groupedMonths[y]) htMatrixState.groupedMonths[y] = [];
+      if (!htMatrixState.groupedMonths[y].includes(m)) htMatrixState.groupedMonths[y].push(m);
+    });
+
+    htMatrixState.dataList = resultArr;
+    htMatrixApplyFilter();
+
+  } catch (err) {
+    console.error('Error loading matrix data:', err);
+    alert('Terjadi kesalahan memuat data dashboard: ' + err.message);
+  } finally {
+    htMatrixState.isLoading = false;
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (scrollEl) scrollEl.style.opacity = '1';
+    if (refreshIcon) refreshIcon.classList.remove('fa-spin');
   }
 }
 
-function htRenderMahramConfirmBody() {
-  const container = document.getElementById('htModalMahramBody');
-  if (!container || !htState.pendingUploadPayload) return;
+/**
+ * Filter dan Render Tabel Matrix
+ */
+function htMatrixApplyFilter() {
+  const q = (htMatrixState.searchQuery || '').toLowerCase().trim();
 
-  const totalNominal = htState.pendingUploadPayload.jumlah;
-  const selectedMembers = htState.currentMahramGroup.filter(m => m.selected);
-  const selectedCount = selectedMembers.length;
-  const splitAmount = selectedCount > 0 ? Math.floor(totalNominal / selectedCount) : 0;
+  if (!q) {
+    htMatrixState.filteredDataList = htMatrixState.dataList;
+  } else {
+    htMatrixState.filteredDataList = htMatrixState.dataList.filter(item =>
+      (item.namaJamaah && item.namaJamaah.toLowerCase().includes(q)) ||
+      (item.noPorsi && item.noPorsi.toLowerCase().includes(q))
+    );
+  }
 
-  container.innerHTML = `
-    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:12px; margin-bottom:16px;">
-      <div style="font-size:12px; color:#166534; font-weight:700;">INFORMASI SETORAN MAHRAN / KELUARGA</div>
-      <div style="font-size:13px; color:#15803d; margin-top:4px;">
-        Terdeteksi ${htState.currentMahramGroup.length} anggota mahram terdaftar. Total setoran <b>${htFormatRupiah(totalNominal)}</b> akan dibagi rata kepada ${selectedCount} anggota yang dipilih masing-masing <b>${htFormatRupiah(splitAmount)}</b>.
-      </div>
+  // Hitung Grand Total
+  const t = {
+    hargaPaket: 0,
+    dp: 0,
+    angsuranBulan: 0,
+    kumulatif: 0,
+    transaksi: {}
+  };
+
+  htMatrixState.ymKeys.forEach(ym => t.transaksi[ym] = 0);
+
+  htMatrixState.filteredDataList.forEach(item => {
+    t.hargaPaket += item.hargaPaket || 0;
+    t.dp += item.dp || 0;
+    t.angsuranBulan += item.angsuranBulan || 0;
+    t.kumulatif += item.totalKumulatif || 0;
+
+    htMatrixState.ymKeys.forEach(ym => {
+      if (item.transaksi[ym]) {
+        t.transaksi[ym] += item.transaksi[ym];
+      }
+    });
+  });
+
+  htMatrixState.grandTotal = t;
+
+  htRenderMatrixTable();
+
+  if (htMatrixState.showChart) {
+    setTimeout(htRenderMatrixChart, 100);
+  }
+}
+
+window.htHandleMatrixSearch = function(val) {
+  htMatrixState.searchQuery = val || '';
+  htMatrixApplyFilter();
+};
+
+const HT_MONTH_NAMES = ["JAN", "FEB", "MAR", "APR", "MEI", "JUN", "JUL", "AGS", "SEP", "OKT", "NOV", "DES"];
+
+function htGetMonthName(mStr) {
+  const m = parseInt(mStr, 10);
+  return (m >= 1 && m <= 12) ? HT_MONTH_NAMES[m - 1] : mStr;
+}
+
+function htFormatMatrixNumber(num) {
+  if (!num || isNaN(num) || num === 0) return '';
+  return new Intl.NumberFormat('id-ID').format(num);
+}
+
+/**
+ * Render Header, Body, dan Footer Tabel Matrix
+ */
+function htRenderMatrixTable() {
+  const thead1 = document.getElementById('htTheadRow1');
+  const thead2 = document.getElementById('htTheadRow2');
+  const tbody = document.getElementById('htMatrixTbody');
+  const tfoot = document.getElementById('htMatrixTfoot');
+
+  if (!thead1 || !thead2 || !tbody || !tfoot) return;
+
+  const years = Object.keys(htMatrixState.groupedMonths).sort();
+
+  // 1. Render Thead Row 1
+  let th1Html = `
+    <th rowspan="2" class="ht-col-no">NO</th>
+    <th rowspan="2" class="ht-col-porsi">NO PORSI</th>
+    <th rowspan="2" class="ht-col-nama">NAMA JAMAAH</th>
+    <th rowspan="2" style="width:90px;">KODE</th>
+    <th rowspan="2" style="width:115px; text-align:right;">HARGA PAKET</th>
+    <th rowspan="2" style="width:105px; text-align:right;">DP</th>
+    <th rowspan="2" style="width:110px; text-align:right; color:#fbbf24;">ANGSURAN/BLN</th>
+    <th rowspan="2" style="width:115px; text-align:right; color:#34d399;">JML ANGSURAN</th>
+  `;
+
+  years.forEach(y => {
+    const colSpan = htMatrixState.groupedMonths[y].length;
+    th1Html += `<th colspan="${colSpan}" class="ht-year-th">${y}</th>`;
+  });
+  thead1.innerHTML = th1Html;
+
+  // 2. Render Thead Row 2 (Bulan)
+  let th2Html = '';
+  years.forEach(y => {
+    htMatrixState.groupedMonths[y].forEach(m => {
+      th2Html += `<th class="ht-month-th">${htGetMonthName(m)}</th>`;
+    });
+  });
+  thead2.innerHTML = th2Html;
+
+  // 3. Render Tbody
+  if (htMatrixState.filteredDataList.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="${8 + htMatrixState.ymKeys.length}" style="text-align:center; padding:50px 20px; background:#0f172a; color:#64748b;">
+          <i class="fa-solid fa-database" style="font-size:36px; margin-bottom:12px; display:block; color:#334155;"></i>
+          <span style="font-size:13px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase;">Tidak ada data transaksi ditemukan</span>
+        </td>
+      </tr>
+    `;
+  } else {
+    tbody.innerHTML = htMatrixState.filteredDataList.map((item, idx) => {
+      let rowHtml = `
+        <tr>
+          <td class="ht-col-no" style="font-family:monospace; color:#64748b;">${idx + 1}</td>
+          <td class="ht-col-porsi">${escapeHtml(item.noPorsi)}</td>
+          <td class="ht-col-nama">
+            <button type="button" onclick="openAngsuranDetail('${escapeHtml(item.noPorsi)}')" title="Lihat rincian angsuran ${escapeHtml(item.namaJamaah)}">
+              ${escapeHtml(item.namaJamaah)}
+            </button>
+          </td>
+          <td class="ht-col-kode">
+            <span class="ht-kode-badge">${escapeHtml(item.kode || '-')}</span>
+          </td>
+          <td class="ht-num-cell">${htFormatMatrixNumber(item.hargaPaket)}</td>
+          <td class="ht-num-cell">${htFormatMatrixNumber(item.dp)}</td>
+          <td class="ht-num-amber">${htFormatMatrixNumber(item.angsuranBulan)}</td>
+          <td class="ht-num-emerald-bold">${htFormatMatrixNumber(item.totalKumulatif)}</td>
+      `;
+
+      htMatrixState.ymKeys.forEach(ym => {
+        const val = item.transaksi[ym];
+        const isPending = item.pendingMonths && item.pendingMonths[ym];
+        if (val && val > 0) {
+          const pillClass = isPending ? 'ht-month-pill-pending' : 'ht-month-pill-approved';
+          rowHtml += `<td class="ht-month-cell"><span class="${pillClass}">${htFormatMatrixNumber(val)}</span></td>`;
+        } else {
+          rowHtml += `<td class="ht-month-cell"></td>`;
+        }
+      });
+
+      rowHtml += '</tr>';
+      return rowHtml;
+    }).join('');
+  }
+
+  // 4. Render Tfoot
+  const gt = htMatrixState.grandTotal;
+  let tfootHtml = `
+    <tr>
+      <td colspan="4" class="ht-tfoot-total-label">TOTAL KESELURUHAN</td>
+      <td class="ht-tfoot-cell">${htFormatMatrixNumber(gt.hargaPaket)}</td>
+      <td class="ht-tfoot-cell">${htFormatMatrixNumber(gt.dp)}</td>
+      <td class="ht-tfoot-cell yellow">${htFormatMatrixNumber(gt.angsuranBulan)}</td>
+      <td class="ht-tfoot-cell green">${htFormatMatrixNumber(gt.kumulatif)}</td>
+  `;
+
+  htMatrixState.ymKeys.forEach(ym => {
+    const val = gt.transaksi[ym];
+    tfootHtml += `<td class="ht-tfoot-cell green">${val ? htFormatMatrixNumber(val) : '-'}</td>`;
+  });
+
+  tfootHtml += '</tr>';
+  tfoot.innerHTML = tfootHtml;
+}
+
+/**
+ * Toggle Tampilan Grafik
+ */
+window.htToggleMatrixChart = function() {
+  htMatrixState.showChart = !htMatrixState.showChart;
+  const container = document.getElementById('htMatrixChartContainer');
+  const btnText = document.getElementById('htChartBtnText');
+  const btnIcon = document.getElementById('htChartIcon');
+
+  if (container) {
+    container.style.display = htMatrixState.showChart ? 'block' : 'none';
+  }
+
+  if (btnText) {
+    btnText.textContent = htMatrixState.showChart ? 'TUTUP GRAFIK' : 'LIHAT GRAFIK';
+  }
+
+  if (btnIcon) {
+    btnIcon.className = htMatrixState.showChart ? 'fa-solid fa-eye-slash' : 'fa-solid fa-chart-area';
+  }
+
+  if (htMatrixState.showChart) {
+    setTimeout(htRenderMatrixChart, 100);
+  }
+};
+
+/**
+ * Render Chart.js
+ */
+function htRenderMatrixChart() {
+  const canvas = document.getElementById('htPaymentChart');
+  if (!canvas) return;
+
+  if (htMatrixState.chartInstance) {
+    htMatrixState.chartInstance.destroy();
+  }
+
+  if (typeof Chart === 'undefined') {
+    console.warn('Chart.js not loaded. Cannot render chart.');
+    return;
+  }
+
+  const labels = htMatrixState.ymKeys.map(ym => {
+    const parts = ym.split('-');
+    return `${parts[1]}/${parts[0]}`;
+  });
+
+  const dataPoints = htMatrixState.ymKeys.map(ym => htMatrixState.grandTotal.transaksi[ym] || 0);
+
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createLinearGradient(0, 0, 0, 240);
+  gradient.addColorStop(0, 'rgba(56, 189, 248, 0.45)');
+  gradient.addColorStop(1, 'rgba(56, 189, 248, 0.0)');
+
+  htMatrixState.chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Total Angsuran Masuk',
+        data: dataPoints,
+        borderColor: '#38bdf8',
+        backgroundColor: gradient,
+        borderWidth: 2.5,
+        pointBackgroundColor: '#0f172a',
+        pointBorderColor: '#38bdf8',
+        pointBorderWidth: 2,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+          titleColor: '#cbd5e1',
+          bodyColor: '#38bdf8',
+          borderColor: '#334155',
+          borderWidth: 1,
+          callbacks: {
+            label: function(context) {
+              return 'Rp ' + new Intl.NumberFormat('id-ID').format(context.raw);
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: '#1e293b' },
+          ticks: { color: '#94a3b8', font: { family: 'monospace', size: 10 } }
+        },
+        y: {
+          grid: { color: '#1e293b' },
+          ticks: {
+            color: '#64748b',
+            font: { family: 'monospace', size: 10 },
+            callback: function(value) {
+              if (value >= 1000000000) return (value / 1000000000) + 'M';
+              if (value >= 1000000) return (value / 1000000) + 'Jt';
+              if (value >= 1000) return (value / 1000) + 'K';
+              return value;
+            }
+          },
+          beginAtZero: true
+        }
+      }
+    }
+  });
+}
+
+/**
+ * Ekspor Matrix ke Excel (XLSX) dengan Styling Lengkap
+ */
+window.htExportMatrixToExcel = function() {
+  if (typeof XLSX === 'undefined') {
+    alert('Library Excel sedang dimuat. Silakan coba kembali dalam 2 detik.');
+    return;
+  }
+
+  const ws_data = [];
+
+  // Header Title
+  ws_data.push([{ v: "LAPORAN ANGSURAN HAJI TERENCANA", s: { font: { bold: true, sz: 14 }, alignment: { horizontal: "center" } } }]);
+  ws_data.push([]);
+
+  // Table Headers
+  const headerStyle = {
+    font: { bold: true, color: { rgb: "FFFFFF" } },
+    fill: { fgColor: { rgb: "0F172A" } },
+    alignment: { horizontal: "center", vertical: "center" },
+    border: {
+      top: { style: "thin", color: { rgb: "334155" } },
+      bottom: { style: "thin", color: { rgb: "334155" } },
+      left: { style: "thin", color: { rgb: "334155" } },
+      right: { style: "thin", color: { rgb: "334155" } }
+    }
+  };
+
+  const headers = ['No', 'No Porsi', 'Nama Jamaah', 'Kode', 'Harga Paket', 'DP', 'Angsuran/Bulan', 'Jumlah Angsuran'].concat(htMatrixState.ymKeys);
+  const headerRow = headers.map(h => ({ v: h, s: headerStyle }));
+  ws_data.push(headerRow);
+
+  const dataStyle = {
+    border: {
+      top: { style: "thin", color: { rgb: "CBD5E1" } },
+      bottom: { style: "thin", color: { rgb: "CBD5E1" } },
+      left: { style: "thin", color: { rgb: "CBD5E1" } },
+      right: { style: "thin", color: { rgb: "CBD5E1" } }
+    },
+    alignment: { vertical: "center" }
+  };
+
+  const moneyStyle = {
+    numFmt: '"Rp"#,##0',
+    alignment: { horizontal: "right", vertical: "center" },
+    border: dataStyle.border
+  };
+
+  // Data Rows
+  htMatrixState.filteredDataList.forEach((it, idx) => {
+    const row = [
+      { v: idx + 1, s: { ...dataStyle, alignment: { horizontal: "center", vertical: "center" } } },
+      { v: it.noPorsi, t: "s", s: { ...dataStyle, alignment: { horizontal: "center", vertical: "center" } } },
+      { v: it.namaJamaah, s: dataStyle },
+      { v: it.kode, s: { ...dataStyle, alignment: { horizontal: "center", vertical: "center" } } },
+      { v: it.hargaPaket || 0, t: "n", s: moneyStyle },
+      { v: it.dp || 0, t: "n", s: moneyStyle },
+      { v: it.angsuranBulan || 0, t: "n", s: moneyStyle },
+      { v: it.totalKumulatif || 0, t: "n", s: moneyStyle }
+    ];
+
+    htMatrixState.ymKeys.forEach(ym => {
+      row.push({ v: it.transaksi[ym] || 0, t: "n", s: moneyStyle });
+    });
+
+    ws_data.push(row);
+  });
+
+  // Totals
+  const footerStyle = {
+    font: { bold: true },
+    fill: { fgColor: { rgb: "E2E8F0" } },
+    border: dataStyle.border,
+    alignment: { horizontal: "right", vertical: "center" }
+  };
+  const footerMoneyStyle = { ...moneyStyle, ...footerStyle };
+
+  const gt = htMatrixState.grandTotal;
+  const totalRow = [
+    { v: 'TOTAL KESELURUHAN', s: footerStyle },
+    { v: '', s: footerStyle },
+    { v: '', s: footerStyle },
+    { v: '', s: footerStyle },
+    { v: gt.hargaPaket || 0, t: "n", s: footerMoneyStyle },
+    { v: gt.dp || 0, t: "n", s: footerMoneyStyle },
+    { v: gt.angsuranBulan || 0, t: "n", s: footerMoneyStyle },
+    { v: gt.kumulatif || 0, t: "n", s: footerMoneyStyle }
+  ];
+
+  htMatrixState.ymKeys.forEach(ym => {
+    totalRow.push({ v: gt.transaksi[ym] || 0, t: "n", s: footerMoneyStyle });
+  });
+  ws_data.push(totalRow);
+
+  const ws = XLSX.utils.aoa_to_sheet(ws_data);
+
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: headers.length - 1 } },
+    { s: { r: ws_data.length - 1, c: 0 }, e: { r: ws_data.length - 1, c: 3 } }
+  ];
+
+  const colWidths = [
+    { wch: 5 }, { wch: 15 }, { wch: 30 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
+  ];
+  htMatrixState.ymKeys.forEach(() => colWidths.push({ wch: 14 }));
+  ws['!cols'] = colWidths;
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Data HT");
+  XLSX.writeFile(wb, "Dashboard_Haji_Terencana.xlsx");
+};
+
+/**
+ * Modal Detail Angsuran Jamaah
+ */
+window.openAngsuranDetail = function(noPorsi) {
+  const item = htMatrixState.dataList.find(x => String(x.noPorsi) === String(noPorsi));
+  if (!item) return;
+
+  htMatrixState.selectedItem = item;
+
+  const modal = document.getElementById('htMatrixDetailModal');
+  const printArea = document.getElementById('htPrintAreaDetail');
+  if (!modal || !printArea) return;
+
+  const rincian = item.rincianTransaksi || [];
+  const sisa = Math.max(0, (item.hargaPaket || 0) - ((item.dp || 0) + (item.totalKumulatif || 0)));
+
+  printArea.innerHTML = `
+    <div style="text-align:center; margin-bottom:20px; border-bottom:2px solid #cbd5e1; padding-bottom:14px;">
+      <h2 style="font-size:20px; font-weight:800; text-transform:uppercase; margin:0 0 4px; color:#0f172a;">Laporan Angsuran Haji Terencana</h2>
+      <p style="font-size:12px; color:#64748b; margin:0;">PT. Fath Indah Travel Service • Dicetak pada: ${new Date().toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})}</p>
     </div>
 
-    <table class="ht-table" style="width:100%;">
+    <table style="width:100%; font-size:13px; margin-bottom:20px; border-collapse:collapse;">
+      <tr>
+        <td style="font-weight:700; width:130px; padding:3px 0;">Nama Jamaah</td>
+        <td style="width:15px;">:</td>
+        <td style="font-weight:800; font-size:14px; text-transform:uppercase; color:#0369a1;">${escapeHtml(item.namaJamaah)}</td>
+      </tr>
+      <tr>
+        <td style="font-weight:700; padding:3px 0;">No. Porsi / BPIH</td>
+        <td>:</td>
+        <td style="font-family:monospace; font-weight:700;">${escapeHtml(item.noPorsi)}</td>
+      </tr>
+      <tr>
+        <td style="font-weight:700; padding:3px 0;">Kode Paket</td>
+        <td>:</td>
+        <td>${escapeHtml(item.kode || '-')}</td>
+      </tr>
+      <tr>
+        <td style="font-weight:700; padding:3px 0;">Harga Paket</td>
+        <td>:</td>
+        <td style="font-family:monospace; font-weight:700;">Rp ${htFormatMatrixNumber(item.hargaPaket)}</td>
+      </tr>
+      <tr>
+        <td style="font-weight:700; padding:3px 0;">Down Payment (DP)</td>
+        <td>:</td>
+        <td style="font-family:monospace; font-weight:700;">Rp ${htFormatMatrixNumber(item.dp)}</td>
+      </tr>
+      <tr>
+        <td style="font-weight:700; padding:3px 0;">Angsuran / Bulan</td>
+        <td>:</td>
+        <td style="font-family:monospace; font-weight:700; color:#d97706;">Rp ${htFormatMatrixNumber(item.angsuranBulan)}</td>
+      </tr>
+    </table>
+
+    <h3 style="font-size:14px; font-weight:800; margin-bottom:8px; color:#0f172a;">Rincian Pembayaran per Bulan</h3>
+    <table style="width:100%; border-collapse:collapse; font-size:12px; margin-bottom:14px;">
       <thead>
-        <tr>
-          <th style="width:40px; text-align:center;">Pilih</th>
-          <th>Nama Anggota Mahram</th>
-          <th>No. BPIH</th>
-          <th style="text-align:right;">Alokasi Nominal</th>
+        <tr style="background:#f1f5f9;">
+          <th style="border:1px solid #cbd5e1; padding:8px; text-align:center; width:45px;">No</th>
+          <th style="border:1px solid #cbd5e1; padding:8px; text-align:left;">Tanggal Setor</th>
+          <th style="border:1px solid #cbd5e1; padding:8px; text-align:center; width:100px;">Status</th>
+          <th style="border:1px solid #cbd5e1; padding:8px; text-align:right; width:160px;">Jumlah Angsuran</th>
         </tr>
       </thead>
       <tbody>
-        ${htState.currentMahramGroup.map((m, idx) => `
+        ${rincian.length === 0 ? `
           <tr>
-            <td style="text-align:center;">
-              <input type="checkbox" ${m.selected ? 'checked' : ''} onchange="htToggleMahramCheckbox(${idx}, this.checked)" style="width:16px; height:16px; accent-color:#0f766e; cursor:pointer;">
+            <td colspan="4" style="border:1px solid #cbd5e1; padding:16px; text-align:center; color:#94a3b8;">Belum ada catatan angsuran</td>
+          </tr>
+        ` : rincian.map((t, i) => `
+          <tr style="${String(t.status).toLowerCase() === 'pending' ? 'background:#fef9c3;' : ''}">
+            <td style="border:1px solid #cbd5e1; padding:6px; text-align:center; font-family:monospace;">${i + 1}</td>
+            <td style="border:1px solid #cbd5e1; padding:6px;">${formatIndonesianDate(t.tanggal)}</td>
+            <td style="border:1px solid #cbd5e1; padding:6px; text-align:center; font-weight:700; font-size:10.5px; text-transform:uppercase; color:${String(t.status).toLowerCase() === 'approved' ? '#0f766e' : '#b45309'};">
+              ${escapeHtml(t.status)}
             </td>
-            <td style="font-weight:700;">${escapeHtml(m.nama)}</td>
-            <td>${escapeHtml(m.nobpih || '-')}</td>
-            <td style="text-align:right; font-weight:700; color:${m.selected ? '#0f766e' : '#94a3b8'};">
-              ${m.selected ? htFormatRupiah(splitAmount) : 'Rp 0'}
+            <td style="border:1px solid #cbd5e1; padding:6px; text-align:right; font-family:monospace; font-weight:700;">
+              Rp ${htFormatMatrixNumber(t.jumlah)}
             </td>
           </tr>
         `).join('')}
+        <tr style="background:#f8fafc; font-weight:800;">
+          <td colspan="3" style="border:1px solid #cbd5e1; padding:8px; text-align:right;">Total Angsuran Masuk:</td>
+          <td style="border:1px solid #cbd5e1; padding:8px; text-align:right; font-family:monospace; color:#059669; font-size:13px;">
+            Rp ${htFormatMatrixNumber(item.totalKumulatif)}
+          </td>
+        </tr>
+        <tr style="background:#f8fafc; font-weight:800;">
+          <td colspan="3" style="border:1px solid #cbd5e1; padding:8px; text-align:right; color:#b91c1c;">Sisa Pembayaran:</td>
+          <td style="border:1px solid #cbd5e1; padding:8px; text-align:right; font-family:monospace; color:#b91c1c; font-size:13px;">
+            Rp ${htFormatMatrixNumber(sisa)}
+          </td>
+        </tr>
       </tbody>
     </table>
-
-    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
-      <button type="button" class="btn-ht-action" onclick="htCloseMahramConfirmModal()">Batal</button>
-      <button type="button" class="btn-ht-action primary" ${selectedCount === 0 ? 'disabled' : ''} onclick="htProceedMahramSubmit()">
-        <i class="ri-check-double-line"></i>
-        <span>Proses & Simpan Setoran (${selectedCount} Orang)</span>
-      </button>
-    </div>
-  `;
-}
-
-window.htToggleMahramCheckbox = function(idx, isChecked) {
-  if (htState.currentMahramGroup[idx]) {
-    htState.currentMahramGroup[idx].selected = isChecked;
-    htRenderMahramConfirmBody();
-  }
-};
-
-window.htCloseMahramConfirmModal = function() {
-  const modal = document.getElementById('htMahramConfirmModal');
-  if (modal) modal.style.display = 'none';
-};
-
-window.htProceedMahramSubmit = async function() {
-  const payload = htState.pendingUploadPayload;
-  const selectedMembers = htState.currentMahramGroup.filter(m => m.selected);
-  if (!payload || selectedMembers.length === 0) return;
-
-  const splitAmount = Math.floor(payload.jumlah / selectedMembers.length);
-  const records = selectedMembers.map(m => {
-    return {
-      ...payload,
-      namaNasabah: m.nama,
-      noBPIH: String(m.nobpih || '').replace(/^0+/, ''),
-      jumlah: splitAmount,
-      uraian: `${payload.uraian} (Mahram: ${m.nama})`
-    };
-  });
-
-  htCloseMahramConfirmModal();
-  await htDoFinalSubmitAngsuran(records);
-};
-
-async function htDoFinalSubmitAngsuran(recordsList) {
-  const submitBtn = document.getElementById('htBtnSubmitUpload');
-  if (submitBtn) {
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="ri-loader-4-line spinner"></i> Menyimpan ke Supabase...';
-  }
-
-  const generatedJournal = 'JRN' + Math.floor(100000 + Math.random() * 900000);
-  const dateStr = new Date().toISOString().substring(0, 10);
-
-  const payloadToPost = recordsList.map((r, i) => {
-    return {
-      id_1: 'AH-' + Date.now().toString().slice(-4) + (i + 1),
-      nojurnal: generatedJournal,
-      idjamaah: htState.currentUser?.idNasabah || 'JH-2026',
-      nobpih: String(r.noBPIH || '').replace(/^0+/, ''),
-      namanasabah: r.namaNasabah,
-      bank: r.bank,
-      uraian: r.uraian,
-      jumlah: String(r.jumlah),
-      tanggal: r.tanggal || dateStr,
-      metodepembayaran: r.metodePembayaran,
-      status: 'Pending',
-      typehaji: 'Haji Terencana',
-      nohp: r.noHP,
-      linkdokumen: r.fileData ? 'Attachment' : null,
-      createdat: new Date().toISOString().replace('T', ' ').substring(0, 19)
-    };
-  });
-
-  let saved = false;
-
-  // 1. Direct Supabase REST POST
-  if (typeof SUPABASE_CONFIG !== 'undefined' && SUPABASE_CONFIG.url && SUPABASE_CONFIG.anonKey) {
-    try {
-      const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/entry_angsuran_haji`, {
-        method: 'POST',
-        headers: {
-          'apikey': SUPABASE_CONFIG.anonKey,
-          'Authorization': `Bearer ${SUPABASE_CONFIG.anonKey}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation'
-        },
-        body: JSON.stringify(payloadToPost)
-      });
-      if (res.ok) {
-        saved = true;
-      }
-    } catch (err) {
-      console.warn('Direct Supabase insert failed:', err);
-    }
-  }
-
-  // 2. Fallback to /api/haji-terencana/angsuran
-  if (!saved) {
-    try {
-      const res = await fetch('/api/haji-terencana/angsuran', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payloadToPost)
-      });
-      if (res.ok) {
-        saved = true;
-      } else {
-        const err = await res.json();
-        alert(`Gagal menyimpan: ${err.error || 'Kesalahan koneksi database'}`);
-      }
-    } catch (err) {
-      alert(`Terjadi kesalahan: ${err.message}`);
-    }
-  }
-
-  if (saved) {
-    alert('Setoran angsuran haji berhasil dikirim! Menunggu approval admin.');
-    document.getElementById('htUploadForm')?.reset();
-    htRemoveSelectedFile();
-    htSwitchTab('entry');
-    await htRefreshData();
-  }
-
-  if (submitBtn) {
-    submitBtn.disabled = false;
-    submitBtn.innerHTML = '<i class="ri-send-plane-fill"></i> Kirim Bukti Angsuran';
-  }
-}
-
-window.htOpenProfileModal = function() {
-  const u = htState.currentUser;
-  if (!u) {
-    alert('Pilih nasabah / jamaah pada filter terlebih dahulu untuk melihat profil personal!');
-    return;
-  }
-
-  const modal = document.getElementById('htProfileModal');
-  const body = document.getElementById('htModalProfileBody');
-  if (!modal || !body) return;
-
-  const d = u.detail || {};
-  const photoUrl = formatDriveFileUrl(d.foto || u.foto);
-
-  body.innerHTML = `
-    <div style="text-align:center; padding-bottom:12px; border-bottom:1px solid #e2e8f0;">
-      <img src="${photoUrl || 'assets/logo.png'}" alt="Foto Jamaah" 
-           style="width:90px; height:90px; border-radius:50%; object-fit:cover; border:3px solid #0284c7; padding:2px; background:#fff; box-shadow:0 4px 10px rgba(2,132,199,0.25);"
-           onerror="this.onerror=null; this.src='assets/logo.png';">
-      <h3 style="font-size:18px; font-weight:800; color:#0f172a; margin:10px 0 2px;">${escapeHtml(u.namaLengkap)}</h3>
-      <div style="font-size:12px; color:#64748b; font-weight:600;">No. BPIH: ${escapeHtml(u.noBPIH || '-')} • ID: ${escapeHtml(d.idjamaah || '-')}</div>
-    </div>
-
-    <div style="background:#f0f9ff; border:1.5px solid #38bdf8; border-radius:12px; padding:14px; margin:14px 0; display:flex; justify-content:space-between; align-items:center;">
-      <div>
-        <div style="font-size:13px; font-weight:700; color:#0369a1;">Download List Keuangan Jamaah</div>
-        <div style="font-size:11px; color:#64748b;">Lihat rincian ledger, cetak invoice PDF, dan unduh CSV</div>
-      </div>
-      <button type="button" class="btn-ht-action primary" onclick="htOpenFinanceListModal()" style="font-size:11px; padding:8px 12px;">
-        <i class="ri-file-chart-line"></i> Buka Rincian
-      </button>
-    </div>
-
-    <div style="display:flex; flex-direction:column; gap:8px; font-size:12px; margin-top:12px;">
-      <div style="display:flex; justify-content:space-between; border-bottom:1px dashed #e2e8f0; padding-bottom:6px;">
-        <span style="color:#64748b;">Nomor SPPH</span>
-        <span style="font-weight:700; color:#0f172a;">${escapeHtml(d.nospph || '-')}</span>
-      </div>
-      <div style="display:flex; justify-content:space-between; border-bottom:1px dashed #e2e8f0; padding-bottom:6px;">
-        <span style="color:#64748b;">Nomor HP / WA</span>
-        <span style="font-weight:700; color:#0f172a;">${escapeHtml(u.noHP || '-')}</span>
-      </div>
-      <div style="display:flex; justify-content:space-between; border-bottom:1px dashed #e2e8f0; padding-bottom:6px;">
-        <span style="color:#64748b;">Jenis Haji</span>
-        <span style="font-weight:700; color:#0f172a;">${escapeHtml(d.jenishaji || 'Haji Terencana')}</span>
-      </div>
-      <div style="display:flex; justify-content:space-between; border-bottom:1px dashed #e2e8f0; padding-bottom:6px;">
-        <span style="color:#64748b;">Tanggal Lahir / Umur</span>
-        <span style="font-weight:700; color:#0f172a;">${escapeHtml(d.tanggallahir || '-')} (${escapeHtml(d.umur || '-')} Thn)</span>
-      </div>
-      <div style="display:flex; justify-content:space-between; border-bottom:1px dashed #e2e8f0; padding-bottom:6px;">
-        <span style="color:#64748b;">Alamat Lengkap</span>
-        <span style="font-weight:600; color:#0f172a; text-align:right; max-width:60%;">${escapeHtml(d.alamat || d.kabkota || '-')}</span>
-      </div>
-      <div style="display:flex; justify-content:space-between; border-bottom:1px dashed #e2e8f0; padding-bottom:6px;">
-        <span style="color:#64748b;">Grup Mahram</span>
-        <span style="font-weight:700; color:#0f172a;">${escapeHtml(d.mahram || '-')}</span>
-      </div>
-      <div style="display:flex; justify-content:space-between; padding-bottom:6px;">
-        <span style="color:#64748b;">Deposit / Biaya BPIH</span>
-        <span style="font-weight:700; color:#0f766e;">${htFormatRupiah(parseFloat(d.dpangsuran || d.hargabpih || 0))}</span>
-      </div>
-    </div>
-
-    <div style="margin-top:16px;">
-      <h4 style="font-size:13px; font-weight:700; color:#0f172a; margin-bottom:8px;">Dokumen Pendukung Jamaah</h4>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-        ${renderHTDocCard('KTP', d.ktp, 'ri-id-card-line')}
-        ${renderHTDocCard('Paspor', d.paspor, 'ri-passport-line')}
-        ${renderHTDocCard('SPPH', d.spph, 'ri-file-text-line')}
-        ${renderHTDocCard('BPJS', d.bpjs, 'ri-shield-cross-line')}
-        ${renderHTDocCard('Bukti Setor', d.buktisetor, 'ri-file-check-line')}
-        ${renderHTDocCard('Bukti Transfer', d.buktitransfer, 'ri-bank-card-line')}
-        ${renderHTDocCard('Buku Nikah', d.bukunikah, 'ri-book-read-line')}
-        ${renderHTDocCard('Kartu Keluarga', d.kartukeluarga, 'ri-community-line')}
-      </div>
-    </div>
   `;
 
   modal.style.display = 'flex';
 };
 
-function renderHTDocCard(title, docUrl, iconClass) {
-  const hasDoc = docUrl && String(docUrl).trim() !== '' && docUrl !== '-';
-  return `
-    <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:10px; display:flex; align-items:center; justify-content:space-between;">
-      <div style="display:flex; align-items:center; gap:8px;">
-        <i class="${iconClass}" style="font-size:18px; color:${hasDoc ? '#0f766e' : '#cbd5e1'};"></i>
-        <span style="font-size:12px; font-weight:600; color:${hasDoc ? '#0f172a' : '#94a3b8'};">${title}</span>
-      </div>
-      ${hasDoc ? `
-        <button type="button" class="btn-ht-action" style="padding:4px 8px; font-size:10px;" onclick="htViewDocument('${title}', '${docUrl}')">
-          Lihat
-        </button>
-      ` : `
-        <span style="font-size:10px; color:#cbd5e1; font-style:italic;">Belum Ada</span>
-      `}
-    </div>
-  `;
-}
-
-window.htCloseProfileModal = function() {
-  const modal = document.getElementById('htProfileModal');
+window.htCloseMatrixDetailModal = function() {
+  const modal = document.getElementById('htMatrixDetailModal');
   if (modal) modal.style.display = 'none';
 };
 
-window.htOpenFinanceListModal = function() {
-  const u = htState.currentUser;
-  if (!u) return;
+window.htPrintMatrixDetail = function() {
+  if (!htMatrixState.selectedItem) return;
+  const printContents = document.getElementById('htPrintAreaDetail')?.innerHTML;
+  if (!printContents) return;
 
-  const modal = document.getElementById('htFinanceListModal');
-  const body = document.getElementById('htFinanceListModalBody');
-  if (!modal || !body) return;
-
-  const angsuran = htState.rawAngsuranList;
-  const totalBayar = angsuran.filter(x => String(x.status).toLowerCase() === 'approved').reduce((a, b) => a + (b.jumlah || 0), 0);
-  const totalBiaya = parseFloat(u.detail?.hargabpih || u.detail?.dpangsuran || 35000000);
-  const sisa = Math.max(0, totalBiaya - totalBayar);
-
-  body.innerHTML = `
-    <div style="border:2px solid #0b2545; background:#fff; max-width:660px; margin:0 auto; padding:18px; font-family:'Times New Roman',serif;">
-      <div style="text-align:center; border-bottom:2px solid #0b2545; padding-bottom:10px; margin-bottom:12px;">
-        <h2 style="font-size:18px; font-weight:bold; color:#0b2545; margin:0;">PT. FATH INDAH TRAVEL SERVICE</h2>
-        <div style="font-size:13px; font-weight:bold; color:#0284c7; margin-top:2px;">REKAPITULASI PEMBAYARAN HAJI TERENCANA</div>
-      </div>
-
-      <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:12px;">
-        <div>
-          <div><strong>Nama Nasabah:</strong> ${escapeHtml(u.namaLengkap)}</div>
-          <div><strong>No. BPIH:</strong> ${escapeHtml(u.noBPIH)}</div>
-        </div>
-        <div style="text-align:right;">
-          <div><strong>No. HP:</strong> ${escapeHtml(u.noHP)}</div>
-          <div><strong>Tanggal Cetak:</strong> ${formatIndonesianDate(new Date())}</div>
-        </div>
-      </div>
-
-      <table style="width:100%; border-collapse:collapse; font-size:11px; margin-bottom:14px;">
-        <thead>
-          <tr style="background:#0b2545; color:#fff;">
-            <th style="border:1px solid #000; padding:6px;">No</th>
-            <th style="border:1px solid #000; padding:6px;">No. Jurnal</th>
-            <th style="border:1px solid #000; padding:6px;">Tanggal</th>
-            <th style="border:1px solid #000; padding:6px;">Bank</th>
-            <th style="border:1px solid #000; padding:6px;">Status</th>
-            <th style="border:1px solid #000; padding:6px; text-align:right;">Nominal (Rp)</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${angsuran.map((item, idx) => `
-            <tr>
-              <td style="border:1px solid #000; padding:4px 6px; text-align:center;">${idx + 1}</td>
-              <td style="border:1px solid #000; padding:4px 6px; font-family:monospace;">${escapeHtml(item.noJurnal)}</td>
-              <td style="border:1px solid #000; padding:4px 6px;">${formatIndonesianDate(item.tanggal)}</td>
-              <td style="border:1px solid #000; padding:4px 6px;">${escapeHtml(item.bank)}</td>
-              <td style="border:1px solid #000; padding:4px 6px; font-weight:bold; color:${String(item.status).toLowerCase() === 'approved' ? '#0f766e' : '#f59e0b'};">${escapeHtml(item.status)}</td>
-              <td style="border:1px solid #000; padding:4px 6px; text-align:right; font-weight:bold;">${htFormatRupiah(item.jumlah)}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-
-      <div style="display:flex; justify-content:flex-end; font-size:12px; margin-bottom:18px;">
-        <table style="width:280px; border-collapse:collapse;">
-          <tr>
-            <td style="padding:3px;">Total Estimasi Biaya</td>
-            <td style="text-align:right; font-weight:bold;">${htFormatRupiah(totalBiaya)}</td>
-          </tr>
-          <tr>
-            <td style="padding:3px; color:#0f766e;">Total Telah Disetor</td>
-            <td style="text-align:right; font-weight:bold; color:#0f766e;">${htFormatRupiah(totalBayar)}</td>
-          </tr>
-          <tr style="border-top:1px solid #000;">
-            <td style="padding:4px 3px; font-weight:bold;">Sisa Kewajiban</td>
-            <td style="text-align:right; font-weight:bold; color:${sisa > 0 ? '#b91c1c' : '#0f766e'};">${htFormatRupiah(sisa)}</td>
-          </tr>
-        </table>
-      </div>
-
-      <div style="display:flex; justify-content:space-between; margin-top:20px; font-size:11px;">
-        <div style="text-align:center; width:180px;">
-          <div>Nasabah Yang Bersangkutan</div>
-          <div style="height:55px;"></div>
-          <div style="font-weight:bold;">(${escapeHtml(u.namaLengkap)})</div>
-        </div>
-        <div style="text-align:center; width:180px;">
-          <div>Bekasi, ${formatIndonesianDate(new Date())}</div>
-          <div>Bagian Keuangan FATH INDAH</div>
-          <div style="height:40px;"></div>
-          <div style="font-weight:bold;">(Administrator)</div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  modal.style.display = 'flex';
-};
-
-window.htCloseFinanceListModal = function() {
-  const modal = document.getElementById('htFinanceListModal');
-  if (modal) modal.style.display = 'none';
-};
-
-window.htExportFinanceCsv = function() {
-  const data = htState.rawAngsuranList;
-  if (!data || data.length === 0) {
-    alert('Tidak ada data angsuran untuk diekspor!');
-    return;
-  }
-
-  const u = htState.currentUser;
-  const header = ['No', 'ID Transaksi', 'No Jurnal', 'No BPIH', 'Nama Nasabah', 'Bank', 'Uraian', 'Nominal', 'Tanggal', 'Metode', 'Status'];
-  const rows = data.map((item, idx) => [
-    idx + 1,
-    `"${item.id}"`,
-    `"${item.noJurnal}"`,
-    `"${item.noBPIH}"`,
-    `"${item.namaNasabah}"`,
-    `"${item.bank}"`,
-    `"${item.uraian}"`,
-    item.jumlah,
-    `"${item.tanggal}"`,
-    `"${item.metodePembayaran}"`,
-    `"${item.status}"`
-  ]);
-
-  const csvContent = 'data:text/csv;charset=utf-8,' + [header.join(','), ...rows.map(e => e.join(','))].join('\n');
-  const encodedUri = encodeURI(csvContent);
-  const link = document.createElement('a');
-  link.setAttribute('href', encodedUri);
-  const nameSuffix = u ? u.noBPIH : 'Semua';
-  link.setAttribute('download', `Angsuran_Haji_Terencana_${nameSuffix}_${new Date().toISOString().substring(0, 10)}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
-
-window.htPrintFinancePdf = function() {
-  const body = document.getElementById('htFinanceListModalBody');
-  if (!body) return;
-
-  const printWindow = window.open('', '_blank', 'width=800,height=900');
+  const printWindow = window.open('', '_blank', 'width=900,height=750');
   if (!printWindow) {
     window.print();
     return;
@@ -9802,85 +9120,28 @@ window.htPrintFinancePdf = function() {
   printWindow.document.write(`
     <!DOCTYPE html>
     <html>
-    <head>
-      <title>Laporan Keuangan Jamaah Haji Terencana</title>
-      <style>
-        body { font-family: "Times New Roman", Times, serif; padding: 20px; }
-        @media print { body { padding: 0; } }
-      </style>
-    </head>
-    <body>
-      ${body.innerHTML}
-      <script>
-        window.onload = function() { window.print(); window.close(); }
-      </script>
-    </body>
+      <head>
+        <title>Cetak Angsuran - ${escapeHtml(htMatrixState.selectedItem.namaJamaah)}</title>
+        <style>
+          @page { size: A4 portrait; margin: 15mm; }
+          body { font-family: 'Plus Jakarta Sans', Arial, sans-serif; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; padding: 15px; }
+        </style>
+      </head>
+      <body>
+        ${printContents}
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+              window.close();
+            }, 300);
+          }
+        </script>
+      </body>
     </html>
   `);
   printWindow.document.close();
 };
-
-window.htViewDocument = function(title, docUrl) {
-  if (!docUrl || docUrl === '-') return;
-
-  const modal = document.getElementById('htDocViewerModal');
-  const titleEl = document.getElementById('htDocViewerTitle');
-  const iframe = document.getElementById('htDocViewerIframe');
-  const img = document.getElementById('htDocViewerImg');
-  const openLink = document.getElementById('htDocViewerOpenLink');
-
-  if (!modal) return;
-
-  if (titleEl) titleEl.textContent = `Pratinjau Dokumen: ${title}`;
-  if (openLink) openLink.href = docUrl;
-
-  const isDrive = docUrl.includes('drive.google.com');
-  const isImage = !isDrive && /\.(jpeg|jpg|gif|png|webp)($|\?)/i.test(docUrl);
-
-  if (isImage) {
-    if (img) {
-      img.src = docUrl;
-      img.style.display = 'block';
-    }
-    if (iframe) iframe.style.display = 'none';
-  } else {
-    let embedUrl = docUrl;
-    if (isDrive) {
-      embedUrl = docUrl.replace(/\/view(\?.*)?$/, '/preview');
-    }
-    if (iframe) {
-      iframe.src = embedUrl;
-      iframe.style.display = 'block';
-    }
-    if (img) img.style.display = 'none';
-  }
-
-  modal.style.display = 'flex';
-};
-
-window.htCloseDocViewerModal = function() {
-  const modal = document.getElementById('htDocViewerModal');
-  const iframe = document.getElementById('htDocViewerIframe');
-  if (modal) modal.style.display = 'none';
-  if (iframe) iframe.src = 'about:blank';
-};
-
-function formatDriveFileUrl(url) {
-  if (!url || typeof url !== 'string') return '';
-  url = url.trim();
-  if (url.includes('drive.google.com/file/d/')) {
-    const fileIdMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-    if (fileIdMatch && fileIdMatch[1]) {
-      return `https://drive.google.com/thumbnail?id=${fileIdMatch[1]}&sz=w400`;
-    }
-  }
-  return url;
-}
-
-function htFormatRupiah(num) {
-  const n = parseInt(num, 10) || 0;
-  return 'Rp ' + n.toLocaleString('id-ID');
-}
 
 function formatIndonesianDate(dateStr) {
   if (!dateStr || dateStr === '-') return '-';
@@ -9892,27 +9153,6 @@ function formatIndonesianDate(dateStr) {
   } catch (e) {
     return dateStr;
   }
-}
-
-function terbilang(n) {
-  n = Math.abs(parseInt(n, 10)) || 0;
-  const angka = ['', 'Satu', 'Dua', 'Tiga', 'Empat', 'Lima', 'Enam', 'Tujuh', 'Delapan', 'Sembilan', 'Sepuluh', 'Sebelas'];
-
-  function convert(num) {
-    if (num < 12) return angka[num];
-    if (num < 20) return convert(num - 10) + ' Belas';
-    if (num < 100) return convert(Math.floor(num / 10)) + ' Puluh ' + convert(num % 10);
-    if (num < 200) return 'Seratus ' + convert(num - 100);
-    if (num < 1000) return convert(Math.floor(num / 100)) + ' Ratus ' + convert(num % 100);
-    if (num < 2000) return 'Seribu ' + convert(num - 1000);
-    if (num < 1000000) return convert(Math.floor(num / 1000)) + ' Ribu ' + convert(num % 1000);
-    if (num < 1000000000) return convert(Math.floor(num / 1000000)) + ' Juta ' + convert(num % 1000000);
-    if (num < 1000000000000) return convert(Math.floor(num / 1000000000)) + ' Milyar ' + convert(num % 1000000000);
-    return convert(Math.floor(num / 1000000000000)) + ' Triliun ' + convert(num % 1000000000000);
-  }
-
-  if (n === 0) return 'Nol';
-  return convert(n).replace(/\s+/g, ' ').trim();
 }
 
 window.initDashboardHT = initDashboardHT;
