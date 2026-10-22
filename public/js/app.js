@@ -8761,7 +8761,7 @@ function htRenderMatrixTable() {
     tbody.innerHTML = htMatrixState.filteredDataList.map((item, idx) => {
       let rowHtml = `
         <tr>
-          <td class="ht-col-no" style="font-family:monospace; color:#64748b;">${idx + 1}</td>
+          <td class="ht-col-no" style="color:#64748b; font-weight:600;">${idx + 1}</td>
           <td class="ht-col-porsi">${escapeHtml(item.noPorsi)}</td>
           <td class="ht-col-nama">
             <span style="color:#38bdf8; font-weight:600;">${escapeHtml(item.namaJamaah)}</span>
@@ -8791,11 +8791,14 @@ function htRenderMatrixTable() {
     }).join('');
   }
 
-  // 4. Render Tfoot
+  // 4. Render Tfoot (Kolom sticky tfoot diselaraskan persis dengan thead & tbody)
   const gt = htMatrixState.grandTotal;
   let tfootHtml = `
     <tr>
-      <td colspan="4" class="ht-tfoot-total-label">TOTAL KESELURUHAN</td>
+      <td class="ht-col-no ht-tfoot-sticky-col"></td>
+      <td class="ht-col-porsi ht-tfoot-sticky-col"></td>
+      <td class="ht-col-nama ht-tfoot-sticky-col ht-tfoot-nama-total">TOTAL KESELURUHAN</td>
+      <td class="ht-col-kode" style="background:#0b132b !important; border-top:2px solid #334155; border-right:1px solid #334155;"></td>
       <td class="ht-tfoot-cell">${htFormatMatrixNumber(gt.hargaPaket)}</td>
       <td class="ht-tfoot-cell">${htFormatMatrixNumber(gt.dp)}</td>
       <td class="ht-tfoot-cell yellow">${htFormatMatrixNumber(gt.angsuranBulan)}</td>
