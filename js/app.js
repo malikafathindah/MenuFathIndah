@@ -6907,7 +6907,41 @@ window.updateBioDocStatusBadge = function(docType, url, label) {
   }
 };
 
-window.handleBioDocFileSelect = async function(fileInput, docType) {
+window.checkBioNamaBeforeBrowse = function(event) {
+  const namaInp = document.getElementById('bioNama');
+  const namaVal = (namaInp?.value || '').trim();
+  if (!namaVal) {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    alert('⚠️ Harap isi Nama Karyawan terlebih dahulu sebelum memilih berkas!');
+    if (namaInp) {
+      namaInp.focus();
+      try {
+        namaInp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } catch (e) {}
+    }
+    return false;
+  }
+  return true;
+};
+
+window.handleBioDocFileSelect = function(fileInput, docType) {
+  const namaInp = document.getElementById('bioNama');
+  const namaVal = (namaInp?.value || '').trim();
+  if (!namaVal) {
+    alert('⚠️ Harap isi Nama Karyawan terlebih dahulu sebelum memilih berkas!');
+    fileInput.value = '';
+    if (namaInp) {
+      namaInp.focus();
+      try {
+        namaInp.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } catch (e) {}
+    }
+    return;
+  }
+
   const file = fileInput.files && fileInput.files[0];
   const cfg = BIO_DOC_CONFIG[docType];
   if (!cfg) return;
@@ -6917,72 +6951,23 @@ window.handleBioDocFileSelect = async function(fileInput, docType) {
   const targetInput = document.getElementById(cfg.fieldId);
 
   if (!file) {
-    if (nameEl) nameEl.textContent = 'Belum ada file dipilih';
+    if (targetInput && targetInput.value) {
+      if (nameEl) nameEl.textContent = 'Berkas tersimpan di Drive';
+      updateBioDocStatusBadge(docType, targetInput.value);
+    } else {
+      if (nameEl) nameEl.textContent = 'Belum ada file dipilih';
+      if (statusEl) statusEl.innerHTML = '';
+    }
     delete window._pendingBioFiles[docType];
     return;
   }
 
-  if (nameEl) nameEl.textContent = file.name;
+  // Rekam file lokal terpilih ke antrian, JANGAN langsung unggah ke Google Drive (tunggu tombol Simpan)
   window._pendingBioFiles[docType] = file;
+  if (nameEl) nameEl.textContent = file.name;
 
-  // Nama file spesifik dengan unsur Nama Karyawan dan Jenis Dokumen
-  const rawNama = (document.getElementById('bioNama')?.value || 'Karyawan').trim();
-  const rawNik = (document.getElementById('bioNik')?.value || '').trim();
-  const cleanNama = rawNama.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
-  const cleanNik = rawNik.replace(/[^a-zA-Z0-9]/g, '_');
-  const ext = file.name.split('.').pop() || (docType === 'FOTO' ? 'jpg' : 'pdf');
-  const specificFileName = `${cfg.prefix}_${cleanNama}${cleanNik ? '_' + cleanNik : ''}.${ext}`;
-
-  // Ambil Webhook Google Drive
-  const webhookUrl = getGDriveWebhookUrl();
-
-  if (!webhookUrl) {
-    if (statusEl) {
-      statusEl.innerHTML = `<span style="color:#fbbf24; font-size:0.75rem;"><i class="fa-solid fa-file-circle-check"></i> File <strong>"${specificFileName}"</strong> dipilih. <a href="javascript:void(0)" onclick="openGDriveConfigModal()" style="color:#38bdf8; text-decoration:underline;">Pasang Webhook Drive</a> agar terunggah otomatis ke Google Drive.</span>`;
-    }
-    return;
-  }
-
-  // Upload langsung ke Google Drive folder 1cHGrQ2cOzcAJ_MYq8MLi96droVIMPvcr
   if (statusEl) {
-    statusEl.innerHTML = `<span class="status-uploading"><i class="fa-solid fa-spinner fa-spin text-cyan"></i> Mengunggah ${specificFileName} ke Google Drive...</span>`;
-  }
-
-  try {
-    const base64Data = await readFileAsBase64(file);
-    const scriptPayload = {
-      folderId: '1cHGrQ2cOzcAJ_MYq8MLi96droVIMPvcr',
-      fileName: specificFileName,
-      mimeType: file.type || 'application/octet-stream',
-      base64: base64Data
-    };
-
-    const res = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(scriptPayload)
-    });
-
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
-    }
-
-    const data = await res.json();
-    if (data.success && (data.directLink || data.fileUrl)) {
-      const driveUrl = data.directLink || data.fileUrl;
-      if (targetInput) targetInput.value = driveUrl;
-      delete window._pendingBioFiles[docType];
-      if (statusEl) {
-        statusEl.innerHTML = `<span class="status-success"><i class="fa-solid fa-circle-check"></i> <a href="${driveUrl}" target="_blank" style="color:#34d399; text-decoration:underline; font-weight:600;"><i class="fa-solid fa-arrow-up-right-from-square"></i> Tersimpan di Google Drive: ${specificFileName}</a></span>`;
-      }
-    } else {
-      throw new Error(data.message || 'Gagal upload');
-    }
-  } catch (err) {
-    console.warn(`Upload ${docType} gagal:`, err);
-    if (statusEl) {
-      statusEl.innerHTML = `<span class="status-error"><i class="fa-solid fa-circle-exclamation"></i> Gagal upload: ${err.message}. File akan tetap diunggah saat tombol Simpan ditekan.</span>`;
-    }
+    statusEl.innerHTML = `<span style="color:#fbbf24; font-size:0.78rem; display:inline-flex; align-items:center; gap:5px;"><i class="fa-solid fa-clock"></i> File lokal <strong>"${file.name}"</strong> dipilih. Berkas akan diunggah ke Google Drive saat tombol <strong>"Simpan Data Karyawan"</strong> ditekan.</span>`;
   }
 };
 
@@ -7002,6 +6987,11 @@ function resetBioKaryawanForm() {
 
   ['FOTO', 'KTP', 'NPWP', 'KK'].forEach(dt => {
     updateBioDocStatusBadge(dt, null);
+    const cfg = BIO_DOC_CONFIG[dt];
+    if (cfg) {
+      const hid = document.getElementById(cfg.fieldId);
+      if (hid) hid.value = '';
+    }
     const fileInp = document.getElementById(
       dt === 'FOTO' ? 'bioFotoFile' :
       dt === 'KTP' ? 'bioKtpFile' :
@@ -7014,6 +7004,12 @@ function resetBioKaryawanForm() {
       dt === 'NPWP' ? 'nameBioNpwp' : 'nameBioKk'
     );
     if (nameEl) nameEl.textContent = 'Belum ada file dipilih';
+    const statusEl = document.getElementById(
+      dt === 'FOTO' ? 'statusBioFoto' :
+      dt === 'KTP' ? 'statusBioKtp' :
+      dt === 'NPWP' ? 'statusBioNpwp' : 'statusBioKk'
+    );
+    if (statusEl) statusEl.innerHTML = '';
   });
   window._pendingBioFiles = {};
 }
@@ -7137,19 +7133,81 @@ window.handleBioKaryawanSubmit = async function(event) {
     btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Mempersiapkan Dokumen...';
   }
 
-  // 1. Auto-upload pending files jika ada Webhook Apps Script
+  // 1. Unggah berkas ke Google Drive hanya saat tombol Simpan ditekan (mencegah duplicate upload)
   const webhookUrl = getGDriveWebhookUrl();
   const pendingDocTypes = Object.keys(window._pendingBioFiles || {});
-  if (pendingDocTypes.length > 0 && webhookUrl) {
-    for (const dt of pendingDocTypes) {
-      const fileInp = document.getElementById(
-        dt === 'FOTO' ? 'bioFotoFile' :
-        dt === 'KTP' ? 'bioKtpFile' :
-        dt === 'NPWP' ? 'bioNpwpFile' : 'bioKkFile'
-      );
-      if (fileInp && fileInp.files && fileInp.files[0]) {
-        if (btnSubmit) btnSubmit.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Mengunggah berkas ${dt} ke Google Drive...`;
-        await window.handleBioDocFileSelect(fileInp, dt);
+
+  if (pendingDocTypes.length > 0) {
+    if (!webhookUrl) {
+      alert('⚠️ Perhatian: Webhook Google Drive belum dikonfigurasi. Berkas belum dapat diunggah ke Google Drive. Silakan atur Webhook Google Drive di konfigurasi.');
+    } else {
+      for (const dt of pendingDocTypes) {
+        const file = window._pendingBioFiles[dt];
+        const cfg = BIO_DOC_CONFIG[dt];
+        if (!file || !cfg) continue;
+
+        const nameEl = document.getElementById(cfg.nameId);
+        const statusEl = document.getElementById(cfg.statusId);
+        const targetInput = document.getElementById(cfg.fieldId);
+
+        // Format nama file spesifik: [PREFIX]_[Nama]_[NIK].[ext]
+        const cleanNama = nama.replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_');
+        const cleanNik = nik.replace(/[^a-zA-Z0-9]/g, '_');
+        const ext = file.name.split('.').pop() || (dt === 'FOTO' ? 'jpg' : 'pdf');
+        const specificFileName = `${cfg.prefix}_${cleanNama}${cleanNik ? '_' + cleanNik : ''}.${ext}`;
+
+        if (btnSubmit) {
+          btnSubmit.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Mengunggah ${cfg.label} ke Google Drive...`;
+        }
+        if (statusEl) {
+          statusEl.innerHTML = `<span class="status-uploading"><i class="fa-solid fa-spinner fa-spin text-cyan"></i> Mengunggah ${specificFileName} ke Google Drive...</span>`;
+        }
+
+        try {
+          const base64Data = await readFileAsBase64(file);
+          const scriptPayload = {
+            folderId: '1cHGrQ2cOzcAJ_MYq8MLi96droVIMPvcr',
+            fileName: specificFileName,
+            mimeType: file.type || 'application/octet-stream',
+            base64: base64Data
+          };
+
+          const res = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(scriptPayload)
+          });
+
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+          }
+
+          const data = await res.json();
+          if (data.success && (data.directLink || data.fileUrl)) {
+            const driveUrl = data.directLink || data.fileUrl;
+            if (targetInput) targetInput.value = driveUrl;
+            if (statusEl) {
+              statusEl.innerHTML = `<span class="status-success"><i class="fa-solid fa-circle-check"></i> <a href="${driveUrl}" target="_blank" style="color:#34d399; text-decoration:underline; font-weight:600;"><i class="fa-solid fa-arrow-up-right-from-square"></i> Tersimpan di Google Drive: ${specificFileName}</a></span>`;
+            }
+            if (nameEl) nameEl.textContent = specificFileName;
+            delete window._pendingBioFiles[dt];
+          } else {
+            throw new Error(data.message || 'Gagal upload ke Google Drive');
+          }
+        } catch (uploadErr) {
+          console.error(`Upload ${dt} error:`, uploadErr);
+          if (statusEl) {
+            statusEl.innerHTML = `<span class="status-error"><i class="fa-solid fa-circle-exclamation"></i> Gagal upload: ${uploadErr.message}</span>`;
+          }
+          const proceed = confirm(`Berkas ${cfg.label} gagal diunggah ke Google Drive (${uploadErr.message}). Apakah Anda ingin tetap melanjutkan menyimpan biodata ke database?`);
+          if (!proceed) {
+            if (btnSubmit) {
+              btnSubmit.disabled = false;
+              btnSubmit.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan Data Karyawan';
+            }
+            return;
+          }
+        }
       }
     }
   }
