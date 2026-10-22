@@ -7148,26 +7148,158 @@ function kelengkapanUmrahApp() {
           fetch('/api/jamaah/all').then(r => r.json()).catch(() => ({ data: [] }))
         ]);
 
-        this.kelengkapanUmrahList = kRes.data || [];
-        this.kelengkapanJamaahMasterList = (jRes.data || []).map(j => ({
-          id: j.id_jamaah || j.id || '',
-          namaLengkap: j.nama_jamaah || j.nama || '',
-          jenisPaket: j.paket || j.nama_paket || '',
-          namaAgen: j.agent || j.nama_agen || j.referensi || '',
-          agent: j.agent || j.nama_agen || j.referensi || '',
-          noPassport: j.no_paspor || j.nomor_paspor || '-',
-          hasKelengkapan: (this.kelengkapanUmrahList || []).some(k => (k.idJamaah || k.id_jamaah) === (j.id_jamaah || j.id))
-        }));
+        let rawJamaah = (jRes && jRes.data) ? jRes.data : [];
+        if (!rawJamaah || rawJamaah.length === 0) {
+          try {
+            const fallbackJ = await fetch('/data/data_jamaah.json').then(r => r.json());
+            if (Array.isArray(fallbackJ)) rawJamaah = fallbackJ;
+          } catch(e) {}
+        }
 
-        // Build list of distinct package names
+        let rawKelengkapan = (kRes && kRes.data) ? kRes.data : [];
+        if (!rawKelengkapan || rawKelengkapan.length === 0) {
+          try {
+            const fallbackK = await fetch('/data/kelengkapan_umrah.json').then(r => r.json());
+            if (Array.isArray(fallbackK)) rawKelengkapan = fallbackK;
+          } catch(e) {}
+        }
+
+        // Build lookup map for Jamaah
+        const jamaahMap = {};
+        rawJamaah.forEach(j => {
+          const jId = (j.id_jamaah || j.id || j['ID Jamaah'] || '').toUpperCase().trim();
+          if (jId) jamaahMap[jId] = j;
+        });
+
+        // 1. Map Master Jamaah List
+        this.kelengkapanJamaahMasterList = rawJamaah.map(j => {
+          const idJ = j.id_jamaah || j.id || j['ID Jamaah'] || '';
+          const name = j.nama_lengkap || j['Nama Lengkap'] || j.nama_jamaah || j.nama || 'Tanpa Nama';
+          const pName = (j.jenis_paket_umrah || j['Jenis Paket Umrah'] || j.paket || j.nama_paket || 'Umrah Reguler').trim();
+          const ag = j.namaagen || j.agent || j.nama_agen || j['Nama Agen'] || j.referensi || j['Referensi'] || '-';
+          const paspor = j.nomor_passport || j['Nomor Passport'] || j.no_paspor || j.nomor_paspor || '-';
+
+          const hasKel = rawKelengkapan.some(k => {
+            const kId = (k.id_jamaah || k.idJamaah || k['ID Jamaah'] || '').toUpperCase().trim();
+            return kId === idJ.toUpperCase().trim();
+          });
+
+          return {
+            id: idJ,
+            id_jamaah: idJ,
+            namaLengkap: name,
+            nama_lengkap: name,
+            nama_jamaah: name,
+            jenisPaket: pName,
+            namaPaket: pName,
+            nama_paket: pName,
+            namaAgen: ag,
+            agent: ag,
+            noPassport: paspor,
+            nomor_passport: paspor,
+            hasKelengkapan: hasKel
+          };
+        });
+
+        // 2. Map and Normalize Kelengkapan List
+        this.kelengkapanUmrahList = rawKelengkapan.map((k, idx) => {
+          const kId = (k.id_jamaah || k.idJamaah || k['ID Jamaah'] || '').toUpperCase().trim();
+          const jInfo = jamaahMap[kId] || {};
+
+          let nama = k.nama_jamaah || k.namaJamaah || k['Nama Jamaah'] || '';
+          if (!nama || /^\d+$/.test(String(nama).trim())) {
+            nama = jInfo.nama_lengkap || jInfo['Nama Lengkap'] || jInfo.nama || nama;
+          }
+
+          let paket = k.nama_paket || k.namaPaket || k['Nama Paket'] || '';
+          if (!paket || /^\d+$/.test(String(paket).trim())) {
+            paket = jInfo.jenis_paket_umrah || jInfo['Jenis Paket Umrah'] || jInfo.paket || paket;
+          }
+
+          let ag = k.agent || k['Agent'] || '';
+          if (!ag || /^\d+$/.test(String(ag).trim())) {
+            ag = jInfo.namaagen || jInfo.referensi || jInfo['Referensi'] || '-';
+          }
+
+          const cleanVal = (val) => {
+            if (!val) return '';
+            const s = String(val).trim();
+            return /^\d+$/.test(s) && s.length <= 2 ? '' : s;
+          };
+
+          const noVisa = cleanVal(k.no_visa || k.noVisa || k['No Visa']);
+          const tglBerlakuVisa = k.tanggal_berlaku_visa || k.tglBerlakuVisa || k['Tanggal Berlaku Visa'] || '';
+          const tglAkhirVisa = k.tanggal_akhir_visa || k.tglAkhirVisa || k['Tanggal Akhir Visa'] || '';
+          const uploadVisa = cleanVal(k.upload_visa || k.uploadVisa || k['Upload Visa']);
+
+          const noPolis = cleanVal(k.no_polis || k.noPolis || k['No Polis']);
+          const tglInputPolis = k.tanggal_input_polis || k.tglInputPolis || k['Tanggal Input Polis'] || '';
+          const tglAwalPolis = k.tanggal_awal_polis || k.tglAwalPolis || k['Tanggal Awal Polis'] || '';
+          const tglAkhirPolis = k.tanggal_akhir_polis || k.tglAkhirPolis || k['Tanggal Akhir Polis'] || '';
+          const uploadAsuransi = cleanVal(k.upload_asuransi || k.uploadAsuransi || k['Upload Asuransi']);
+
+          const noBpjs = cleanVal(k.nomor_bpjs || k.no_bpjs || k.noBpjs || k['Nomor BPJS']);
+          const uploadBpjs = cleanVal(k.upload_bpjs || k.uploadBpjs || k['Upload BPJS']);
+
+          let status = k.status_kelengkapan || k.statusKelengkapan || k['Status Kelengkapan'] || '';
+          if (!status || /^\d+$/.test(String(status).trim())) {
+            const hasV = Boolean(noVisa || uploadVisa);
+            const hasP = Boolean(noPolis || uploadAsuransi);
+            const hasB = Boolean(noBpjs || uploadBpjs);
+            if (hasV && hasP && hasB) status = 'Lengkap';
+            else if (hasV || hasP || hasB) status = 'Sebagian';
+            else status = 'Belum Lengkap';
+          }
+
+          const idKel = k.id_kelengkapan || k.idKelengkapan || k['ID Kelengkapan'] || ('KUM-' + String(idx + 1).padStart(3, '0'));
+
+          return {
+            ...k,
+            idKelengkapan: idKel,
+            id_kelengkapan: idKel,
+            idJamaah: kId || k.id_jamaah || k.idJamaah || '',
+            id_jamaah: kId || k.id_jamaah || k.idJamaah || '',
+            namaJamaah: nama || kId,
+            nama_jamaah: nama || kId,
+            namaPaket: paket || '-',
+            nama_paket: paket || '-',
+            agent: ag || '-',
+            noVisa: noVisa,
+            no_visa: noVisa,
+            tglBerlakuVisa: tglBerlakuVisa,
+            tanggal_berlaku_visa: tglBerlakuVisa,
+            tglAkhirVisa: tglAkhirVisa,
+            tanggal_akhir_visa: tglAkhirVisa,
+            uploadVisa: uploadVisa,
+            upload_visa: uploadVisa,
+            noPolis: noPolis,
+            no_polis: noPolis,
+            tglInputPolis: tglInputPolis,
+            tanggal_input_polis: tglInputPolis,
+            tglAwalPolis: tglAwalPolis,
+            tanggal_awal_polis: tglAwalPolis,
+            tglAkhirPolis: tglAkhirPolis,
+            tanggal_akhir_polis: tglAkhirPolis,
+            uploadAsuransi: uploadAsuransi,
+            upload_asuransi: uploadAsuransi,
+            noBpjs: noBpjs,
+            nomor_bpjs: noBpjs,
+            uploadBpjs: uploadBpjs,
+            upload_bpjs: uploadBpjs,
+            statusKelengkapan: status,
+            status_kelengkapan: status
+          };
+        });
+
+        // 3. Distinct package list
         const pkts = new Set();
         this.kelengkapanJamaahMasterList.forEach(j => {
-          if (j.jenisPaket) pkts.add(j.jenisPaket);
+          if (j.jenisPaket && j.jenisPaket !== '-') pkts.add(j.jenisPaket.trim());
         });
         this.kelengkapanUmrahList.forEach(k => {
-          if (k.namaPaket) pkts.add(k.namaPaket);
+          if (k.namaPaket && k.namaPaket !== '-' && !/^\d+$/.test(k.namaPaket)) pkts.add(k.namaPaket.trim());
         });
-        this.kelengkapanPaketList = Array.from(pkts).filter(Boolean);
+        this.kelengkapanPaketList = Array.from(pkts).filter(Boolean).sort();
 
         if (force && window.Swal) {
           Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Data kelengkapan berhasil disegarkan!', timer: 2500, showConfirmButton: false });
@@ -7181,11 +7313,13 @@ function kelengkapanUmrahApp() {
 
     getFilteredJamaahForKelengkapan() {
       if (!this.kelengkapanFilterPaket) return [];
-      return (this.kelengkapanJamaahMasterList || []).filter(j => j.jenisPaket === this.kelengkapanFilterPaket);
+      const sel = (this.kelengkapanFilterPaket || '').trim().toLowerCase();
+      return (this.kelengkapanJamaahMasterList || []).filter(j => (j.jenisPaket || '').trim().toLowerCase() === sel);
     },
 
     getJamaahCountInPaket(paketName) {
-      return (this.kelengkapanJamaahMasterList || []).filter(j => j.jenisPaket === paketName).length;
+      const p = (paketName || '').trim().toLowerCase();
+      return (this.kelengkapanJamaahMasterList || []).filter(j => (j.jenisPaket || '').trim().toLowerCase() === p).length;
     },
 
     getFilteredKelengkapanRecords() {
@@ -7193,13 +7327,13 @@ function kelengkapanUmrahApp() {
       const q = (this.kelengkapanSearchKeyword || '').toLowerCase().trim();
       if (q) {
         list = list.filter(k => 
-          (k.namaJamaah && k.namaJamaah.toLowerCase().includes(q)) ||
-          (k.idJamaah && k.idJamaah.toLowerCase().includes(q)) ||
-          (k.namaPaket && k.namaPaket.toLowerCase().includes(q)) ||
-          (k.agent && k.agent.toLowerCase().includes(q)) ||
-          (k.noVisa && k.noVisa.toLowerCase().includes(q)) ||
-          (k.noPolis && k.noPolis.toLowerCase().includes(q)) ||
-          (k.noBpjs && k.noBpjs.toLowerCase().includes(q))
+          (k.namaJamaah && String(k.namaJamaah).toLowerCase().includes(q)) ||
+          (k.idJamaah && String(k.idJamaah).toLowerCase().includes(q)) ||
+          (k.namaPaket && String(k.namaPaket).toLowerCase().includes(q)) ||
+          (k.agent && String(k.agent).toLowerCase().includes(q)) ||
+          (k.noVisa && String(k.noVisa).toLowerCase().includes(q)) ||
+          (k.noPolis && String(k.noPolis).toLowerCase().includes(q)) ||
+          (k.noBpjs && String(k.noBpjs).toLowerCase().includes(q))
         );
       }
       if (this.kelengkapanFilterStatus && this.kelengkapanFilterStatus !== 'Semua') {
@@ -7209,6 +7343,9 @@ function kelengkapanUmrahApp() {
     },
 
     getKelengkapanCountByStatus(status) {
+      if (status === 'Belum Lengkap') {
+        return (this.kelengkapanUmrahList || []).filter(k => k.statusKelengkapan !== 'Lengkap').length;
+      }
       return (this.kelengkapanUmrahList || []).filter(k => k.statusKelengkapan === status).length;
     },
 
@@ -7226,18 +7363,19 @@ function kelengkapanUmrahApp() {
         return;
       }
 
-      const found = (this.kelengkapanJamaahMasterList || []).find(j => j.id === id);
+      const cleanId = String(id).toUpperCase().trim();
+      const found = (this.kelengkapanJamaahMasterList || []).find(j => (j.id || '').toUpperCase().trim() === cleanId);
       this.selectedKelengkapanJamaah = found || { id, namaLengkap: id, jenisPaket: this.kelengkapanFilterPaket, agent: '-' };
 
       // Cari apakah sudah ada data kelengkapan tersimpan
-      const existing = (this.kelengkapanUmrahList || []).find(k => (k.idJamaah || k.id_jamaah) === id);
+      const existing = (this.kelengkapanUmrahList || []).find(k => (k.idJamaah || k.id_jamaah || '').toUpperCase().trim() === cleanId);
       if (existing) {
         this.kelengkapanForm = {
           idKelengkapan: existing.idKelengkapan || existing.id_kelengkapan || '',
           idJamaah: existing.idJamaah || existing.id_jamaah || id,
-          namaJamaah: existing.namaJamaah || existing.nama_jamaah || found.namaLengkap,
-          namaPaket: existing.namaPaket || existing.nama_paket || found.jenisPaket,
-          agent: existing.agent || found.agent || '-',
+          namaJamaah: existing.namaJamaah || existing.nama_jamaah || (found ? found.namaLengkap : ''),
+          namaPaket: existing.namaPaket || existing.nama_paket || (found ? found.jenisPaket : this.kelengkapanFilterPaket),
+          agent: existing.agent || (found ? (found.agent || found.namaAgen || '-') : '-'),
           noVisa: existing.noVisa || existing.no_visa || '',
           tglBerlakuVisa: existing.tglBerlakuVisa || existing.tgl_berlaku_visa || '',
           tglAkhirVisa: existing.tglAkhirVisa || existing.tgl_akhir_visa || '',
@@ -7249,7 +7387,7 @@ function kelengkapanUmrahApp() {
           uploadAsuransi: existing.uploadAsuransi || existing.upload_asuransi || '',
           noBpjs: existing.noBpjs || existing.no_bpjs || '',
           uploadBpjs: existing.uploadBpjs || existing.upload_bpjs || '',
-          statusKelengkapan: existing.statusKelengkapan || existing.status_kelengkapan || 'Lengkap'
+          statusKelengkapan: existing.statusKelengkapan || existing.status_kelengkapan || 'Belum Lengkap'
         };
       } else {
         this.resetKelengkapanForm();
@@ -7262,8 +7400,15 @@ function kelengkapanUmrahApp() {
 
     editKelengkapanRecord(item) {
       this.kelengkapanViewTab = 'form';
-      if (item.namaPaket) this.kelengkapanFilterPaket = item.namaPaket;
-      this.onKelengkapanJamaahSelect(item.idJamaah);
+      const jId = item.idJamaah || item.id_jamaah;
+      const cleanId = String(jId).toUpperCase().trim();
+      const found = (this.kelengkapanJamaahMasterList || []).find(j => (j.id || '').toUpperCase().trim() === cleanId);
+      if (found && found.jenisPaket) {
+        this.kelengkapanFilterPaket = found.jenisPaket;
+      } else if (item.namaPaket && item.namaPaket !== '-') {
+        this.kelengkapanFilterPaket = item.namaPaket;
+      }
+      this.onKelengkapanJamaahSelect(jId);
       if (window.Swal) {
         Swal.fire({ toast: true, position: 'top-end', icon: 'info', title: 'Data kelengkapan dimuat ke formulir', timer: 2000, showConfirmButton: false });
       }
@@ -7316,10 +7461,10 @@ function kelengkapanUmrahApp() {
       this.isSavingKelengkapan = true;
 
       // Auto hitung status kelengkapan
-      const hasVisa = Boolean(this.kelengkapanForm.noVisa);
-      const hasPolis = Boolean(this.kelengkapanForm.noPolis);
-      const hasBpjs = Boolean(this.kelengkapanForm.noBpjs);
-      let status = 'Belum Ada Data';
+      const hasVisa = Boolean(this.kelengkapanForm.noVisa || this.kelengkapanForm.uploadVisa);
+      const hasPolis = Boolean(this.kelengkapanForm.noPolis || this.kelengkapanForm.uploadAsuransi);
+      const hasBpjs = Boolean(this.kelengkapanForm.noBpjs || this.kelengkapanForm.uploadBpjs);
+      let status = 'Belum Lengkap';
       if (hasVisa && hasPolis && hasBpjs) {
         status = 'Lengkap';
       } else if (hasVisa || hasPolis || hasBpjs) {
@@ -7329,22 +7474,36 @@ function kelengkapanUmrahApp() {
 
       try {
         const payload = {
+          id_kelengkapan: this.kelengkapanForm.idKelengkapan || ('KUM-' + Date.now().toString().slice(-6)),
+          id_jamaah: this.kelengkapanForm.idJamaah,
+          nama_jamaah: this.kelengkapanForm.namaJamaah,
+          nama_paket: this.kelengkapanForm.namaPaket,
+          agent: this.kelengkapanForm.agent,
+          no_visa: this.kelengkapanForm.noVisa,
+          tanggal_berlaku_visa: this.kelengkapanForm.tglBerlakuVisa || null,
+          tanggal_akhir_visa: this.kelengkapanForm.tglAkhirVisa || null,
+          upload_visa: this.kelengkapanForm.uploadVisa,
+          no_polis: this.kelengkapanForm.noPolis,
+          tanggal_input_polis: this.kelengkapanForm.tglInputPolis || new Date().toISOString().slice(0, 10),
+          tanggal_awal_polis: this.kelengkapanForm.tglAwalPolis || null,
+          tanggal_akhir_polis: this.kelengkapanForm.tglAkhirPolis || null,
+          upload_asuransi: this.kelengkapanForm.uploadAsuransi,
+          nomor_bpjs: this.kelengkapanForm.noBpjs,
+          upload_bpjs: this.kelengkapanForm.uploadBpjs,
+          status_kelengkapan: status,
+          // camelCase aliases
           idKelengkapan: this.kelengkapanForm.idKelengkapan || ('KUM-' + Date.now().toString().slice(-6)),
           idJamaah: this.kelengkapanForm.idJamaah,
           namaJamaah: this.kelengkapanForm.namaJamaah,
           namaPaket: this.kelengkapanForm.namaPaket,
-          agent: this.kelengkapanForm.agent,
           noVisa: this.kelengkapanForm.noVisa,
           tglBerlakuVisa: this.kelengkapanForm.tglBerlakuVisa,
           tglAkhirVisa: this.kelengkapanForm.tglAkhirVisa,
-          uploadVisa: this.kelengkapanForm.uploadVisa,
           noPolis: this.kelengkapanForm.noPolis,
-          tglInputPolis: this.kelengkapanForm.tglInputPolis || new Date().toISOString().slice(0, 10),
+          tglInputPolis: this.kelengkapanForm.tglInputPolis,
           tglAwalPolis: this.kelengkapanForm.tglAwalPolis,
           tglAkhirPolis: this.kelengkapanForm.tglAkhirPolis,
-          uploadAsuransi: this.kelengkapanForm.uploadAsuransi,
           noBpjs: this.kelengkapanForm.noBpjs,
-          uploadBpjs: this.kelengkapanForm.uploadBpjs,
           statusKelengkapan: status
         };
 

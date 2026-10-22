@@ -1085,6 +1085,12 @@ function switchModule(moduleName) {
   if (viewId === 'kelengkapan_umrah') {
     if (window.appKelengkapanInstance && typeof window.appKelengkapanInstance.loadKelengkapanUmrahData === 'function') {
       window.appKelengkapanInstance.loadKelengkapanUmrahData();
+    } else {
+      setTimeout(() => {
+        if (window.appKelengkapanInstance && typeof window.appKelengkapanInstance.loadKelengkapanUmrahData === 'function') {
+          window.appKelengkapanInstance.loadKelengkapanUmrahData();
+        }
+      }, 350);
     }
   }
   if (viewId === 'settings') renderSettings();
