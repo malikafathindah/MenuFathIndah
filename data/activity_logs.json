@@ -1,5 +1,16 @@
 [
   {
+    "LogID": "LOG-W93X8CEG",
+    "Timestamp": "2026-10-22 21:13:21",
+    "Username": "admin",
+    "IP_Address": "127.0.0.1 (Localhost)",
+    "Maps_URL": "https://www.google.com/maps?q=-6.323021878624052,106.7572956830909",
+    "Location": "RW 02, Pisangan, Ciputat Timur",
+    "Action": "LOGIN_SUCCESS (User ADMINISTRATOR UTAMA berhasil login pada 2026-10-22 21:13:21)",
+    "Module": "Auth",
+    "isNewSessionLog": true
+  },
+  {
     "LogID": "LOG-K2G674AX",
     "Timestamp": "2026-10-22 09:04:40",
     "Username": "admin",
