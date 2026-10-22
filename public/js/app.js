@@ -742,7 +742,10 @@ function renderSidebarMenu() {
     categories[cat].forEach(m => {
       const isCurrentActive = state.activeModule === m.ModuleID || 
         (m.ModuleID === 'mod_dashboard' && state.activeModule === 'dashboard') ||
-        (m.ModuleID === 'mod_data_jamaah' && state.activeModule === 'jamaah') ||
+        (m.ModuleID === 'mod_data_jamaah' && (state.activeModule === 'jamaah' || state.activeModule === 'mod_data_jamaah')) ||
+        (m.ModuleID === 'mod_form_input_jamaah' && (state.activeModule === 'jamaah' || state.activeModule === 'mod_form_input_jamaah')) ||
+        (m.ModuleID === 'mod_pembayaran_group' && (state.activeModule === 'pembayaran_group' || state.activeModule === 'mod_pembayaran_group')) ||
+        (m.ModuleID === 'mod_kelengkapan_umrah' && (state.activeModule === 'kelengkapan_umrah' || state.activeModule === 'mod_kelengkapan_umrah')) ||
         (m.ModuleID === 'mod_logs' && state.activeModule === 'logs') ||
         (m.ModuleID === 'mod_users' && state.activeModule === 'users') ||
         (m.ModuleID === 'mod_cuti_karyawan' && state.activeModule === 'cuti_absensi') ||
@@ -964,6 +967,8 @@ function switchModule(moduleName) {
   let viewId = moduleName;
   if (moduleName === 'mod_dashboard') viewId = 'dashboard';
   else if (moduleName === 'mod_data_jamaah' || moduleName === 'mod_form_input_jamaah') viewId = 'jamaah';
+  else if (moduleName === 'mod_pembayaran_group' || moduleName === 'mod_pembayaran_jamaah') viewId = 'pembayaran_group';
+  else if (moduleName === 'mod_kelengkapan_umrah' || moduleName === 'mod_input_kelengkapan_umrah') viewId = 'kelengkapan_umrah';
   else if (moduleName === 'mod_logs') viewId = 'logs';
   else if (moduleName === 'mod_users' || moduleName === 'mod_sistem_user') viewId = 'users';
   else if (moduleName === 'mod_attendance' || moduleName === 'rekap_absensi' || moduleName === 'mod_rekap_absensi') viewId = 'rekap_absensi';
@@ -1027,6 +1032,8 @@ function switchModule(moduleName) {
     upload_dok: { title: 'Pusat Unggahan Dokumen Fisik Karyawan', breadcrumb: 'SDM & Personalia / Berkas KTP, KK, Ijazah ke Google Drive' },
     slip_gaji: { title: 'Lihat Dokumen Slip Gaji Karyawan', breadcrumb: 'Keuangan & SDM / Pratinjau Slip Gaji Resmi' },
     dashboard_ht: { title: 'Dashboard Haji Terencana', breadcrumb: 'Haji / Dashboard Agregasi Angsuran Khusus Jamaah Haji Terencana' },
+    pembayaran_group: { title: 'Sistem Pembayaran Jamaah & Kolektif Agen', breadcrumb: 'Umrah / Transaksi Individual, Kolektif & Matriks Bulanan' },
+    kelengkapan_umrah: { title: 'Input Kelengkapan Data Umrah', breadcrumb: 'Umrah / Pencatatan Dokumen Visa, Asuransi Polis & BPJS' },
     settings: { title: 'Konfigurasi Database', breadcrumb: 'Sistem / Pengalihan Google Sheets & Supabase' }
   };
 
@@ -1055,6 +1062,28 @@ function switchModule(moduleName) {
   if (viewId === 'upload_dok') initUploadDocView();
   if (viewId === 'slip_gaji') initSlipGajiView();
   if (viewId === 'dashboard_ht') initDashboardHT();
+  if (viewId === 'jamaah') {
+    if (window.appCoreInstance && typeof window.appCoreInstance.fetchJamaahData === 'function') {
+      window.appCoreInstance.currentModule = moduleName;
+      if (moduleName === 'mod_form_input_jamaah') {
+        window.appCoreInstance.activeSubTab = 'form';
+      } else {
+        window.appCoreInstance.activeSubTab = 'table';
+      }
+      window.appCoreInstance.fetchJamaahData();
+    }
+  }
+  if (viewId === 'pembayaran_group') {
+    if (window.appPaymentInstance && typeof window.appPaymentInstance.refreshAllData === 'function') {
+      window.appPaymentInstance.currentModule = moduleName;
+      window.appPaymentInstance.refreshAllData();
+    }
+  }
+  if (viewId === 'kelengkapan_umrah') {
+    if (window.appKelengkapanInstance && typeof window.appKelengkapanInstance.loadKelengkapanUmrahData === 'function') {
+      window.appKelengkapanInstance.loadKelengkapanUmrahData();
+    }
+  }
   if (viewId === 'settings') renderSettings();
 }
 
@@ -9013,3 +9042,578 @@ function formatIndonesianDate(dateStr) {
 }
 
 window.initDashboardHT = initDashboardHT;
+
+
+
+// ============================================================================
+// 14. GOOGLE APPS SCRIPT BRIDGE & SUPABASE CRUD HANDLERS (JAMAAH & UMRAH)
+// ============================================================================
+
+(function initGoogleScriptBridge() {
+  if (typeof window.google === 'undefined') {
+    window.google = {};
+  }
+  if (!window.google.script) {
+    window.google.script = {};
+  }
+
+  window.sessionToken = window.sessionToken || 'TOKEN_DEMO_2026';
+
+  window.google.script.run = {
+    _successHandler: null,
+    _failureHandler: null,
+
+    withSuccessHandler(fn) {
+      const copy = Object.assign({}, this);
+      copy._successHandler = fn;
+      return copy;
+    },
+
+    withFailureHandler(fn) {
+      const copy = Object.assign({}, this);
+      copy._failureHandler = fn;
+      return copy;
+    },
+
+    // --- 1. Data Jamaah API ---
+    async getJamaahList() {
+      try {
+        const res = await fetch('/api/jamaah/all');
+        const json = await res.json();
+        const list = (json && json.data) ? json.data : [];
+        const mapped = list.map((j, idx) => ({
+          rowIndex: idx + 2,
+          id: j.id_jamaah || j.id || ('JM-' + (idx + 1)),
+          dbId: j.id,
+          timestamp: j.timestamp || '',
+          referensi: j.referensi || '',
+          namaLengkap: j.nama_lengkap || '',
+          namaAyah: j.nama_ayah_kandung || '',
+          tempatLahir: j.tempat_lahir || '',
+          tanggalLahir: j.tanggal_lahir || '',
+          jenisKelamin: j.jenis_kelamin || 'Laki-laki',
+          statusPernikahan: j.status_pernikahan || '',
+          titel: j.titel || (j.jenis_kelamin === 'Perempuan' ? 'Hj.' : 'H.'),
+          alamatKtp: j.alamat_ktp || '',
+          kelurahan: j.kelurahan_desa || '',
+          kecamatan: j.kecamatan || '',
+          kabupaten: j.kabupaten_kota || '',
+          provinsi: j.provinsi || '',
+          kodePos: j.kode_pos || '',
+          noKtp: j.nomor_ktp || '',
+          noHp: j.nomor_seluler || '',
+          noTelpRumah: j.nomor_telepon_rumah || '',
+          noHpKeluarga: j.nomor_seluler_keluarga || '',
+          email: j.email_address || '',
+          pendidikan: j.pendidikan_terakhir || '',
+          pekerjaan: j.pekerjaan || '',
+          noPassport: j.nomor_passport || '',
+          tempatPaspor: j.tempat_dikeluarkan_paspor || '',
+          tglDikeluarkanPaspor: j.tanggal_dikeluarkan_paspor || '',
+          tglExpiredPaspor: j.tanggal_berakhir_paspor || '',
+          jenisPaket: j.jenis_paket_umrah || 'Paket Reguler',
+          rencanaKeberangkatan: j.tanggal_keberangkatan || '',
+          tglKeberangkatan: j.tanggal_keberangkatan || '',
+          caraPembayaran: j.cara_pembayaran || 'Transfer Bank',
+          ukuranBaju: j.ukuran_baju || 'L',
+          kantorCabang: j.kantor_cabang || 'Pusat',
+          uploadKtp: j.upload_ktp || '',
+          uploadPasport: j.upload_pasport || '',
+          bukuNikah: j.buku_nikah || '',
+          suratNikah: j.surat_nikah || '',
+          fotoJamaah: j.foto_jamaah || '',
+          kartuKeluarga: j.kartu_keluarga || '',
+          uploadBuktiTransfer: j.upload_bukti_transfer || '',
+          tglDaftar: j.tanggal_daftar || '',
+          tipeKamar: j.tipe_kamar || 'Quad',
+          hargaPaket: Number(j.harga_paket) || 35000000,
+          potongan: Number(j.potongan) || 0,
+          voucher: Number(j.voucher) || 0,
+          jumlahHarusDibayar: Number(j.jumlah_harus_dibayar) || Number(j.harga_paket) || 35000000,
+          totalHarga: Number(j.jumlah_harus_dibayar) || Number(j.harga_paket) || 35000000,
+          hotelMakkah: j.hotel_makkah || '',
+          noKamarMakkah: j.no_kamar_makkah || '',
+          hotelMadinah: j.hotel_madinah || '',
+          noKamarMadinah: j.no_kamar_madinah || '',
+          status: j.status_jamaah || 'Terdaftar',
+          statusJamaah: j.status_jamaah || 'Terdaftar',
+          namaAgen: j.namaagen || j.referensi || '',
+          noTelpAgen: j.notelp || '',
+          faedah: Number(j.faedah) || 0,
+          bankAgen: j.bank || '',
+          noRekeningAgen: j.norekening || '',
+          tanggalkirim: j.tanggalkirim || '',
+          noJurnalEraHajj: j.nojurnalerahajj || '',
+          catatan: j.catatan || '',
+          userInput: j.user_input || 'Admin'
+        }));
+        if (this._successHandler) this._successHandler(mapped);
+      } catch (err) {
+        if (this._failureHandler) this._failureHandler(err);
+      }
+    },
+
+    async saveJamaah(payload, userActive = 'Admin') {
+      try {
+        const idJamaah = payload.id || ('JM-' + new Date().getFullYear() + '-' + String(Math.floor(1000 + Math.random() * 9000)));
+        const dbPayload = {
+          id_jamaah: idJamaah,
+          timestamp: payload.timestamp || new Date().toISOString().replace('T', ' ').substring(0, 19),
+          referensi: payload.referensi || '',
+          nama_lengkap: payload.namaLengkap || '',
+          nama_ayah_kandung: payload.namaAyah || '',
+          tempat_lahir: payload.tempatLahir || '',
+          tanggal_lahir: payload.tanggalLahir || '',
+          jenis_kelamin: payload.jenisKelamin || 'Laki-laki',
+          status_pernikahan: payload.statusPernikahan || '',
+          titel: payload.titel || '',
+          alamat_ktp: payload.alamatKtp || '',
+          kelurahan_desa: payload.kelurahan || '',
+          kecamatan: payload.kecamatan || '',
+          kabupaten_kota: payload.kabupaten || '',
+          provinsi: payload.provinsi || '',
+          kode_pos: payload.kodePos || '',
+          nomor_ktp: payload.noKtp || '',
+          nomor_seluler: payload.noHp || '',
+          nomor_telepon_rumah: payload.noTelpRumah || '',
+          nomor_seluler_keluarga: payload.noHpKeluarga || '',
+          email_address: payload.email || '',
+          pendidikan_terakhir: payload.pendidikan || '',
+          pekerjaan: payload.pekerjaan || '',
+          nomor_passport: payload.noPassport || '',
+          tempat_dikeluarkan_paspor: payload.tempatPaspor || '',
+          tanggal_dikeluarkan_paspor: payload.tglDikeluarkanPaspor || '',
+          tanggal_berakhir_paspor: payload.tglExpiredPaspor || '',
+          jenis_paket_umrah: payload.jenisPaket || '',
+          tanggal_keberangkatan: payload.rencanaKeberangkatan || payload.tglKeberangkatan || '',
+          cara_pembayaran: payload.caraPembayaran || 'Transfer Bank',
+          ukuran_baju: payload.ukuranBaju || '',
+          kantor_cabang: payload.kantorCabang || '',
+          upload_ktp: payload.uploadKtp || '',
+          upload_pasport: payload.uploadPasport || '',
+          buku_nikah: payload.bukuNikah || '',
+          surat_nikah: payload.suratNikah || '',
+          foto_jamaah: payload.fotoJamaah || '',
+          kartu_keluarga: payload.kartuKeluarga || '',
+          upload_bukti_transfer: payload.uploadBuktiTransfer || '',
+          tanggal_daftar: payload.tglDaftar || new Date().toISOString().split('T')[0],
+          tipe_kamar: payload.tipeKamar || 'Quad',
+          harga_paket: String(payload.hargaPaket || 0),
+          potongan: String(payload.potongan || 0),
+          voucher: String(payload.voucher || 0),
+          jumlah_harus_dibayar: String(payload.jumlahHarusDibayar || payload.totalHarga || 0),
+          hotel_makkah: payload.hotelMakkah || '',
+          no_kamar_makkah: payload.noKamarMakkah || '',
+          hotel_madinah: payload.hotelMadinah || '',
+          no_kamar_madinah: payload.noKamarMadinah || '',
+          status_jamaah: payload.status || 'Terdaftar',
+          user_input: userActive,
+          namaagen: payload.namaAgen || payload.referensi || '',
+          notelp: payload.noTelpAgen || '',
+          faedah: String(payload.faedah || 0),
+          bank: payload.bankAgen || '',
+          norekening: payload.noRekeningAgen || '',
+          tanggalkirim: payload.tanggalKirim || '',
+          nojurnalerahajj: payload.noJurnalErahajj || '',
+          catatan: payload.catatanAgen || ''
+        };
+
+        if (payload.dbId) dbPayload.id = payload.dbId;
+
+        const res = await fetch('/api/jamaah', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(dbPayload)
+        });
+        const resJson = await res.json();
+        if (this._successHandler) this._successHandler({ success: true, message: 'Data Jamaah berhasil disimpan ke Supabase!', data: resJson.data });
+      } catch (err) {
+        if (this._failureHandler) this._failureHandler(err);
+      }
+    },
+
+    async deleteJamaah(id, userActive = 'Admin') {
+      try {
+        const res = await fetch('/api/jamaah/' + encodeURIComponent(id), { method: 'DELETE' });
+        const resJson = await res.json();
+        if (this._successHandler) this._successHandler({ success: true, message: resJson.message || 'Data jamaah berhasil dihapus' });
+      } catch (err) {
+        if (this._failureHandler) this._failureHandler(err);
+      }
+    },
+
+    async updateJamaahRoomAssignment(jamaahId, roomData, userActive = 'Admin') {
+      try {
+        const resGet = await fetch('/api/jamaah/all');
+        const jsonGet = await resGet.json();
+        const found = (jsonGet.data || []).find(j => (j.id_jamaah === jamaahId || j.id === jamaahId));
+        if (found) {
+          found.tipe_kamar = roomData.tipeKamar || 'Quad';
+          found.hotel_makkah = roomData.hotelMakkah || '';
+          found.no_kamar_makkah = roomData.noKamarMakkah || '';
+          found.hotel_madinah = roomData.hotelMadinah || '';
+          found.no_kamar_madinah = roomData.noKamarMadinah || '';
+          found.updatedat = new Date().toISOString();
+          await fetch('/api/jamaah', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(found)
+          });
+        }
+        if (this._successHandler) this._successHandler({ success: true, message: 'Penempatan kamar jamaah berhasil diperbarui!' });
+      } catch (err) {
+        if (this._failureHandler) this._failureHandler(err);
+      }
+    },
+
+    // --- 2. Pembayaran Group & Individual API ---
+    async getPaymentHistory(jamaahId = null) {
+      try {
+        let url = '/api/pembayaran/history';
+        if (jamaahId) url += '?idJamaah=' + encodeURIComponent(jamaahId);
+        const res = await fetch(url);
+        const json = await res.json();
+        const list = (json && json.data) ? json.data : [];
+        const mapped = list.map((p, idx) => ({
+          rowIndex: idx + 2,
+          idKwitansi: p.id_kwitansi || ('KWT-' + (idx + 1)),
+          timestamp: p.timestamp || '',
+          idJamaah: p.id_jamaah || '',
+          namaJamaah: p.nama_jamaah || '',
+          noKtp: p.nomor_ktp || '',
+          jenisPaket: p.jenis_paket || '',
+          jumlahPembayaran: Number(p.jumlah_pembayaran) || 0,
+          tipePembayaran: p.tipe_pembayaran || 'Angsuran',
+          metodePembayaran: p.metode_pembayaran || 'Transfer Bank',
+          namaBank: p.nama_bank || '',
+          noReferensi: p.nomor_referensi || '',
+          keterangan: p.keterangan || '',
+          tglBayar: p.tanggal_bayar || '',
+          userInput: p.user_input || 'Admin',
+          status: p.status || 'Verified',
+          uploadBuktiTransfer: p.linkbuktitransfer || ''
+        }));
+        if (this._successHandler) this._successHandler(mapped);
+      } catch (err) {
+        if (this._failureHandler) this._failureHandler(err);
+      }
+    },
+
+    async saveJamaahPayment(payload, userActive = 'Admin') {
+      try {
+        const kwtId = 'KWT-' + new Date().getFullYear() + '-' + String(Math.floor(1000 + Math.random() * 9000));
+        const record = {
+          id_kwitansi: kwtId,
+          timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+          id_jamaah: payload.idJamaah || '',
+          nama_jamaah: payload.namaJamaah || '',
+          nomor_ktp: payload.noKtp || '',
+          jenis_paket: payload.jenisPaket || '',
+          jumlah_pembayaran: String(payload.jumlahPembayaran || 0),
+          tipe_pembayaran: payload.tipePembayaran || 'Angsuran',
+          metode_pembayaran: payload.metodePembayaran || 'Transfer Bank',
+          nama_bank: payload.namaBank || '',
+          nomor_referensi: payload.noReferensi || '',
+          keterangan: payload.keterangan || '',
+          tanggal_bayar: payload.tglBayar || new Date().toISOString().split('T')[0],
+          user_input: userActive,
+          status: 'Verified',
+          linkbuktitransfer: payload.uploadBuktiTransfer || ''
+        };
+
+        const res = await fetch('/api/pembayaran/save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(record)
+        });
+        const json = await res.json();
+        if (this._successHandler) this._successHandler({ success: true, message: 'Pembayaran berhasil disimpan ke Supabase!', kwtId: kwtId, data: json.data });
+      } catch (err) {
+        if (this._failureHandler) this._failureHandler(err);
+      }
+    },
+
+    async deleteJamaahPayment(kwitansiId, userActive = 'Admin') {
+      try {
+        const res = await fetch('/api/pembayaran/' + encodeURIComponent(kwitansiId), { method: 'DELETE' });
+        const json = await res.json();
+        if (this._successHandler) this._successHandler({ success: true, message: json.message || 'Pembayaran berhasil dihapus' });
+      } catch (err) {
+        if (this._failureHandler) this._failureHandler(err);
+      }
+    },
+
+    async apiGetAgenListWithPaket() {
+      try {
+        const res = await fetch('/api/jamaah/all');
+        const json = await res.json();
+        const list = json.data || [];
+        const agenMap = {};
+
+        list.forEach(j => {
+          const namaAgen = String(j.namaagen || j.referensi || '').trim();
+          if (!namaAgen) return;
+          const paket = String(j.jenis_paket_umrah || 'Paket Reguler').trim();
+          if (!agenMap[namaAgen]) {
+            agenMap[namaAgen] = { namaAgen, paketMap: {} };
+          }
+          if (!agenMap[namaAgen].paketMap[paket]) {
+            agenMap[namaAgen].paketMap[paket] = [];
+          }
+          agenMap[namaAgen].paketMap[paket].push({
+            idJamaah: j.id_jamaah || j.id,
+            namaJamaah: j.nama_lengkap || 'Jamaah',
+            noKtp: j.nomor_ktp || '',
+            noHp: j.nomor_seluler || '',
+            jenisPaket: paket,
+            totalHarga: Number(j.jumlah_harus_dibayar || j.harga_paket) || 0
+          });
+        });
+
+        const result = Object.keys(agenMap).sort().map(namaAgen => ({
+          namaAgen,
+          pakets: Object.keys(agenMap[namaAgen].paketMap).sort().map(pkt => ({
+            namaPaket: pkt,
+            jamaahList: agenMap[namaAgen].paketMap[pkt]
+          }))
+        }));
+
+        if (this._successHandler) this._successHandler(result);
+      } catch (err) {
+        if (this._failureHandler) this._failureHandler(err);
+      }
+    },
+
+    async apiSaveKolektifPayment(token, formData) {
+      try {
+        const today = new Date();
+        const dateStr = today.toISOString().slice(2, 10).replace(/-/g, '');
+        const newId = 'GRP-PAY-' + dateStr + '-' + String(Math.floor(1000 + Math.random() * 9000));
+        const nowStr = today.toISOString().replace('T', ' ').substring(0, 19);
+        const tglBayar = formData.tanggal || today.toISOString().split('T')[0];
+
+        const jamaahList = (formData.jamaahList || []).filter(j => j.selected !== false);
+        const listIdStr = jamaahList.map(j => j.idJamaah).join(', ');
+        const alokasiObj = {};
+        jamaahList.forEach(j => { alokasiObj[j.idJamaah] = j.nominal; });
+
+        const groupRow = {
+          id_group_payment: newId,
+          waktu_transaksi: nowStr,
+          tanggal_bayar: tglBayar,
+          nama_agen: formData.namaAgen || '',
+          jenis_paket_umrah: formData.jenisPaket || '',
+          total_nominal: Number(formData.totalNominal) || 0,
+          metode_pembayaran: formData.metodePembayaran || 'Transfer Bank',
+          bank_asal: formData.namaBankAsal || '',
+          bank_tujuan: formData.namaBankTujuan || '',
+          no_referensi: formData.noReferensi || '',
+          bukti_bayar: formData.buktiBayarUrl || '',
+          list_id_jamaah: listIdStr,
+          rincian_alokasi_json: JSON.stringify(alokasiObj),
+          diskon_kolektif: formData.diskonKolektif || 0,
+          catatan: formData.catatan || '',
+          user_input: 'Admin',
+          status: 'Verified'
+        };
+
+        // Simpan ke API Pembayaran Group
+        await fetch('/api/pembayaran-group', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(groupRow)
+        });
+
+        // Pecah ke rekaman history_pembayaran individual
+        for (let j of jamaahList) {
+          const indivRecord = {
+            id_kwitansi: 'KWT-' + dateStr + '-' + String(Math.floor(1000 + Math.random() * 9000)),
+            timestamp: nowStr,
+            id_jamaah: j.idJamaah,
+            nama_jamaah: j.namaJamaah,
+            nomor_ktp: j.noKtp || '',
+            jenis_paket: j.jenisPaket || formData.jenisPaket || '',
+            jumlah_pembayaran: String(Number(j.nominal) || 0),
+            tipe_pembayaran: 'Angsuran Kolektif',
+            metode_pembayaran: formData.metodePembayaran || 'Transfer Bank',
+            nama_bank: formData.namaBankTujuan || '',
+            nomor_referensi: formData.noReferensi || '',
+            tanggal_bayar: tglBayar,
+            keterangan: 'Pembayaran Kolektif via Agen: ' + formData.namaAgen + ' | Ref: ' + newId,
+            user_input: 'Admin',
+            status: 'Verified',
+            linkbuktitransfer: formData.buktiBayarUrl || ''
+          };
+          await fetch('/api/pembayaran/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(indivRecord)
+          });
+        }
+
+        if (this._successHandler) this._successHandler({
+          success: true,
+          message: 'Pembayaran kolektif berhasil disimpan untuk ' + jamaahList.length + ' jamaah (ID: ' + newId + ')!',
+          idGroupPayment: newId
+        });
+      } catch (err) {
+        if (this._failureHandler) this._failureHandler(err);
+      }
+    },
+
+    // --- 3. Kelengkapan Umrah API ---
+    async getKelengkapanUmrahData() {
+      try {
+        const [resJamaah, resKel] = await Promise.all([
+          fetch('/api/jamaah/all').then(r => r.json()),
+          fetch('/api/kelengkapan-umrah').then(r => r.json())
+        ]);
+
+        const rawJamaahList = resJamaah.data || [];
+        const kelRows = resKel.data || [];
+
+        const kelengkapanMap = {};
+        const kelengkapanRecords = kelRows.map((r, idx) => {
+          const idJ = String(r.id_jamaah || '').trim();
+          const rec = {
+            rowIndex: idx + 2,
+            idKelengkapan: r.id_kelengkapan || ('KUM-' + String(idx + 1).padStart(3, '0')),
+            idJamaah: idJ,
+            namaJamaah: r.nama_jamaah || '',
+            namaPaket: r.nama_paket || '',
+            agent: r.agent || '',
+            noVisa: r.no_visa || '',
+            tglBerlakuVisa: r.tanggal_berlaku_visa || '',
+            tglAkhirVisa: r.tanggal_akhir_visa || '',
+            uploadVisa: r.upload_visa || '',
+            noPolis: r.no_polis || '',
+            tglInputPolis: r.tanggal_input_polis || '',
+            tglAwalPolis: r.tanggal_awal_polis || '',
+            tglAkhirPolis: r.tanggal_akhir_polis || '',
+            uploadAsuransi: r.upload_asuransi || '',
+            noBpjs: r.nomor_bpjs || '',
+            uploadBpjs: r.upload_bpjs || '',
+            statusKelengkapan: r.status_kelengkapan || 'Belum Lengkap',
+            tglInput: r.tanggal_input || '',
+            createdAt: r.createdat || '',
+            updatedAt: r.updatedat || '',
+            userInput: r.user_input || 'Admin'
+          };
+          if (idJ) kelengkapanMap[idJ.toLowerCase()] = rec;
+          return rec;
+        });
+
+        const paketSet = new Set();
+        rawJamaahList.forEach(j => {
+          const p = String(j.jenis_paket_umrah || '').trim();
+          if (p) paketSet.add(p);
+        });
+
+        const enrichedJamaahList = rawJamaahList.map(j => {
+          const id = String(j.id_jamaah || j.id || '').trim();
+          const existing = kelengkapanMap[id.toLowerCase()] || null;
+          return {
+            id: id,
+            namaLengkap: j.nama_lengkap || '',
+            jenisPaket: j.jenis_paket_umrah || '',
+            agent: j.namaagen || j.referensi || '-',
+            noKtp: j.nomor_ktp || '',
+            noPassport: j.nomor_passport || '',
+            noHp: j.nomor_seluler || '',
+            hasKelengkapan: !!existing,
+            kelengkapan: existing || {
+              noVisa: '',
+              tglBerlakuVisa: '',
+              tglAkhirVisa: '',
+              uploadVisa: '',
+              noPolis: '',
+              tglInputPolis: '',
+              tglAwalPolis: '',
+              tglAkhirPolis: '',
+              uploadAsuransi: '',
+              noBpjs: '',
+              uploadBpjs: '',
+              statusKelengkapan: 'Belum Ada Data'
+            }
+          };
+        });
+
+        const result = {
+          success: true,
+          data: {
+            jamaahList: enrichedJamaahList,
+            paketList: Array.from(paketSet).sort(),
+            records: kelengkapanRecords
+          }
+        };
+
+        if (this._successHandler) this._successHandler(result);
+      } catch (err) {
+        if (this._failureHandler) this._failureHandler(err);
+      }
+    },
+
+    async saveKelengkapanUmrah(payload, filePayloads = null, userInput = 'Admin') {
+      try {
+        const hasVisa = Boolean(payload.noVisa && String(payload.noVisa).trim());
+        const hasPolis = Boolean(payload.noPolis && String(payload.noPolis).trim());
+        const hasBpjs = Boolean(payload.noBpjs && String(payload.noBpjs).trim());
+
+        let statusKelengkapan = 'Belum Lengkap';
+        if (hasVisa && hasPolis && hasBpjs) statusKelengkapan = 'Lengkap';
+        else if (hasVisa || hasPolis || hasBpjs) statusKelengkapan = 'Sebagian';
+
+        const idKel = payload.idKelengkapan || ('KUM-' + String(Math.floor(100 + Math.random() * 900)));
+        const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+        const record = {
+          id_kelengkapan: idKel,
+          id_jamaah: payload.idJamaah,
+          nama_jamaah: payload.namaJamaah || '',
+          nama_paket: payload.namaPaket || '',
+          agent: payload.agent || '',
+          no_visa: payload.noVisa || '',
+          tanggal_berlaku_visa: payload.tglBerlakuVisa || '',
+          tanggal_akhir_visa: payload.tglAkhirVisa || '',
+          upload_visa: payload.uploadVisa || '',
+          no_polis: payload.noPolis || '',
+          tanggal_input_polis: payload.tglInputPolis || nowStr.split(' ')[0],
+          tanggal_awal_polis: payload.tglAwalPolis || '',
+          tanggal_akhir_polis: payload.tglAkhirPolis || '',
+          upload_asuransi: payload.uploadAsuransi || '',
+          nomor_bpjs: payload.noBpjs || '',
+          upload_bpjs: payload.uploadBpjs || '',
+          status_kelengkapan: statusKelengkapan,
+          tanggal_input: payload.tglInput || nowStr.split(' ')[0],
+          updatedat: nowStr,
+          user_input: userInput
+        };
+
+        await fetch('/api/kelengkapan-umrah', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(record)
+        });
+
+        if (this._successHandler) this._successHandler({
+          success: true,
+          message: 'Data & dokumen kelengkapan Jamaah ' + (payload.namaJamaah || payload.idJamaah) + ' berhasil disimpan (' + statusKelengkapan + ')!',
+          idKelengkapan: idKel,
+          statusKelengkapan: statusKelengkapan
+        });
+      } catch (err) {
+        if (this._failureHandler) this._failureHandler(err);
+      }
+    },
+
+    async deleteKelengkapanUmrah(idJamaah) {
+      try {
+        const res = await fetch('/api/kelengkapan-umrah/' + encodeURIComponent(idJamaah), { method: 'DELETE' });
+        const json = await res.json();
+        if (this._successHandler) this._successHandler({ success: true, message: json.message || 'Data kelengkapan berhasil dihapus' });
+      } catch (err) {
+        if (this._failureHandler) this._failureHandler(err);
+      }
+    }
+  };
+})();

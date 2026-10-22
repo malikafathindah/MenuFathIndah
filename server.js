@@ -822,6 +822,122 @@ app.get('/api/haji-terencana/running-text', async (req, res) => {
 });
 
 // Fallback to index.html for SPA
+
+// ============================================================================
+// 15. ENDPOINTS UNTUK MODUL JAMAAH, FORM INPUT, PEMBAYARAN GROUP & KELENGKAPAN UMRAH
+// ============================================================================
+
+// A. DATA JAMAAH & FORM INPUT JAMAAH
+app.get('/api/jamaah/all', async (req, res) => {
+  try {
+    const list = await supabase.getAllSupabaseJamaah(1000);
+    res.json({ success: true, count: list.length, data: list });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/jamaah', async (req, res) => {
+  try {
+    const record = req.body;
+    const result = await supabase.upsertSupabaseJamaah(record);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/jamaah/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await supabase.deleteSupabaseJamaah(id);
+    res.json({ success: true, message: 'Data jamaah berhasil dihapus' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// B. KELENGKAPAN DOKUMEN UMRAH (VISA, POLIS, BPJS)
+app.get('/api/kelengkapan-umrah', async (req, res) => {
+  try {
+    const list = await supabase.getSupabaseKelengkapanUmrah();
+    res.json({ success: true, count: list.length, data: list });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/kelengkapan-umrah', async (req, res) => {
+  try {
+    const record = req.body;
+    const result = await supabase.upsertSupabaseKelengkapanUmrah(record);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/kelengkapan-umrah/:idJamaah', async (req, res) => {
+  try {
+    const { idJamaah } = req.params;
+    await supabase.deleteSupabaseKelengkapanUmrah(idJamaah);
+    res.json({ success: true, message: 'Data kelengkapan berhasil dihapus' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// C. PEMBAYARAN JAMAAH INDIVIDUAL (HISTORY PEMBAYARAN)
+app.get('/api/pembayaran/history', async (req, res) => {
+  try {
+    const { idJamaah } = req.query;
+    const list = await supabase.getSupabaseHistoryPembayaran(idJamaah);
+    res.json({ success: true, count: list.length, data: list });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/pembayaran/save', async (req, res) => {
+  try {
+    const record = req.body;
+    const result = await supabase.insertSupabaseHistoryPembayaran(record);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/pembayaran/:idKwitansi', async (req, res) => {
+  try {
+    const { idKwitansi } = req.params;
+    await supabase.deleteSupabaseHistoryPembayaran(idKwitansi);
+    res.json({ success: true, message: 'Transaksi pembayaran berhasil dihapus' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// D. PEMBAYARAN KOLEKTIF GRUP / AGEN
+app.get('/api/pembayaran-group', async (req, res) => {
+  try {
+    const list = await supabase.getSupabasePembayaranGroup();
+    res.json({ success: true, count: list.length, data: list });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/pembayaran-group', async (req, res) => {
+  try {
+    const record = req.body;
+    const result = await supabase.insertSupabasePembayaranGroup(record);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
