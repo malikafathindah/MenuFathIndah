@@ -8761,7 +8761,7 @@ function htRenderMatrixTable() {
     tbody.innerHTML = htMatrixState.filteredDataList.map((item, idx) => {
       let rowHtml = `
         <tr>
-          <td class="ht-col-no" style="color:#64748b; font-weight:600;">${idx + 1}</td>
+          <td class="ht-col-no" style="font-family:monospace; color:#64748b;">${idx + 1}</td>
           <td class="ht-col-porsi">${escapeHtml(item.noPorsi)}</td>
           <td class="ht-col-nama">
             <span style="color:#38bdf8; font-weight:600;">${escapeHtml(item.namaJamaah)}</span>
@@ -8791,14 +8791,11 @@ function htRenderMatrixTable() {
     }).join('');
   }
 
-  // 4. Render Tfoot (Kolom sticky tfoot diselaraskan persis dengan thead & tbody)
+  // 4. Render Tfoot
   const gt = htMatrixState.grandTotal;
   let tfootHtml = `
     <tr>
-      <td class="ht-col-no ht-tfoot-sticky-col"></td>
-      <td class="ht-col-porsi ht-tfoot-sticky-col"></td>
-      <td class="ht-col-nama ht-tfoot-sticky-col ht-tfoot-nama-total">TOTAL KESELURUHAN</td>
-      <td class="ht-col-kode" style="background:#0b132b !important; border-top:2px solid #334155; border-right:1px solid #334155;"></td>
+      <td colspan="4" class="ht-tfoot-total-label">TOTAL KESELURUHAN</td>
       <td class="ht-tfoot-cell">${htFormatMatrixNumber(gt.hargaPaket)}</td>
       <td class="ht-tfoot-cell">${htFormatMatrixNumber(gt.dp)}</td>
       <td class="ht-tfoot-cell yellow">${htFormatMatrixNumber(gt.angsuranBulan)}</td>
@@ -9634,110 +9631,22 @@ window.initDashboardHT = initDashboardHT;
 // ============================================================================
 // 14. MODUL UPLOAD DOKUMEN JAMAAH UMRAH (mod_upload_dok_jamaah)
 // ============================================================================
-// ============================================================================
-// 14. MODUL UPLOAD DOKUMEN JAMAAH UMRAH (mod_upload_dok_jamaah)
-// ============================================================================
 let stateUploadDokJamaah = {
   documents: [],
   jamaahList: [],
-  selectedFilePayload: null,
-  activeTab: 'form', // 'form' or 'directory'
-  viewMode: 'cards', // 'cards' or 'table'
-  quickFilter: ''
+  selectedFilePayload: null
 };
 
 async function initUploadDokJamaahView() {
-  // Check screen width for default mobile tab
-  if (window.innerWidth < 1024) {
-    switchUploadDokTab(stateUploadDokJamaah.activeTab || 'form');
+  if (window.appUploadDokJamaahInstance && typeof window.appUploadDokJamaahInstance.loadAllData === 'function') {
+    window.appUploadDokJamaahInstance.loadAllData();
   } else {
-    // Show both on desktop
-    const f = document.getElementById('containerUploadDokForm');
-    const d = document.getElementById('containerUploadDokDirectory');
-    if (f) f.classList.remove('hidden');
-    if (d) d.classList.remove('hidden');
-  }
-  await loadUploadDokJamaahDropdowns();
-  await loadUploadDokJamaahData();
-}
-
-function switchUploadDokTab(tabName) {
-  stateUploadDokJamaah.activeTab = tabName;
-  const btnForm = document.getElementById('tabBtnUploadForm');
-  const btnDir = document.getElementById('tabBtnUploadDirectory');
-  const formSec = document.getElementById('containerUploadDokForm');
-  const dirSec = document.getElementById('containerUploadDokDirectory');
-
-  if (tabName === 'form') {
-    if (btnForm) {
-      btnForm.className = 'flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm';
-    }
-    if (btnDir) {
-      btnDir.className = 'flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 text-slate-400 hover:text-slate-200';
-    }
-    if (window.innerWidth < 1024) {
-      if (formSec) formSec.classList.remove('hidden');
-      if (dirSec) dirSec.classList.add('hidden');
-    }
-  } else {
-    if (btnForm) {
-      btnForm.className = 'flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 text-slate-400 hover:text-slate-200';
-    }
-    if (btnDir) {
-      btnDir.className = 'flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm';
-    }
-    if (window.innerWidth < 1024) {
-      if (formSec) formSec.classList.add('hidden');
-      if (dirSec) dirSec.classList.remove('hidden');
-    }
-  }
-}
-
-function setDokViewMode(mode) {
-  stateUploadDokJamaah.viewMode = mode;
-  const cardsContainer = document.getElementById('dokCardsContainer');
-  const tableContainer = document.getElementById('dokTableContainer');
-  const btnCards = document.getElementById('btnViewModeCards');
-  const btnTable = document.getElementById('btnViewModeTable');
-
-  if (mode === 'cards') {
-    if (cardsContainer) cardsContainer.classList.remove('hidden');
-    if (tableContainer) tableContainer.classList.add('hidden');
-    if (btnCards) btnCards.className = 'px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
-    if (btnTable) btnTable.className = 'px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200';
-  } else {
-    if (cardsContainer) cardsContainer.classList.add('hidden');
-    if (tableContainer) tableContainer.classList.remove('hidden');
-    if (btnCards) btnCards.className = 'px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200';
-    if (btnTable) btnTable.className = 'px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
-  }
-}
-
-function setQuickDokFilter(filter) {
-  stateUploadDokJamaah.quickFilter = filter;
-  const pills = ['Semua', 'KTP', 'Paspor', 'KK', 'Nikah', 'Foto', 'TF'];
-  const pillMap = {
-    '': 'Semua',
-    'KTP': 'KTP',
-    'Paspor': 'Paspor',
-    'Kartu Keluarga': 'KK',
-    'Surat Nikah': 'Nikah',
-    'Foto Jamaah': 'Foto',
-    'Bukti Transfer': 'TF'
-  };
-
-  pills.forEach(p => {
-    const el = document.getElementById('pillDok' + p);
-    if (el) {
-      if (pillMap[filter] === p) {
-        el.className = 'px-3 py-1 rounded-full whitespace-nowrap font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm';
-      } else {
-        el.className = 'px-3 py-1 rounded-full whitespace-nowrap text-slate-400 hover:text-slate-200 bg-slate-950 border border-slate-800';
+    setTimeout(() => {
+      if (window.appUploadDokJamaahInstance && typeof window.appUploadDokJamaahInstance.loadAllData === 'function') {
+        window.appUploadDokJamaahInstance.loadAllData();
       }
-    }
-  });
-
-  renderUploadDokJamaahTable();
+    }, 350);
+  }
 }
 
 async function loadUploadDokJamaahDropdowns() {
@@ -9751,7 +9660,7 @@ async function loadUploadDokJamaahDropdowns() {
     const paketSelect = document.getElementById('udjFilterPaket');
     if (paketSelect) {
       const currentVal = paketSelect.value;
-      const pakets = [...new Set(list.map(j => (j.jenis_paket_umrah || j.jenisPaket || j.paket || j.nama_paket || '').trim()).filter(Boolean))].sort();
+      const pakets = [...new Set(list.map(j => j.jenisPaket || j.jenis_paket_umrah || j.nama_paket || '').filter(Boolean))];
       paketSelect.innerHTML = '<option value="">-- Semua Paket Umrah --</option>' +
         pakets.map(p => `<option value="${escapeHtml(p)}" ${p === currentVal ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('');
     }
@@ -9764,21 +9673,17 @@ async function loadUploadDokJamaahDropdowns() {
 
 function populateJamaahSelectOptions(targetPaket = '') {
   const select = document.getElementById('udjSelectJamaah');
-  const countBadge = document.getElementById('udjJamaahCountBadge');
   if (!select) return;
   const list = stateUploadDokJamaah.jamaahList || [];
-  const targetLower = targetPaket.trim().toLowerCase();
-  const filtered = targetLower 
-    ? list.filter(j => (j.jenis_paket_umrah || j.jenisPaket || j.paket || j.nama_paket || '').trim().toLowerCase() === targetLower)
+  const filtered = targetPaket 
+    ? list.filter(j => (j.jenisPaket || j.jenis_paket_umrah || j.nama_paket || '') === targetPaket)
     : list;
-
-  if (countBadge) countBadge.textContent = `${filtered.length} Jamaah`;
 
   select.innerHTML = '<option value="">-- Pilih Jamaah --</option>' +
     filtered.map(j => {
-      const id = j.id_jamaah || j.id || '';
-      const nama = j.nama_lengkap || j.namaLengkap || j.nama || 'Tanpa Nama';
-      const pkt = j.jenis_paket_umrah || j.jenisPaket || '';
+      const id = j.id || j.id_jamaah || '';
+      const nama = j.namaLengkap || j.nama_lengkap || j.nama || 'Tanpa Nama';
+      const pkt = j.jenisPaket || j.jenis_paket_umrah || '';
       return `<option value="${escapeHtml(id)}">${escapeHtml(id)} - ${escapeHtml(nama)} (${escapeHtml(pkt)})</option>`;
     }).join('');
 }
@@ -9786,103 +9691,42 @@ function populateJamaahSelectOptions(targetPaket = '') {
 function onUploadDokJamaahPaketFilterChange() {
   const paket = document.getElementById('udjFilterPaket')?.value || '';
   populateJamaahSelectOptions(paket);
-  // Reset selected jamaah
-  const select = document.getElementById('udjSelectJamaah');
-  if (select) select.value = '';
-  onUploadDokJamaahSelectChange();
+  // Clear jamaah inputs
+  if (document.getElementById('udjSelectJamaah')) document.getElementById('udjSelectJamaah').value = '';
+  if (document.getElementById('udjIdJamaahInput')) document.getElementById('udjIdJamaahInput').value = '';
+  if (document.getElementById('udjPasporInput')) document.getElementById('udjPasporInput').value = '';
 }
 
 function onUploadDokJamaahSelectChange() {
   const id = document.getElementById('udjSelectJamaah')?.value || '';
-  const card = document.getElementById('udjJamaahInfoCard');
-  if (!id) {
-    if (card) card.classList.add('hidden');
-    return;
-  }
-
-  const cleanId = id.toUpperCase().trim();
-  const found = (stateUploadDokJamaah.jamaahList || []).find(j => (j.id_jamaah || j.id || '').toUpperCase().trim() === cleanId);
-
-  if (card && found) {
-    card.classList.remove('hidden');
-    const idBadge = document.getElementById('udjInfoIdBadge');
-    const pasporBadge = document.getElementById('udjInfoPasporBadge');
-    const namaText = document.getElementById('udjInfoNamaText');
-    const paketText = document.getElementById('udjInfoPaketText');
-    const checklist = document.getElementById('udjDocStatusChecklist');
-
-    if (idBadge) idBadge.textContent = found.id_jamaah || found.id || id;
-    if (pasporBadge) pasporBadge.textContent = 'Paspor: ' + (found.nomor_passport || found.noPassport || '-');
-    if (namaText) namaText.textContent = found.nama_lengkap || found.namaLengkap || 'Tanpa Nama';
-    if (paketText) paketText.textContent = 'Paket: ' + (found.jenis_paket_umrah || found.jenisPaket || '-');
-
-    if (checklist) {
-      const items = [
-        { label: 'KTP', has: Boolean(found.upload_ktp) },
-        { label: 'Paspor', has: Boolean(found.upload_pasport) },
-        { label: 'KK', has: Boolean(found.kartu_keluarga) },
-        { label: 'Nikah', has: Boolean(found.surat_nikah || found.buku_nikah) },
-        { label: 'Foto', has: Boolean(found.foto_jamaah) },
-        { label: 'Bukti TF', has: Boolean(found.upload_bukti_transfer) }
-      ];
-
-      checklist.innerHTML = items.map(it => {
-        if (it.has) {
-          return `<span class="px-2 py-0.5 rounded text-[9.5px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-            <i class="fa-solid fa-check text-[8px]"></i> ${it.label}
-          </span>`;
-        }
-        return `<span class="px-2 py-0.5 rounded text-[9.5px] font-medium bg-slate-900 text-slate-500 border border-slate-800">
-          ${it.label}
-        </span>`;
-      }).join('');
-    }
-  }
+  const found = (stateUploadDokJamaah.jamaahList || []).find(j => (j.id || j.id_jamaah) === id);
+  const idInput = document.getElementById('udjIdJamaahInput');
+  const pasporInput = document.getElementById('udjPasporInput');
+  if (idInput) idInput.value = id;
+  if (pasporInput) pasporInput.value = found ? (found.nomorPassport || found.nomor_passport || found.noPassport || '-') : '-';
 }
 
-function handleUdjFilePick(event, isCamera = false) {
+function handleUdjFilePick(event) {
   const file = event.target.files && event.target.files[0];
-  if (!file) return;
-
-  const card = document.getElementById('udjFilePreviewCard');
-  const nameEl = document.getElementById('udjPreviewFileName');
-  const sizeEl = document.getElementById('udjPreviewFileSize');
-  const thumbEl = document.getElementById('udjPreviewThumbnail');
-
+  const preview = document.getElementById('udjFileNamePreview');
+  if (!file) {
+    stateUploadDokJamaah.selectedFilePayload = null;
+    if (preview) preview.textContent = '';
+    return;
+  }
   const reader = new FileReader();
   reader.onload = (e) => {
     stateUploadDokJamaah.selectedFilePayload = {
       name: file.name,
       size: file.size,
       type: file.type,
-      base64: e.target.result,
-      isCamera: isCamera
+      base64: e.target.result
     };
-
-    if (nameEl) nameEl.textContent = file.name;
-    if (sizeEl) sizeEl.textContent = `${(file.size / 1024).toFixed(1)} KB ${isCamera ? '(Kamera HP)' : ''}`;
-
-    if (thumbEl) {
-      if (file.type && file.type.startsWith('image/')) {
-        thumbEl.innerHTML = `<img src="${e.target.result}" alt="Preview" class="w-full h-full object-cover">`;
-      } else {
-        thumbEl.innerHTML = `<i class="fa-solid fa-file-pdf text-rose-400 text-lg"></i>`;
-      }
+    if (preview) {
+      preview.textContent = `✓ ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
     }
-
-    if (card) card.classList.remove('hidden');
   };
   reader.readAsDataURL(file);
-}
-
-function clearUdjFileSelection() {
-  stateUploadDokJamaah.selectedFilePayload = null;
-  const cameraInput = document.getElementById('udjCameraInput');
-  const fileInput = document.getElementById('udjFileInput');
-  const card = document.getElementById('udjFilePreviewCard');
-  if (cameraInput) cameraInput.value = '';
-  if (fileInput) fileInput.value = '';
-  if (card) card.classList.add('hidden');
 }
 
 async function handleUploadDokJamaahSubmit(event) {
@@ -9890,46 +9734,53 @@ async function handleUploadDokJamaahSubmit(event) {
   const selectJamaah = document.getElementById('udjSelectJamaah');
   const idJamaah = selectJamaah?.value;
   if (!idJamaah) {
-    alert('Silakan pilih nama jamaah terlebih dahulu!');
+    alert('Silakan pilih jamaah terlebih dahulu!');
     return;
   }
-
-  const cleanId = idJamaah.toUpperCase().trim();
-  const foundJamaah = (stateUploadDokJamaah.jamaahList || []).find(j => (j.id_jamaah || j.id || '').toUpperCase().trim() === cleanId);
-  const namaJamaah = foundJamaah ? (foundJamaah.nama_lengkap || foundJamaah.namaLengkap || idJamaah) : idJamaah;
+  const foundJamaah = (stateUploadDokJamaah.jamaahList || []).find(j => (j.id || j.id_jamaah) === idJamaah);
+  const namaJamaah = foundJamaah ? (foundJamaah.namaLengkap || foundJamaah.nama_lengkap || idJamaah) : idJamaah;
   const jenisDok = document.getElementById('udjJenisDok')?.value || 'Dokumen';
-  const linkFile = (document.getElementById('udjLinkInput')?.value || '').trim();
-  const keterangan = (document.getElementById('udjKeteranganInput')?.value || '').trim();
+  const linkFile = document.getElementById('udjLinkInput')?.value || '';
+  const keterangan = document.getElementById('udjKeteranganInput')?.value || '';
   const filePayload = stateUploadDokJamaah.selectedFilePayload;
 
   if (!filePayload && !linkFile) {
-    alert('Silakan ambil foto lewat Kamera HP, pilih file dari perangkat, atau masukkan link Google Drive dokumen!');
+    alert('Pilih file berkas atau masukkan link Google Drive dokumen!');
     return;
   }
 
-  const ext = (filePayload && filePayload.name.includes('.')) ? ('.' + filePayload.name.split('.').pop()) : '.png';
-  const fileName = filePayload ? filePayload.name : `${cleanId} - ${namaJamaah} - ${jenisDok}${ext}`;
+  const fileName = filePayload ? filePayload.name : `${idJamaah} - ${namaJamaah} - ${jenisDok}.pdf`;
   const fileUrl = linkFile || (filePayload ? filePayload.base64 : '');
   const fileId = 'DRV-' + Date.now().toString().slice(-8);
   const uploader = (window.currentUser && window.currentUser.username) ? window.currentUser.username : 'Admin';
 
   const payload = {
     docid: 'DOCJ-' + Date.now().toString().slice(-6) + '-' + Math.floor(Math.random() * 900 + 100),
+    DocID: 'DOCJ-' + Date.now().toString().slice(-6) + '-' + Math.floor(Math.random() * 900 + 100),
     timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
-    id_jamaah: cleanId,
+    Timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+    id_jamaah: idJamaah,
+    'ID Jamaah': idJamaah,
     nama_lengkap: namaJamaah,
+    'Nama Lengkap': namaJamaah,
     jenis_dokumen: jenisDok,
+    'Jenis Dokumen': jenisDok,
     nama_file: fileName,
+    'Nama File': fileName,
     link_file: fileUrl,
+    'Link File': fileUrl,
     file_id: fileId,
+    'File ID': fileId,
     uploader: uploader,
-    keterangan: keterangan || 'Diunggah via Portal Jamaah Umrah'
+    Uploader: uploader,
+    keterangan: keterangan || 'Diunggah via Portal Jamaah Umrah',
+    Keterangan: keterangan || 'Diunggah via Portal Jamaah Umrah'
   };
 
   const btn = document.getElementById('btnSubmitUploadDokJamaah');
   if (btn) {
     btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Menyimpan ke Supabase...</span>';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...';
   }
 
   try {
@@ -9943,27 +9794,21 @@ async function handleUploadDokJamaahSubmit(event) {
       if (window.Swal) {
         Swal.fire({
           icon: 'success',
-          title: 'Berkas Tersimpan ke Supabase!',
-          text: `Dokumen ${jenisDok} untuk jamaah ${namaJamaah} berhasil diarsipkan.`,
+          title: 'Berkas Berhasil Diarsipkan!',
+          text: `Dokumen ${jenisDok} untuk jamaah ${namaJamaah} berhasil disimpan ke database.`,
           timer: 2500,
           showConfirmButton: false
         });
       } else {
-        alert(`Dokumen ${jenisDok} untuk jamaah ${namaJamaah} berhasil disimpan ke Supabase!`);
+        alert('Dokumen berhasil disimpan!');
       }
-
-      // Reset form & preview
+      // Reset form
       document.getElementById('formUploadDokJamaah').reset();
-      clearUdjFileSelection();
-      onUploadDokJamaahSelectChange();
-
-      // Refresh data
+      if (document.getElementById('udjIdJamaahInput')) document.getElementById('udjIdJamaahInput').value = '';
+      if (document.getElementById('udjPasporInput')) document.getElementById('udjPasporInput').value = '';
+      if (document.getElementById('udjFileNamePreview')) document.getElementById('udjFileNamePreview').textContent = '';
+      stateUploadDokJamaah.selectedFilePayload = null;
       await loadUploadDokJamaahData();
-
-      // On mobile, switch to directory view so user immediately sees their file
-      if (window.innerWidth < 1024) {
-        switchUploadDokTab('directory');
-      }
     } else {
       alert('Gagal mengunggah dokumen: ' + (result.error || 'Terjadi kesalahan'));
     }
@@ -9972,53 +9817,48 @@ async function handleUploadDokJamaahSubmit(event) {
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up text-sm"></i> <span>Simpan & Arsipkan Dokumen ke Supabase</span>';
+      btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> <span>Simpan & Arsipkan Dokumen</span>';
     }
   }
 }
 
 async function loadUploadDokJamaahData(force = false) {
-  const icon = document.getElementById('iconReloadDokJamaah');
-  if (icon && force) icon.classList.add('animate-spin');
-
+  const tbody = document.getElementById('tableDokJamaahBody');
+  if (tbody && force) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;"><i class="fa-solid fa-spinner fa-spin"></i> Menyegarkan data berkas...</td></tr>';
+  }
   try {
     const res = await fetch('/api/upload-dok-jamaah');
     const json = await res.json();
     stateUploadDokJamaah.documents = json.data || [];
     renderUploadDokJamaahTable();
     if (force && window.Swal) {
-      Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Data dokumen berhasil disegarkan!', timer: 2000, showConfirmButton: false });
+      Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Data berkas berhasil disegarkan!', timer: 2000, showConfirmButton: false });
     }
   } catch (err) {
     console.error('Gagal memuat dokumen jamaah:', err);
-  } finally {
-    if (icon && force) icon.classList.remove('animate-spin');
+    if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#f43f5e; padding:20px;">Gagal memuat berkas: ${escapeHtml(err.message)}</td></tr>`;
   }
 }
 
 function renderUploadDokJamaahTable() {
   const tbody = document.getElementById('tableDokJamaahBody');
-  const cardsContainer = document.getElementById('dokCardsContainer');
-  let docs = stateUploadDokJamaah.documents || [];
+  if (!tbody) return;
 
+  let docs = stateUploadDokJamaah.documents || [];
   const keyword = (document.getElementById('searchDokJamaahInput')?.value || '').toLowerCase().trim();
-  const filterJenis = stateUploadDokJamaah.quickFilter || '';
+  const filterJenis = document.getElementById('filterDokJamaahJenis')?.value || '';
 
   // Update counts
   let totalKtp = 0;
   let totalPaspor = 0;
   let totalKk = 0;
-  let totalNikah = 0;
-  let totalFoto = 0;
   let totalTf = 0;
-
   docs.forEach(d => {
     const jd = (d['Jenis Dokumen'] || d.jenis_dokumen || '').toLowerCase();
     if (jd.includes('ktp')) totalKtp++;
     if (jd.includes('paspor')) totalPaspor++;
     if (jd.includes('keluarga') || jd.includes('kk')) totalKk++;
-    if (jd.includes('nikah')) totalNikah++;
-    if (jd.includes('foto')) totalFoto++;
     if (jd.includes('transfer') || jd.includes('bukti') || jd.includes('bayar')) totalTf++;
   });
 
@@ -10026,39 +9866,17 @@ function renderUploadDokJamaahTable() {
   const statPasporEl = document.getElementById('statTotalPasporJamaah');
   const statKkEl = document.getElementById('statTotalKkJamaah');
   const statTfEl = document.getElementById('statTotalTfJamaah');
-  const statGrand = document.getElementById('statGrandTotalDokJamaah');
-  const badgeTab = document.getElementById('badgeTotalDokJamaahTab');
-
+  const badgeTotal = document.getElementById('badgeTotalDokJamaah');
   if (statKtpEl) statKtpEl.textContent = totalKtp;
   if (statPasporEl) statPasporEl.textContent = totalPaspor;
   if (statKkEl) statKkEl.textContent = totalKk;
   if (statTfEl) statTfEl.textContent = totalTf;
-  if (statGrand) statGrand.textContent = docs.length;
-  if (badgeTab) badgeTab.textContent = docs.length;
+  if (badgeTotal) badgeTotal.textContent = `${docs.length} Berkas`;
 
-  const countPillSemua = document.getElementById('countPillSemua');
-  const countPillKTP = document.getElementById('countPillKTP');
-  const countPillPaspor = document.getElementById('countPillPaspor');
-  const countPillKK = document.getElementById('countPillKK');
-  const countPillNikah = document.getElementById('countPillNikah');
-  const countPillFoto = document.getElementById('countPillFoto');
-  const countPillTF = document.getElementById('countPillTF');
-
-  if (countPillSemua) countPillSemua.textContent = docs.length;
-  if (countPillKTP) countPillKTP.textContent = totalKtp;
-  if (countPillPaspor) countPillPaspor.textContent = totalPaspor;
-  if (countPillKK) countPillKK.textContent = totalKk;
-  if (countPillNikah) countPillNikah.textContent = totalNikah;
-  if (countPillFoto) countPillFoto.textContent = totalFoto;
-  if (countPillTF) countPillTF.textContent = totalTf;
-
-  // Filter by pill
+  // Apply filters
   if (filterJenis) {
-    const fLower = filterJenis.toLowerCase();
-    docs = docs.filter(d => (d['Jenis Dokumen'] || d.jenis_dokumen || '').toLowerCase().includes(fLower));
+    docs = docs.filter(d => (d['Jenis Dokumen'] || d.jenis_dokumen || '') === filterJenis);
   }
-
-  // Filter by search keyword
   if (keyword) {
     docs = docs.filter(d => {
       const docId = (d.DocID || d.docid || '').toLowerCase();
@@ -10070,157 +9888,68 @@ function renderUploadDokJamaahTable() {
     });
   }
 
+  if (docs.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:28px; color:#94a3b8;">Tidak ada dokumen jamaah yang cocok dengan filter.</td></tr>';
+    return;
+  }
+
   const badgeColorMap = {
-    'KTP': 'bg-sky-500/15 text-sky-300 border-sky-500/30',
-    'Paspor': 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-    'Kartu Keluarga': 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-    'Surat Nikah': 'bg-rose-500/15 text-rose-300 border-rose-500/30',
-    'Foto Jamaah': 'bg-purple-500/15 text-purple-300 border-purple-500/30',
-    'Bukti Transfer': 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-    'BPJS': 'bg-teal-500/15 text-teal-300 border-teal-500/30'
+    'KTP': 'background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3);',
+    'Paspor': 'background:rgba(52,211,153,0.15); color:#34d399; border:1px solid rgba(52,211,153,0.3);',
+    'Kartu Keluarga': 'background:rgba(251,191,36,0.15); color:#fbbf24; border:1px solid rgba(251,191,36,0.3);',
+    'Surat Nikah': 'background:rgba(244,114,182,0.15); color:#f472b6; border:1px solid rgba(244,114,182,0.3);',
+    'Foto Jamaah': 'background:rgba(167,139,250,0.15); color:#a78bfa; border:1px solid rgba(167,139,250,0.3);',
+    'Bukti Transfer': 'background:rgba(34,197,94,0.15); color:#4ade80; border:1px solid rgba(34,197,94,0.3);'
   };
 
-  // 1. RENDER CARDS VIEW (OPTIMAL UNTUK HP / TOUCH SCREEN)
-  if (cardsContainer) {
-    if (docs.length === 0) {
-      cardsContainer.innerHTML = `
-        <div class="py-12 text-center text-slate-500 text-xs bg-slate-950/60 rounded-xl border border-dashed border-slate-800">
-          <i class="fa-solid fa-folder-open text-3xl mb-2 text-slate-600"></i>
-          <p class="font-bold text-slate-400">Tidak ada dokumen jamaah yang cocok</p>
-          <p class="text-[11px] text-slate-500 mt-0.5">Ubah kata kunci pencarian atau pilih filter jenis dokumen lainnya</p>
-        </div>
-      `;
-    } else {
-      cardsContainer.innerHTML = docs.map((d, index) => {
-        const docId = d.DocID || d.docid || '-';
-        const idJamaah = d['ID Jamaah'] || d.id_jamaah || '-';
-        const nama = d['Nama Lengkap'] || d.nama_lengkap || '-';
-        const jenis = d['Jenis Dokumen'] || d.jenis_dokumen || 'Dokumen';
-        const file = d['Nama File'] || d.nama_file || 'file';
-        const link = d['Link File'] || d.link_file || '';
-        const ket = d.Keterangan || d.keterangan || '-';
-        const time = d.Timestamp || d.timestamp || '-';
-        const badgeClass = badgeColorMap[jenis] || 'bg-slate-800 text-slate-300 border-slate-700';
+  tbody.innerHTML = docs.map((d, index) => {
+    const docId = d.DocID || d.docid || '-';
+    const idJamaah = d['ID Jamaah'] || d.id_jamaah || '-';
+    const nama = d['Nama Lengkap'] || d.nama_lengkap || '-';
+    const jenis = d['Jenis Dokumen'] || d.jenis_dokumen || 'Dokumen';
+    const file = d['Nama File'] || d.nama_file || 'file';
+    const link = d['Link File'] || d.link_file || '';
+    const ket = d.Keterangan || d.keterangan || '-';
+    const time = d.Timestamp || d.timestamp || '-';
+    const badgeStyle = badgeColorMap[jenis] || 'background:rgba(148,163,184,0.15); color:#cbd5e1; border:1px solid rgba(148,163,184,0.3);';
 
-        const isImage = file.match(/\.(jpg|jpeg|png|webp)$/i) || (link && link.includes('image'));
-
-        return `
-          <div class="bg-slate-950/90 border border-slate-800 hover:border-slate-700 rounded-xl p-3.5 transition-all shadow-sm space-y-2.5">
-            <!-- Header Card: Jenis Dokumen & DocID -->
-            <div class="flex items-center justify-between gap-2">
-              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${badgeClass}">
-                ${escapeHtml(jenis)}
-              </span>
-              <span class="text-[10px] font-mono text-cyan-400 font-bold bg-cyan-950/80 border border-cyan-800/60 px-2 py-0.5 rounded-md">
-                ${escapeHtml(docId)}
-              </span>
-            </div>
-
-            <!-- Body Card: Nama Jamaah & ID -->
-            <div class="flex items-start justify-between gap-2">
-              <div class="min-w-0">
-                <h4 class="font-bold text-slate-100 text-sm truncate">${escapeHtml(nama)}</h4>
-                <div class="flex items-center gap-2 mt-0.5 text-[11px]">
-                  <span class="font-mono text-emerald-400 font-semibold">[${escapeHtml(idJamaah)}]</span>
-                  <span class="text-slate-500 text-[10px]">${escapeHtml(time.slice(0, 16))}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- File Name & Notes -->
-            <div class="bg-slate-900/80 rounded-lg p-2 text-[11px] space-y-1">
-              <div class="flex items-center gap-1.5 text-slate-300 truncate">
-                <i class="${isImage ? 'fa-regular fa-file-image text-cyan-400' : 'fa-regular fa-file-lines text-emerald-400'} shrink-0"></i>
-                <span class="truncate font-mono text-[10.5px]">${escapeHtml(file)}</span>
-              </div>
-              ${ket && ket !== '-' ? `<div class="text-[10px] text-slate-400 italic truncate">${escapeHtml(ket)}</div>` : ''}
-            </div>
-
-            <!-- Mobile Touch Action Buttons (Big Targets) -->
-            <div class="grid grid-cols-2 gap-2 pt-1">
-              ${link ? `
-                <a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer"
-                  class="py-2 px-3 bg-sky-500/15 hover:bg-sky-500/25 active:bg-sky-500/30 text-sky-300 border border-sky-500/40 rounded-xl text-xs font-bold text-center flex items-center justify-center gap-1.5 transition-all text-decoration-none">
-                  <i class="fa-solid fa-arrow-up-right-from-square text-[11px]"></i>
-                  <span>Buka Berkas</span>
-                </a>
-              ` : `
-                <button type="button" disabled class="py-2 px-3 bg-slate-900 text-slate-600 border border-slate-800 rounded-xl text-xs font-bold">
-                  <span>Tidak Ada Link</span>
-                </button>
-              `}
-              <button type="button" onclick="deleteUploadDokJamaahConfirm('${escapeHtml(docId)}')"
-                class="py-2 px-3 bg-rose-500/10 hover:bg-rose-500/20 active:bg-rose-500/30 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all">
-                <i class="fa-solid fa-trash-can text-[11px]"></i>
-                <span>Hapus</span>
-              </button>
-            </div>
+    return `
+      <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+        <td style="text-align:center; color:#94a3b8; font-size:12px;">${index + 1}</td>
+        <td>
+          <div style="font-family:monospace; font-weight:700; color:#38bdf8; font-size:12px;">${escapeHtml(docId)}</div>
+          <div style="font-size:10px; color:#64748b;">${escapeHtml(time)}</div>
+        </td>
+        <td>
+          <div style="font-weight:700; color:#f1f5f9; font-size:13px;">${escapeHtml(nama)}</div>
+          <div style="font-size:11px; color:#34d399; font-family:monospace;">${escapeHtml(idJamaah)}</div>
+        </td>
+        <td>
+          <span style="display:inline-block; padding:3px 8px; border-radius:6px; font-size:11px; font-weight:700; ${badgeStyle}">
+            ${escapeHtml(jenis)}
+          </span>
+        </td>
+        <td>
+          <div style="font-size:12px; color:#e2e8f0; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(file)}">
+            <i class="fa-regular fa-file" style="margin-right:4px; color:#94a3b8;"></i>${escapeHtml(file)}
           </div>
-        `;
-      }).join('');
-    }
-  }
-
-  // 2. RENDER DESKTOP TABLE VIEW
-  if (tbody) {
-    if (docs.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-slate-500 text-xs">Tidak ada dokumen jamaah yang cocok.</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = docs.map((d, index) => {
-      const docId = d.DocID || d.docid || '-';
-      const idJamaah = d['ID Jamaah'] || d.id_jamaah || '-';
-      const nama = d['Nama Lengkap'] || d.nama_lengkap || '-';
-      const jenis = d['Jenis Dokumen'] || d.jenis_dokumen || 'Dokumen';
-      const file = d['Nama File'] || d.nama_file || 'file';
-      const link = d['Link File'] || d.link_file || '';
-      const ket = d.Keterangan || d.keterangan || '-';
-      const time = d.Timestamp || d.timestamp || '-';
-      const badgeClass = badgeColorMap[jenis] || 'bg-slate-800 text-slate-300 border-slate-700';
-
-      return `
-        <tr class="hover:bg-slate-900/50 transition-colors">
-          <td class="py-2.5 px-3 text-center text-slate-500 font-mono text-[11px]">${index + 1}</td>
-          <td class="py-2.5 px-3">
-            <div class="font-mono font-bold text-cyan-400 text-xs">${escapeHtml(docId)}</div>
-            <div class="text-[10px] text-slate-500">${escapeHtml(time.slice(0, 16))}</div>
-          </td>
-          <td class="py-2.5 px-3">
-            <div class="font-bold text-slate-100">${escapeHtml(nama)}</div>
-            <div class="font-mono text-emerald-400 text-[11px]">${escapeHtml(idJamaah)}</div>
-          </td>
-          <td class="py-2.5 px-3">
-            <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${badgeClass}">
-              ${escapeHtml(jenis)}
-            </span>
-          </td>
-          <td class="py-2.5 px-3">
-            <div class="max-w-[180px] truncate font-mono text-slate-300 text-[11px]" title="${escapeHtml(file)}">
-              <i class="fa-regular fa-file mr-1 text-slate-500"></i>${escapeHtml(file)}
-            </div>
-          </td>
-          <td class="py-2.5 px-3 text-[11px] text-slate-400 max-w-[150px] truncate" title="${escapeHtml(ket)}">
-            ${escapeHtml(ket)}
-          </td>
-          <td class="py-2.5 px-3 text-center">
-            <div class="flex items-center justify-center gap-1.5">
-              ${link ? `
-                <a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer"
-                  class="p-1.5 bg-sky-500/15 hover:bg-sky-500/25 text-sky-300 border border-sky-500/30 rounded-lg text-xs" title="Buka Dokumen">
-                  <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                </a>
-              ` : ''}
-              <button type="button" onclick="deleteUploadDokJamaahConfirm('${escapeHtml(docId)}')"
-                class="p-1.5 bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/30 rounded-lg text-xs" title="Hapus Dokumen">
-                <i class="fa-solid fa-trash-can"></i>
-              </button>
-            </div>
-          </td>
-        </tr>
-      `;
-    }).join('');
-  }
+        </td>
+        <td style="font-size:11px; color:#94a3b8; max-width:180px;">${escapeHtml(ket)}</td>
+        <td style="text-align:center;">
+          <div style="display:flex; justify-content:center; gap:6px;">
+            ${link ? `
+              <a href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer" class="btn-sm" title="Buka Dokumen" style="background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3); border-radius:6px; padding:4px 8px; font-size:11px; text-decoration:none; display:inline-flex; align-items:center;">
+                <i class="fa-solid fa-arrow-up-right-from-square"></i>
+              </a>
+            ` : ''}
+            <button type="button" class="btn-sm" onclick="deleteUploadDokJamaahConfirm('${escapeHtml(docId)}')" title="Hapus Dokumen" style="background:rgba(244,63,94,0.15); color:#fb7185; border:1px solid rgba(244,63,94,0.3); border-radius:6px; padding:4px 8px; font-size:11px; cursor:pointer;">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
 
 async function deleteUploadDokJamaahConfirm(docId) {
@@ -10230,7 +9959,7 @@ async function deleteUploadDokJamaahConfirm(docId) {
     const json = await res.json();
     if (json.success) {
       if (window.Swal) {
-        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Dokumen berhasil dihapus dari Supabase!', timer: 2000, showConfirmButton: false });
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Dokumen berhasil dihapus!', timer: 2000, showConfirmButton: false });
       }
       await loadUploadDokJamaahData();
     } else {

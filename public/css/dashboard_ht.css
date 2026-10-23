@@ -14,7 +14,6 @@
   gap: 16px;
   color: #cbd5e1;
   font-family: 'Plus Jakarta Sans', sans-serif;
-  width: 100%;
   min-height: calc(100vh - 120px);
 }
 
@@ -251,15 +250,11 @@
   overflow: hidden;
   position: relative;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
-  width: 100%;
 }
 
 .ht-table-scroll {
   overflow: auto;
-  max-height: calc(100vh - 220px);
-  min-height: 480px;
-  position: relative;
-  width: 100%;
+  max-height: calc(100vh - 270px);
 }
 
 .ht-table-scroll::-webkit-scrollbar {
@@ -322,8 +317,6 @@
   z-index: 40;
   box-shadow: 2px 0 5px rgba(0, 0, 0, 0.5);
   text-align: center;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-variant-numeric: tabular-nums;
 }
 
 .ht-col-porsi {
@@ -335,11 +328,10 @@
   background-color: #0f172a !important;
   z-index: 40;
   box-shadow: 2px 0 5px rgba(0, 0, 0, 0.5);
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.03em;
+  font-family: monospace;
+  font-weight: 700;
   color: #22d3ee;
+  text-shadow: 0 0 8px rgba(34, 211, 238, 0.45);
 }
 
 .ht-col-nama {
@@ -417,7 +409,7 @@
 
 .ht-col-kode {
   text-align: center;
-  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-family: monospace;
 }
 
 .ht-kode-badge {
@@ -429,46 +421,33 @@
   font-size: 10px;
   font-weight: 700;
   color: #94a3b8;
-  letter-spacing: 0.04em;
 }
 
 .ht-num-cell {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum';
+  font-family: monospace;
   text-align: right;
-  color: #cbd5e1;
-  font-size: 11.5px;
-  font-weight: 600;
+  color: #94a3b8;
 }
 
 .ht-num-amber {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum';
+  font-family: monospace;
   text-align: right;
   color: #fbbf24;
-  font-weight: 700;
-  font-size: 11.5px;
+  font-weight: 600;
 }
 
 .ht-num-emerald-bold {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum';
+  font-family: monospace;
   text-align: right;
   color: #34d399;
   font-weight: 700;
-  background: rgba(16, 185, 129, 0.1);
-  font-size: 11.5px;
+  background: rgba(30, 41, 59, 0.35);
+  text-shadow: 0 0 8px rgba(52, 211, 153, 0.4);
 }
 
 .ht-month-cell {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum';
+  font-family: monospace;
   text-align: right;
-  font-size: 11.5px;
   padding: 6px 8px;
 }
 
@@ -479,9 +458,8 @@
   background: rgba(16, 185, 129, 0.12);
   border: 1px solid rgba(16, 185, 129, 0.25);
   color: #6ee7b7;
-  font-weight: 700;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  box-shadow: 0 0 5px rgba(16, 185, 129, 0.2);
 }
 
 .ht-month-pill-pending {
@@ -492,73 +470,52 @@
   border: 1px solid rgba(234, 179, 8, 0.35);
   color: #fde047;
   font-weight: 700;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 5px rgba(234, 179, 8, 0.25);
 }
 
 /* Sticky Tfoot */
 .ht-matrix-table tfoot {
   position: sticky;
   bottom: 0;
-  z-index: 50;
-  background-color: #0b132b !important;
-  border-top: 2px solid #38bdf8;
-  box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.8);
+  z-index: 35;
+  background-color: #0f172a;
+  border-top: 2px solid #475569;
+  box-shadow: 0 -4px 10px rgba(0, 0, 0, 0.5);
   font-weight: 800;
-}
-
-.ht-matrix-table tfoot tr {
-  background-color: #0b132b !important;
-}
-
-.ht-matrix-table tfoot td {
-  position: sticky;
-  bottom: 0;
-  background-color: #0b132b !important;
-}
-
-.ht-tfoot-sticky-col {
-  position: sticky;
-  bottom: 0;
-  background-color: #0b132b !important;
-  z-index: 60;
-  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.5);
-  border-top: 2px solid #38bdf8;
-  border-right: 1px solid #334155;
-}
-
-.ht-tfoot-nama-total {
-  text-align: right;
-  padding: 10px 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 11px;
   color: #67e8f9;
-  font-weight: 800;
-  white-space: nowrap;
+}
+
+.ht-tfoot-total-label {
+  position: sticky;
+  left: 0;
+  z-index: 45;
+  background-color: #0f172a !important;
+  text-align: right;
+  padding: 10px 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 10.5px;
+  color: #67e8f9;
+  border-right: 1px solid #475569;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.5);
 }
 
 .ht-tfoot-cell {
-  background-color: #0b132b !important;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum';
+  font-family: monospace;
   text-align: right;
   padding: 10px 12px;
-  border-right: 1px solid #334155;
-  border-top: 2px solid #38bdf8;
+  border-right: 1px solid #475569;
   font-weight: 800;
-  font-size: 11.5px;
-  color: #f1f5f9;
 }
 
 .ht-tfoot-cell.green {
-  color: #34d399 !important;
-  background: rgba(16, 185, 129, 0.12) !important;
+  color: #6ee7b7;
+  background: rgba(30, 41, 59, 0.5);
+  text-shadow: 0 0 8px rgba(52, 211, 153, 0.4);
 }
 
 .ht-tfoot-cell.yellow {
-  color: #fde047 !important;
+  color: #fde047;
 }
 
 /* Detail Modal Box */

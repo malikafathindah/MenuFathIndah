@@ -7560,357 +7560,1036 @@ function kelengkapanUmrahApp() {
              MODULE: UPLOAD DOKUMEN JAMAAH UMRAH (mod_upload_dok_jamaah)
              ================================================================ -->
         <div class="module-view" id="view-upload_dok_jamaah">
-          
-          <!-- Banner Header Bar with Statistics -->
-          <div class="bg-slate-900/90 border border-slate-800 p-4 sm:p-5 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-xl relative overflow-hidden">
-            <div class="absolute -right-10 -bottom-10 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+<!-- ============================================================================ -->
+<!-- UPLOAD DOKUMEN JAMAAH UMRAH VIEW (mod_upload_dok_jamaah)                    -->
+<!-- 3 Tab: Form Upload, Daftar Dokumen Jamaah, Dashboard Dokumen Umrah          -->
+<!-- ============================================================================ -->
+<div class="space-y-4" x-data="uploadDokJamaahApp()" x-init="init()">
 
-            <div class="flex items-center gap-3.5 z-10">
-              <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 p-0.5 shadow-lg shadow-emerald-500/20 shrink-0">
-                <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-emerald-400">
-                  <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
-                </div>
+  <!-- 1. Header Bar with 3 Navigation Tabs (Matches Screenshot Lampiran 1) -->
+  <div class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl flex flex-col lg:flex-row items-center justify-between gap-4 shadow-xl relative overflow-hidden">
+    <div class="absolute -right-10 -bottom-10 w-48 h-48 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
+
+    <div class="flex items-center gap-3.5 z-10">
+      <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 via-teal-500 to-cyan-600 p-0.5 shadow-lg shadow-emerald-500/20 shrink-0">
+        <div class="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center text-emerald-400">
+          <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
+        </div>
+      </div>
+      <div>
+        <div class="flex items-center flex-wrap gap-2">
+          <h2 class="text-lg font-extrabold text-slate-100 tracking-tight">Upload Dokumen Jamaah</h2>
+          <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">mod_upload_dok_jamaah</span>
+        </div>
+        <p class="text-xs text-slate-400 mt-0.5 flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block shadow-sm shadow-emerald-400/50"></span>
+          <span>Penyimpanan Google Drive per Jenis Dokumen Jamaah | Sheet Target: <strong class="text-slate-200 font-mono">UploadDokJamaah</strong></span>
+        </p>
+      </div>
+    </div>
+
+    <!-- 3 Navigation Tabs (Right Side) -->
+    <div class="flex items-center flex-wrap gap-2 z-10 w-full lg:w-auto justify-end">
+      <div class="bg-slate-950 p-1 rounded-xl border border-slate-800 flex items-center gap-1">
+        <button type="button" @click="activeTab = 'form'"
+          :class="activeTab === 'form' ? 'bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 shadow-sm' : 'text-slate-400 hover:text-slate-200'"
+          class="px-3.5 py-2 rounded-lg text-xs transition-all flex items-center gap-2">
+          <i class="fa-solid fa-file-arrow-up"></i>
+          <span>Form Upload</span>
+        </button>
+        <button type="button" @click="activeTab = 'daftar'"
+          :class="activeTab === 'daftar' ? 'bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 shadow-sm' : 'text-slate-400 hover:text-slate-200'"
+          class="px-3.5 py-2 rounded-lg text-xs transition-all flex items-center gap-2">
+          <i class="fa-solid fa-table-list"></i>
+          <span>Daftar Dokumen Jamaah</span>
+          <span class="px-1.5 py-0.2 rounded-full text-[9px] font-mono bg-slate-900 text-emerald-400 border border-slate-800" x-text="documents ? documents.length : 0"></span>
+        </button>
+        <button type="button" @click="activeTab = 'dashboard'"
+          :class="activeTab === 'dashboard' ? 'bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 shadow-sm' : 'text-slate-400 hover:text-slate-200'"
+          class="px-3.5 py-2 rounded-lg text-xs transition-all flex items-center gap-2">
+          <i class="fa-solid fa-chart-pie"></i>
+          <span>Dashboard Dokumen Umrah</span>
+        </button>
+      </div>
+
+      <button type="button" @click="loadAllData(true)" :disabled="isLoading"
+        class="px-3.5 py-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700/80 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm disabled:opacity-50">
+        <i class="fa-solid fa-arrows-rotate" :class="{ 'animate-spin': isLoading }"></i>
+        <span>Segarkan</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ============================================================================ -->
+  <!-- TAB 1: FORM UPLOAD (IDENTIK DENGAN SCREENSHOT LAMPIRAN 1)                    -->
+  <!-- ============================================================================ -->
+  <div x-show="activeTab === 'form'" class="space-y-4" x-transition>
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+      <!-- CARD 1 (LEFT): 1. INFORMASI JAMAAH & BERKAS -->
+      <div class="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+        <div class="border-b border-slate-800/80 pb-3 flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-sm font-bold">
+            <i class="fa-solid fa-table-cells"></i>
+          </div>
+          <div>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-emerald-400">1. INFORMASI JAMAAH & BERKAS</h3>
+            <p class="text-[11px] text-slate-400">Pilih Jamaah & Jenis Dokumen</p>
+          </div>
+        </div>
+
+        <form @submit.prevent="submitUpload()" class="space-y-4">
+          <!-- Pilih Jamaah -->
+          <div>
+            <label class="block text-slate-300 mb-1.5 text-xs font-semibold">
+              Pilih Jamaah <span class="text-rose-400">*</span>
+            </label>
+            <div class="relative">
+              <select x-model="selectedJamaahId" @change="onJamaahChange()" required
+                class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/90 rounded-xl text-slate-100 text-xs font-semibold focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/30 transition-all cursor-pointer">
+                <option value="">-- Pilih Jamaah (Terbaru) --</option>
+                <template x-for="j in getSortedJamaahList()" :key="j.id || j.id_jamaah">
+                  <option :value="j.id_jamaah || j.id" x-text="'[' + (j.id_jamaah || j.id) + '] ' + (j.nama_lengkap || j.namaLengkap || j.nama || 'Tanpa Nama') + (j.jenis_paket_umrah || j.jenisPaket ? ' - ' + (j.jenis_paket_umrah || j.jenisPaket) : '')"></option>
+                </template>
+              </select>
+            </div>
+            <p class="text-[10.5px] text-slate-500 mt-1.5 leading-relaxed">
+              Daftar nama jamaah diambil dari Sheet Data Jamaah (Header "Nama Lengkap"), diurutkan dari ID Jamaah terbaru.
+            </p>
+          </div>
+
+          <!-- Jenis Dokumen -->
+          <div>
+            <label class="block text-slate-300 mb-1.5 text-xs font-semibold">
+              Jenis Dokumen <span class="text-rose-400">*</span>
+            </label>
+            <select x-model="selectedJenisDok" required
+              class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/90 rounded-xl text-slate-100 text-xs font-semibold focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/30 transition-all cursor-pointer">
+              <option value="1. KTP">1. KTP</option>
+              <option value="2. Kartu Keluarga">2. Kartu Keluarga</option>
+              <option value="3. Surat Nikah">3. Surat Nikah / Buku Nikah</option>
+              <option value="4. Foto Jamaah">4. Foto Jamaah</option>
+              <option value="5. Bukti Transfer">5. Bukti Transfer</option>
+              <option value="6. Paspor">6. Paspor</option>
+              <option value="7. Buku Vaksin / Meningitis">7. Buku Vaksin / Meningitis</option>
+              <option value="8. BPJS Kesehatan">8. BPJS Kesehatan</option>
+              <option value="9. Dokumen Lainnya">9. Dokumen Lainnya</option>
+            </select>
+          </div>
+
+          <!-- Catatan / Keterangan -->
+          <div>
+            <label class="block text-slate-300 mb-1.5 text-xs font-semibold">
+              Catatan / Keterangan
+            </label>
+            <textarea x-model="keterangan" rows="3" placeholder="Contoh: Bukti Transfer pelunasan / Scan Paspor halaman 1-2..."
+              class="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/90 rounded-xl text-slate-200 text-xs placeholder-slate-500 focus:outline-none focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400/30 transition-all resize-none"></textarea>
+          </div>
+
+          <!-- Quick Jamaah Information Card (Active when selected) -->
+          <template x-if="selectedJamaah">
+            <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3 text-xs space-y-1.5 transition-all">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-slate-400">ID Jamaah:</span>
+                <span class="font-mono text-cyan-400 font-bold" x-text="selectedJamaah.id_jamaah || selectedJamaah.id"></span>
               </div>
-              <div>
-                <div class="flex items-center flex-wrap gap-2">
-                  <h2 class="text-base sm:text-lg font-extrabold text-slate-100 tracking-tight">Pusat Unggahan Dokumen Jamaah</h2>
-                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">mod_upload_dok_jamaah</span>
-                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 hidden sm:inline-block">Kategori: Umrah</span>
-                </div>
-                <p class="text-xs text-slate-400 mt-0.5">Pengarsipan berkas resmi jamaah (KTP, Paspor, KK, Buku Nikah, Foto, Bukti TF) terhubung Supabase & siap akses HP</p>
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-slate-400">Paket Umrah:</span>
+                <span class="text-amber-300 font-semibold truncate max-w-[190px]" x-text="selectedJamaah.jenis_paket_umrah || selectedJamaah.jenisPaket || '-'"></span>
+              </div>
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-slate-400">No Paspor:</span>
+                <span class="font-mono text-purple-300 font-semibold" x-text="selectedJamaah.nomor_passport || selectedJamaah.nomorPassport || '-'"></span>
               </div>
             </div>
+          </template>
+        </form>
+      </div>
 
-            <!-- Toolbar Action & View Tabs -->
-            <div class="flex items-center flex-wrap gap-2 z-10 w-full md:w-auto justify-between md:justify-end">
-              <div class="bg-slate-950 p-1 rounded-xl border border-slate-800 flex items-center gap-1 w-full sm:w-auto justify-center">
-                <button type="button" id="tabBtnUploadForm" onclick="switchUploadDokTab('form')"
-                  class="flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm">
-                  <i class="fa-solid fa-file-arrow-up"></i>
-                  <span>Form Unggah</span>
-                </button>
-                <button type="button" id="tabBtnUploadDirectory" onclick="switchUploadDokTab('directory')"
-                  class="flex-1 sm:flex-initial px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 text-slate-400 hover:text-slate-200">
-                  <i class="fa-solid fa-folder-tree"></i>
-                  <span>Direktori Berkas</span>
-                  <span class="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-slate-900 text-emerald-400 border border-slate-800" id="badgeTotalDokJamaahTab">0</span>
-                </button>
-              </div>
+      <!-- CARD 2 (RIGHT): 2. PILIH & UNGGAH BERKAS FISIK JAMAAH -->
+      <div class="lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+        <div class="border-b border-slate-800/80 pb-3 flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-sm font-bold">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+          </div>
+          <div>
+            <h3 class="text-xs font-bold uppercase tracking-wider text-cyan-400">2. PILIH & UNGGAH BERKAS FISIK JAMAAH</h3>
+            <p class="text-[11px] text-slate-400">Nama file otomatis diubah: <code class="text-cyan-300 font-mono text-[10.5px]">ID Jamaah - Nama Lengkap - Jenis Dokumen.ext</code></p>
+          </div>
+        </div>
 
-              <button type="button" onclick="loadUploadDokJamaahData(true)" title="Segarkan Data"
-                class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm">
-                <i class="fa-solid fa-rotate" id="iconReloadDokJamaah"></i>
-                <span class="hidden sm:inline">Segarkan</span>
+        <!-- Drag & Drop Area -->
+        <div @dragover.prevent="isDragging = true"
+             @dragleave.prevent="isDragging = false"
+             @drop.prevent="handleDrop($event)"
+             @click="$refs.fileInput.click()"
+             :class="isDragging ? 'border-emerald-400 bg-emerald-500/10' : 'border-slate-700/80 hover:border-slate-600 bg-slate-950/60'"
+             class="border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all group relative overflow-hidden">
+          
+          <input type="file" x-ref="fileInput" @change="handleFileSelect($event)" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" class="hidden">
+
+          <div class="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-2xl mx-auto mb-3 shadow-lg shadow-emerald-500/10 group-hover:scale-105 transition-transform">
+            <i class="fa-solid fa-arrow-up-from-bracket"></i>
+          </div>
+
+          <h4 class="text-slate-100 font-bold text-sm">Klik di sini atau Drag & Drop berkas Jamaah</h4>
+          <p class="text-slate-400 text-xs mt-1">Format didukung: PDF, PNG, JPG, JPEG, DOC, DOCX (Maks 10 MB)</p>
+
+          <!-- Selected File Badge -->
+          <template x-if="selectedFile">
+            <div class="mt-4 inline-flex items-center gap-2 bg-emerald-950/80 border border-emerald-500/40 px-3.5 py-1.5 rounded-xl text-xs text-emerald-300 font-medium shadow-md" @click.stop>
+              <i class="fa-solid fa-file-circle-check text-emerald-400 text-sm"></i>
+              <span x-text="selectedFile.name"></span>
+              <span class="text-[10px] text-slate-400 font-mono" x-text="'(' + (selectedFile.size / 1024).toFixed(1) + ' KB)'"></span>
+              <button type="button" @click.stop="removeFile()" class="ml-1 text-rose-400 hover:text-rose-300" title="Hapus Berkas">
+                <i class="fa-solid fa-xmark"></i>
               </button>
             </div>
+          </template>
+        </div>
+
+        <!-- Optional URL Link Input -->
+        <div>
+          <label class="block text-slate-300 mb-1 text-xs font-semibold flex items-center justify-between">
+            <span>Link Google Drive Dokumen (Opsional)</span>
+            <span class="text-[10.5px] text-slate-500">Jika file tersimpan di Google Drive</span>
+          </label>
+          <input type="url" x-model="linkInput" placeholder="https://drive.google.com/file/d/..."
+            class="w-full px-3.5 py-2 bg-slate-950 border border-slate-700/80 rounded-xl text-slate-200 text-xs placeholder-slate-500 focus:outline-none focus:border-cyan-400">
+        </div>
+
+        <!-- Info Box 1: Format Nama File Baru -->
+        <div class="bg-slate-950/90 border border-slate-800 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div class="flex items-center gap-2 text-xs font-semibold text-emerald-400">
+            <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
+            <span>Format Nama File Baru:</span>
           </div>
-
-          <!-- KPI Summary Cards (Mobile-friendly horizontal grid) -->
-          <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mt-3">
-            <div class="bg-slate-900/80 border border-slate-800 p-3 rounded-xl flex items-center gap-2.5">
-              <div class="w-9 h-9 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shrink-0 text-sm">
-                <i class="fa-solid fa-id-card"></i>
-              </div>
-              <div class="min-w-0">
-                <p class="text-[10px] uppercase font-bold text-slate-400 truncate">Total KTP</p>
-                <p class="text-sm sm:text-base font-extrabold text-sky-300 font-mono" id="statTotalKtpJamaah">0</p>
-              </div>
-            </div>
-
-            <div class="bg-slate-900/80 border border-slate-800 p-3 rounded-xl flex items-center gap-2.5">
-              <div class="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 text-sm">
-                <i class="fa-solid fa-passport"></i>
-              </div>
-              <div class="min-w-0">
-                <p class="text-[10px] uppercase font-bold text-slate-400 truncate">Total Paspor</p>
-                <p class="text-sm sm:text-base font-extrabold text-emerald-300 font-mono" id="statTotalPasporJamaah">0</p>
-              </div>
-            </div>
-
-            <div class="bg-slate-900/80 border border-slate-800 p-3 rounded-xl flex items-center gap-2.5">
-              <div class="w-9 h-9 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 text-sm">
-                <i class="fa-solid fa-people-roof"></i>
-              </div>
-              <div class="min-w-0">
-                <p class="text-[10px] uppercase font-bold text-slate-400 truncate">Kartu Keluarga</p>
-                <p class="text-sm sm:text-base font-extrabold text-amber-300 font-mono" id="statTotalKkJamaah">0</p>
-              </div>
-            </div>
-
-            <div class="bg-slate-900/80 border border-slate-800 p-3 rounded-xl flex items-center gap-2.5">
-              <div class="w-9 h-9 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0 text-sm">
-                <i class="fa-solid fa-file-invoice-dollar"></i>
-              </div>
-              <div class="min-w-0">
-                <p class="text-[10px] uppercase font-bold text-slate-400 truncate">Bukti Transfer</p>
-                <p class="text-sm sm:text-base font-extrabold text-purple-300 font-mono" id="statTotalTfJamaah">0</p>
-              </div>
-            </div>
-
-            <div class="col-span-2 sm:col-span-1 bg-slate-900/80 border border-slate-800 p-3 rounded-xl flex items-center gap-2.5">
-              <div class="w-9 h-9 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 shrink-0 text-sm">
-                <i class="fa-solid fa-folder-closed"></i>
-              </div>
-              <div class="min-w-0">
-                <p class="text-[10px] uppercase font-bold text-slate-400 truncate">Total Berkas</p>
-                <p class="text-sm sm:text-base font-extrabold text-cyan-300 font-mono" id="statGrandTotalDokJamaah">0</p>
-              </div>
-            </div>
+          <div class="bg-emerald-950/60 border border-emerald-500/30 px-3 py-1.5 rounded-lg text-emerald-300 font-mono text-xs font-bold truncate max-w-full sm:max-w-[340px]"
+            x-text="computedFileName">
           </div>
+        </div>
 
-          <!-- Main Layout Container (Responsive Grid / Mobile Tab Switching) -->
-          <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start mt-4">
-            
-            <!-- SECTION 1: FORM UPLOAD BERKAS (MOBILE-FRIENDLY WITH CAMERA HP) -->
-            <div id="containerUploadDokForm" class="lg:col-span-5 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
-              <div class="border-b border-slate-800/80 pb-3 flex items-center justify-between">
-                <div class="flex items-center gap-2.5">
-                  <div class="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-sm font-bold">
-                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                  </div>
-                  <div>
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-emerald-400">1. Form Unggah Berkas Fisik</h3>
-                    <p class="text-[11px] text-slate-400">Pilih Jamaah dan ambil foto via Kamera HP atau pilih berkas</p>
-                  </div>
-                </div>
-              </div>
+        <!-- Info Box 2: Auto Sync Info Note -->
+        <div class="bg-slate-950/80 border border-slate-800/80 rounded-xl p-3 flex items-start gap-2.5 text-xs text-slate-400">
+          <i class="fa-solid fa-arrows-rotate text-emerald-400 mt-0.5 shrink-0 text-sm"></i>
+          <span class="leading-relaxed">
+            Otomatis menyalin URL ke Sheet <strong class="text-slate-200">Data Jamaah</strong> pada header yang sesuai (Upload Pasport/KTP). Jika data sudah ada, sistem akan memperbarui dokumen terkait.
+          </span>
+        </div>
 
-              <form id="formUploadDokJamaah" onsubmit="handleUploadDokJamaahSubmit(event)" class="space-y-3.5 text-xs">
-                
-                <!-- FILTER 1: PAKET UMRAH -->
-                <div>
-                  <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between" for="udjFilterPaket">
-                    <span class="flex items-center gap-1.5">
-                      <i class="fa-solid fa-kaaba text-amber-400"></i>
-                      <span>Filter Paket Umrah</span>
-                    </span>
-                    <span class="text-[10.5px] text-slate-400">Pilih untuk menyaring</span>
-                  </label>
-                  <select id="udjFilterPaket" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-slate-100 font-medium focus:outline-none focus:border-emerald-400"
-                    onchange="onUploadDokJamaahPaketFilterChange()">
-                    <option value="">-- Semua Paket Umrah --</option>
-                  </select>
-                </div>
+        <!-- Bottom Actions -->
+        <div class="flex items-center justify-end gap-3 pt-2">
+          <button type="button" @click="resetForm()"
+            class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-colors flex items-center gap-1.5">
+            <i class="fa-solid fa-rotate-left"></i>
+            <span>Reset Form</span>
+          </button>
+          
+          <button type="button" @click="submitUpload()" :disabled="isSaving || !selectedJamaahId"
+            class="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold rounded-xl text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center gap-2 disabled:opacity-50">
+            <i class="fa-solid fa-cloud-arrow-up" x-show="!isSaving"></i>
+            <i class="fa-solid fa-spinner animate-spin" x-show="isSaving"></i>
+            <span x-text="isSaving ? 'Mengunggah Berkas...' : 'Unggah Berkas Jamaah'"></span>
+          </button>
+        </div>
 
-                <!-- FILTER 2: PILIH NAMA JAMAAH -->
-                <div>
-                  <label class="block text-slate-300 mb-1 font-semibold flex items-center justify-between" for="udjSelectJamaah">
-                    <span class="flex items-center gap-1.5">
-                      <i class="fa-solid fa-user-check text-cyan-400"></i>
-                      <span>Pilih Jamaah <span class="text-rose-400">*</span></span>
-                    </span>
-                    <span class="text-[10.5px] text-cyan-400 font-normal" id="udjJamaahCountBadge">0 Jamaah</span>
-                  </label>
-                  <select id="udjSelectJamaah" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-slate-100 font-medium focus:outline-none focus:border-cyan-400" required
-                    onchange="onUploadDokJamaahSelectChange()">
-                    <option value="">-- Pilih Jamaah --</option>
-                  </select>
-                </div>
+      </div>
 
-                <!-- JAMAAH QUICK INFO BADGE (TAMPIL KETIKA JAMAAH DIPILIH) -->
-                <div id="udjJamaahInfoCard" class="hidden bg-slate-950/80 border border-emerald-500/30 rounded-xl p-3 space-y-2">
-                  <div class="flex items-center justify-between">
-                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" id="udjInfoIdBadge">-</span>
-                    <span class="text-[10px] font-mono text-slate-400" id="udjInfoPasporBadge">Paspor: -</span>
-                  </div>
-                  <div class="font-bold text-slate-100 text-xs truncate" id="udjInfoNamaText">-</div>
-                  <div class="text-[10px] text-amber-300 truncate" id="udjInfoPaketText">-</div>
+    </div>
+  </div>
+
+  <!-- ============================================================================ -->
+  <!-- TAB 2: DAFTAR DOKUMEN JAMAAH (REKAP TABEL BERKAS TERSIMPAN)                  -->
+  <!-- ============================================================================ -->
+  <div x-show="activeTab === 'daftar'" class="space-y-4" x-transition>
+
+    <!-- Mini KPI Stats Toolbar -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div class="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shrink-0">
+          <i class="fa-solid fa-id-card text-base"></i>
+        </div>
+        <div>
+          <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total KTP</p>
+          <p class="text-base font-extrabold text-sky-300 font-mono" x-text="countByJenis('KTP') + ' Berkas'"></p>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0">
+          <i class="fa-solid fa-passport text-base"></i>
+        </div>
+        <div>
+          <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Paspor</p>
+          <p class="text-base font-extrabold text-emerald-300 font-mono" x-text="countByJenis('Paspor') + ' Berkas'"></p>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+          <i class="fa-solid fa-people-roof text-base"></i>
+        </div>
+        <div>
+          <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Kartu Keluarga</p>
+          <p class="text-base font-extrabold text-amber-300 font-mono" x-text="countByJenis('Kartu Keluarga') + ' Berkas'"></p>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/80 border border-slate-800 p-3.5 rounded-xl flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
+          <i class="fa-solid fa-receipt text-base"></i>
+        </div>
+        <div>
+          <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Bukti Bayar / TF</p>
+          <p class="text-base font-extrabold text-purple-300 font-mono" x-text="(countByJenis('Bukti') + countByJenis('Transfer')) + ' Berkas'"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toolbar Filter & Search -->
+    <div class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl shadow-xl space-y-4">
+      <div class="flex flex-col md:flex-row items-center justify-between gap-3">
+        <div class="relative w-full md:w-80">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+          <input type="text" x-model="searchQuery" placeholder="Cari nama jamaah, ID, doc id, file..."
+            class="w-full pl-8 pr-3 py-2 bg-slate-950 border border-slate-700/80 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-400">
+        </div>
+
+        <div class="flex items-center flex-wrap gap-2.5 w-full md:w-auto justify-end">
+          <!-- Filter Jenis Dokumen -->
+          <select x-model="filterJenis"
+            class="px-3 py-2 bg-slate-950 border border-slate-700/80 rounded-xl text-xs text-emerald-300 font-semibold focus:outline-none focus:border-emerald-400">
+            <option value="Semua">Semua Jenis Dokumen</option>
+            <option value="KTP">KTP</option>
+            <option value="Paspor">Paspor</option>
+            <option value="Kartu Keluarga">Kartu Keluarga</option>
+            <option value="Surat Nikah">Surat Nikah</option>
+            <option value="Foto">Foto Jamaah</option>
+            <option value="Transfer">Bukti Transfer</option>
+            <option value="Vaksin">Buku Vaksin</option>
+            <option value="BPJS">BPJS Kesehatan</option>
+          </select>
+
+          <!-- Filter Paket -->
+          <select x-model="filterPaket"
+            class="px-3 py-2 bg-slate-950 border border-slate-700/80 rounded-xl text-xs text-cyan-300 font-semibold focus:outline-none focus:border-cyan-400">
+            <option value="Semua">Semua Paket Umrah</option>
+            <template x-for="p in paketList" :key="p">
+              <option :value="p" x-text="p"></option>
+            </template>
+          </select>
+
+          <span class="text-xs text-slate-400 font-medium px-2" x-text="'Total: ' + getFilteredDocs().length + ' berkas'"></span>
+        </div>
+      </div>
+
+      <!-- Data Table -->
+      <div class="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden shadow-inner">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs whitespace-nowrap">
+            <thead class="bg-slate-900/90 text-emerald-300 uppercase tracking-wider font-bold border-b border-slate-800">
+              <tr>
+                <th class="py-2.5 px-3 text-center w-10">No</th>
+                <th class="py-2.5 px-3 w-32">Doc ID</th>
+                <th class="py-2.5 px-3 w-36">Waktu Upload</th>
+                <th class="py-2.5 px-3 w-28">ID Jamaah</th>
+                <th class="py-2.5 px-3">Nama Jamaah</th>
+                <th class="py-2.5 px-3">Jenis Dokumen</th>
+                <th class="py-2.5 px-3">Nama File Berkas</th>
+                <th class="py-2.5 px-3">Keterangan</th>
+                <th class="py-2.5 px-3">Uploader</th>
+                <th class="py-2.5 px-3 text-center w-24 border-l border-slate-800">Aksi</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/80 text-slate-300 font-medium">
+              <template x-for="(doc, idx) in getFilteredDocs()" :key="doc.DocID || doc.docid || idx">
+                <tr class="hover:bg-slate-900/50 transition-colors">
+                  <td class="py-2.5 px-3 text-center text-slate-500 font-mono text-[11px]" x-text="idx + 1"></td>
+                  <td class="py-2.5 px-3 font-mono text-cyan-400 font-bold" x-text="doc.DocID || doc.docid"></td>
+                  <td class="py-2.5 px-3 text-[11px] text-slate-400" x-text="doc.Timestamp || doc.timestamp || '-'"></td>
+                  <td class="py-2.5 px-3 font-mono text-emerald-400 font-semibold" x-text="doc['ID Jamaah'] || doc.id_jamaah || '-'"></td>
+                  <td class="py-2.5 px-3 font-bold text-slate-100" x-text="doc['Nama Lengkap'] || doc.nama_lengkap || '-'"></td>
                   
-                  <!-- Checklist Dokumen Terunggah di Master Jamaah -->
-                  <div class="pt-2 border-t border-slate-800">
-                    <p class="text-[9.5px] uppercase font-bold text-slate-400 mb-1.5">Status Kelengkapan di Master Jamaah:</p>
-                    <div class="flex items-center flex-wrap gap-1" id="udjDocStatusChecklist">
-                      <!-- Rendered dynamically -->
-                    </div>
-                  </div>
-                </div>
+                  <!-- Jenis Dokumen Badge -->
+                  <td class="py-2.5 px-3">
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold inline-block"
+                      :class="{
+                        'bg-sky-500/15 text-sky-300 border border-sky-500/30': (doc['Jenis Dokumen'] || doc.jenis_dokumen) === 'KTP',
+                        'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30': (doc['Jenis Dokumen'] || doc.jenis_dokumen) === 'Paspor',
+                        'bg-amber-500/15 text-amber-300 border border-amber-500/30': (doc['Jenis Dokumen'] || doc.jenis_dokumen) === 'Kartu Keluarga',
+                        'bg-rose-500/15 text-rose-300 border border-rose-500/30': (doc['Jenis Dokumen'] || doc.jenis_dokumen) === 'Surat Nikah',
+                        'bg-pink-500/15 text-pink-300 border border-pink-500/30': (doc['Jenis Dokumen'] || doc.jenis_dokumen) === 'Foto Jamaah',
+                        'bg-purple-500/15 text-purple-300 border border-purple-500/30': (doc['Jenis Dokumen'] || doc.jenis_dokumen) === 'Bukti Transfer' || (doc['Jenis Dokumen'] || doc.jenis_dokumen) === 'Upload Bukti Transfer',
+                        'bg-teal-500/15 text-teal-300 border border-teal-500/30': (doc['Jenis Dokumen'] || doc.jenis_dokumen) === 'BPJS',
+                        'bg-slate-800 text-slate-300 border border-slate-700': !['KTP','Paspor','Kartu Keluarga','Surat Nikah','Foto Jamaah','Bukti Transfer','Upload Bukti Transfer','BPJS'].includes(doc['Jenis Dokumen'] || doc.jenis_dokumen)
+                      }"
+                      x-text="doc['Jenis Dokumen'] || doc.jenis_dokumen"></span>
+                  </td>
 
-                <!-- JENIS DOKUMEN FISIK -->
-                <div>
-                  <label class="block text-slate-300 mb-1 font-semibold flex items-center gap-1.5" for="udjJenisDok">
-                    <i class="fa-solid fa-folder-closed text-emerald-400"></i>
-                    <span>Jenis Dokumen Fisik <span class="text-rose-400">*</span></span>
-                  </label>
-                  <select id="udjJenisDok" class="w-full px-3 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-slate-100 font-medium focus:outline-none focus:border-emerald-400" required>
-                    <option value="KTP">KTP (Kartu Tanda Penduduk)</option>
-                    <option value="Paspor">Buku Paspor</option>
-                    <option value="Kartu Keluarga">Kartu Keluarga (KK)</option>
-                    <option value="Surat Nikah">Buku / Surat Nikah</option>
-                    <option value="Foto Jamaah">Foto Jamaah (4x6 Latar Putih)</option>
-                    <option value="Bukti Transfer">Bukti Transfer / Pembayaran</option>
-                    <option value="BPJS">Kartu BPJS Kesehatan</option>
-                    <option value="Vaksin">Buku Vaksin / Meningitis</option>
-                    <option value="Dokumen Lainnya">Dokumen Lainnya</option>
-                  </select>
-                </div>
+                  <!-- Nama File & Link -->
+                  <td class="py-2.5 px-3 text-slate-300 font-mono text-[11px] truncate max-w-[220px]" :title="doc['Nama File'] || doc.nama_file" x-text="doc['Nama File'] || doc.nama_file || '-'"></td>
+                  <td class="py-2.5 px-3 text-slate-400 text-[11px] truncate max-w-[200px]" :title="doc.Keterangan || doc.keterangan" x-text="doc.Keterangan || doc.keterangan || '-'"></td>
+                  <td class="py-2.5 px-3 text-slate-400 text-[11px]" x-text="doc.Uploader || doc.uploader || 'Admin'"></td>
 
-                <!-- DUAL INPUT: KAMERA HP & FILE PICKER (MOBILE-OPTIMIZED) -->
-                <div>
-                  <label class="block text-slate-300 mb-1.5 font-semibold flex items-center justify-between">
-                    <span class="flex items-center gap-1.5">
-                      <i class="fa-solid fa-file-image text-cyan-400"></i>
-                      <span>Unggah File / Foto <span class="text-rose-400">*</span></span>
-                    </span>
-                    <span class="text-[10px] text-slate-400">JPG, PNG, PDF</span>
-                  </label>
-
-                  <!-- Hidden native inputs -->
-                  <input type="file" id="udjCameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleUdjFilePick(event, true)">
-                  <input type="file" id="udjFileInput" accept=".jpg,.jpeg,.png,.pdf" class="hidden" onchange="handleUdjFilePick(event, false)">
-
-                  <!-- Big Mobile Touch Action Buttons -->
-                  <div class="grid grid-cols-2 gap-2">
-                    <button type="button" onclick="document.getElementById('udjCameraInput').click()"
-                      class="px-3 py-3 bg-gradient-to-r from-cyan-600/30 to-blue-600/30 hover:from-cyan-600/40 hover:to-blue-600/40 border border-cyan-500/40 rounded-xl text-cyan-300 font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all active:scale-95 shadow-sm">
-                      <i class="fa-solid fa-camera text-base"></i>
-                      <span>Foto Kamera HP</span>
-                    </button>
-
-                    <button type="button" onclick="document.getElementById('udjFileInput').click()"
-                      class="px-3 py-3 bg-gradient-to-r from-emerald-600/30 to-teal-600/30 hover:from-emerald-600/40 hover:to-teal-600/40 border border-emerald-500/40 rounded-xl text-emerald-300 font-bold text-xs flex flex-col items-center justify-center gap-1 transition-all active:scale-95 shadow-sm">
-                      <i class="fa-solid fa-folder-open text-base"></i>
-                      <span>Pilih File / Galeri</span>
-                    </button>
-                  </div>
-
-                  <!-- File Preview Container -->
-                  <div id="udjFilePreviewCard" class="hidden mt-2 p-3 bg-slate-950 border border-slate-700/80 rounded-xl">
-                    <div class="flex items-center justify-between gap-2">
-                      <div class="flex items-center gap-2.5 overflow-hidden">
-                        <div id="udjPreviewThumbnail" class="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-emerald-400 overflow-hidden shrink-0">
-                          <i class="fa-regular fa-file"></i>
-                        </div>
-                        <div class="min-w-0">
-                          <p id="udjPreviewFileName" class="text-xs font-bold text-slate-100 truncate">file.png</p>
-                          <p id="udjPreviewFileSize" class="text-[10px] text-slate-400 font-mono">0 KB</p>
-                        </div>
-                      </div>
-                      <button type="button" onclick="clearUdjFileSelection()" class="p-1.5 text-rose-400 hover:text-rose-300 rounded-lg hover:bg-rose-500/10 transition-colors" title="Batal Pilih File">
-                        <i class="fa-solid fa-xmark text-sm"></i>
+                  <!-- Aksi -->
+                  <td class="py-2.5 px-3 text-center border-l border-slate-800">
+                    <div class="flex items-center justify-center gap-1.5">
+                      <template x-if="doc['Link File'] || doc.link_file">
+                        <a :href="doc['Link File'] || doc.link_file" target="_blank"
+                          class="p-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 rounded-lg text-xs transition-colors"
+                          title="Buka / Unduh Berkas di Google Drive">
+                          <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        </a>
+                      </template>
+                      <button type="button" @click="deleteDoc(doc.DocID || doc.docid)"
+                        class="p-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg text-xs transition-colors"
+                        title="Hapus Dokumen">
+                        <i class="fa-solid fa-trash-can"></i>
                       </button>
                     </div>
-                  </div>
-                </div>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
 
-                <!-- LINK DOKUMEN / GOOGLE DRIVE -->
-                <div>
-                  <label class="block text-slate-300 mb-1 font-semibold flex items-center gap-1.5" for="udjLinkInput">
-                    <i class="fa-brands fa-google-drive text-amber-400"></i>
-                    <span>Link Dokumen / Google Drive (Opsional)</span>
-                  </label>
-                  <input type="url" id="udjLinkInput" class="w-full px-3 py-2 bg-slate-950 border border-slate-700/80 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-400 text-xs"
-                    placeholder="https://drive.google.com/file/d/...">
-                </div>
-
-                <!-- KETERANGAN / CATATAN -->
-                <div>
-                  <label class="block text-slate-300 mb-1 font-semibold flex items-center gap-1.5" for="udjKeteranganInput">
-                    <i class="fa-solid fa-comment-dots text-slate-400"></i>
-                    <span>Keterangan Dokumen</span>
-                  </label>
-                  <textarea id="udjKeteranganInput" class="w-full px-3 py-2 bg-slate-950 border border-slate-700/80 rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-400 text-xs" rows="2"
-                    placeholder="Catatan tambahan dokumen jamaah..."></textarea>
-                </div>
-
-                <!-- SUBMIT BUTTON -->
-                <button type="submit" id="btnSubmitUploadDokJamaah"
-                  class="w-full py-3 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-extrabold rounded-xl text-xs shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 active:scale-98">
-                  <i class="fa-solid fa-cloud-arrow-up text-sm"></i>
-                  <span>Simpan & Arsipkan Dokumen ke Supabase</span>
-                </button>
-              </form>
-            </div>
-
-            <!-- SECTION 2: DIREKTORI BERKAS JAMAAH (CARDS ON MOBILE, TABLE ON DESKTOP) -->
-            <div id="containerUploadDokDirectory" class="lg:col-span-7 bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
-              
-              <!-- Search, Filter & View Controls -->
-              <div class="space-y-3">
-                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-                  <div class="relative flex-1">
-                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
-                    <input type="text" id="searchDokJamaahInput" placeholder="Cari nama, ID, nama file..." oninput="renderUploadDokJamaahTable()"
-                      class="w-full pl-8 pr-3 py-2 bg-slate-950 border border-slate-700/80 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-400">
-                  </div>
-
-                  <div class="flex items-center gap-1.5 self-end sm:self-auto">
-                    <!-- Mobile view mode toggle (Cards vs Table) -->
-                    <div class="bg-slate-950 p-1 rounded-xl border border-slate-800 flex items-center gap-0.5">
-                      <button type="button" id="btnViewModeCards" onclick="setDokViewMode('cards')" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40" title="Mode Kartu">
-                        <i class="fa-solid fa-grip"></i>
-                      </button>
-                      <button type="button" id="btnViewModeTable" onclick="setDokViewMode('table')" class="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200" title="Mode Tabel">
-                        <i class="fa-solid fa-table-list"></i>
-                      </button>
-                    </div>
-
-                    <button type="button" onclick="loadUploadDokJamaahData(true)" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs" title="Segarkan">
-                      <i class="fa-solid fa-rotate"></i>
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Quick Filter Pills (Horizontal Touch Scroll on Mobile) -->
-                <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-[11px]">
-                  <button type="button" onclick="setQuickDokFilter('')" id="pillDokSemua"
-                    class="px-3 py-1 rounded-full whitespace-nowrap font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                    Semua (<span id="countPillSemua">0</span>)
-                  </button>
-                  <button type="button" onclick="setQuickDokFilter('KTP')" id="pillDokKTP"
-                    class="px-3 py-1 rounded-full whitespace-nowrap text-slate-400 hover:text-slate-200 bg-slate-950 border border-slate-800">
-                    KTP (<span id="countPillKTP">0</span>)
-                  </button>
-                  <button type="button" onclick="setQuickDokFilter('Paspor')" id="pillDokPaspor"
-                    class="px-3 py-1 rounded-full whitespace-nowrap text-slate-400 hover:text-slate-200 bg-slate-950 border border-slate-800">
-                    Paspor (<span id="countPillPaspor">0</span>)
-                  </button>
-                  <button type="button" onclick="setQuickDokFilter('Kartu Keluarga')" id="pillDokKK"
-                    class="px-3 py-1 rounded-full whitespace-nowrap text-slate-400 hover:text-slate-200 bg-slate-950 border border-slate-800">
-                    KK (<span id="countPillKK">0</span>)
-                  </button>
-                  <button type="button" onclick="setQuickDokFilter('Surat Nikah')" id="pillDokNikah"
-                    class="px-3 py-1 rounded-full whitespace-nowrap text-slate-400 hover:text-slate-200 bg-slate-950 border border-slate-800">
-                    Buku Nikah (<span id="countPillNikah">0</span>)
-                  </button>
-                  <button type="button" onclick="setQuickDokFilter('Foto Jamaah')" id="pillDokFoto"
-                    class="px-3 py-1 rounded-full whitespace-nowrap text-slate-400 hover:text-slate-200 bg-slate-950 border border-slate-800">
-                    Foto (<span id="countPillFoto">0</span>)
-                  </button>
-                  <button type="button" onclick="setQuickDokFilter('Bukti Transfer')" id="pillDokTF"
-                    class="px-3 py-1 rounded-full whitespace-nowrap text-slate-400 hover:text-slate-200 bg-slate-950 border border-slate-800">
-                    Bukti TF (<span id="countPillTF">0</span>)
-                  </button>
-                </div>
-              </div>
-
-              <!-- VIEW 1: CARDS CONTAINER (MOBILE-FRIENDLY) -->
-              <div id="dokCardsContainer" class="space-y-2.5 max-h-[600px] overflow-y-auto pr-1">
-                <!-- Rendered dynamically via renderUploadDokJamaahCards() -->
-              </div>
-
-              <!-- VIEW 2: TABLE CONTAINER (DESKTOP) -->
-              <div id="dokTableContainer" class="hidden bg-slate-950 rounded-xl border border-slate-800 overflow-hidden shadow-inner max-h-[600px] overflow-y-auto">
-                <table class="w-full text-left text-xs whitespace-nowrap">
-                  <thead class="bg-slate-900/90 text-emerald-300 uppercase tracking-wider font-bold border-b border-slate-800 sticky top-0 z-10">
-                    <tr>
-                      <th class="py-2.5 px-3 text-center w-10">No</th>
-                      <th class="py-2.5 px-3">Doc ID</th>
-                      <th class="py-2.5 px-3">Jamaah</th>
-                      <th class="py-2.5 px-3">Jenis Dokumen</th>
-                      <th class="py-2.5 px-3">Nama File</th>
-                      <th class="py-2.5 px-3">Keterangan</th>
-                      <th class="py-2.5 px-3 text-center w-24">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody id="tableDokJamaahBody" class="divide-y divide-slate-800/80 text-slate-300 font-medium">
-                    <tr><td colspan="7" class="py-8 text-center text-slate-500">Memuat data berkas jamaah...</td></tr>
-                  </tbody>
-                </table>
-              </div>
-
-            </div>
-
+        <template x-if="getFilteredDocs().length === 0">
+          <div class="py-12 text-center text-slate-500 text-xs">
+            <i class="fa-solid fa-folder-open text-3xl mb-2 text-slate-600"></i>
+            <p>Tidak ada dokumen yang sesuai dengan pencarian atau filter.</p>
           </div>
+        </template>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============================================================================ -->
+  <!-- TAB 3: DASHBOARD DOKUMEN UMRAH (METRIK & MATRIKS CHECKLIST JAMAAH)          -->
+  <!-- ============================================================================ -->
+  <div x-show="activeTab === 'dashboard'" class="space-y-4" x-transition>
+
+    <!-- Executive KPI Row -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl flex items-center gap-3">
+        <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 text-xl">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+        </div>
+        <div>
+          <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Berkas Terunggah</p>
+          <p class="text-lg font-extrabold text-slate-100 font-mono" x-text="documents.length + ' Dokumen'"></p>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl flex items-center gap-3">
+        <div class="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 shrink-0 text-xl">
+          <i class="fa-solid fa-users"></i>
+        </div>
+        <div>
+          <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Total Jamaah</p>
+          <p class="text-lg font-extrabold text-cyan-300 font-mono" x-text="jamaahList.length + ' Orang'"></p>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl flex items-center gap-3">
+        <div class="w-12 h-12 rounded-xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-center text-teal-400 shrink-0 text-xl">
+          <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <div>
+          <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Dokumen Lengkap</p>
+          <p class="text-lg font-extrabold text-teal-300 font-mono" x-text="getLengkapCount() + ' Jamaah'"></p>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl flex items-center gap-3">
+        <div class="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 text-xl">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+        </div>
+        <div>
+          <p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Belum Lengkap</p>
+          <p class="text-lg font-extrabold text-amber-300 font-mono" x-text="getBelumLengkapCount() + ' Jamaah'"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Visual Breakdown Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      
+      <!-- Distribusi Berkas Fisik -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-chart-bar text-emerald-400 text-sm"></i>
+            <h4 class="text-xs font-bold text-slate-100 uppercase tracking-wide">Distribusi Dokumen Per Kategori</h4>
+          </div>
+          <span class="text-[11px] text-slate-400">Total: <strong class="text-emerald-300" x-text="documents.length"></strong> berkas</span>
+        </div>
+
+        <div class="space-y-2.5 text-xs">
+          <!-- KTP -->
+          <div>
+            <div class="flex justify-between text-[11px] mb-1">
+              <span class="text-slate-300 font-medium">KTP (Kartu Tanda Penduduk)</span>
+              <span class="text-sky-400 font-mono font-bold" x-text="countByJenis('KTP') + ' berkas'"></span>
+            </div>
+            <div class="w-full bg-slate-950 h-2 rounded-full overflow-hidden">
+              <div class="bg-sky-500 h-full rounded-full transition-all duration-500" :style="'width: ' + (documents.length ? Math.min(100, Math.round((countByJenis('KTP') / documents.length) * 100)) : 0) + '%'"></div>
+            </div>
+          </div>
+
+          <!-- Paspor -->
+          <div>
+            <div class="flex justify-between text-[11px] mb-1">
+              <span class="text-slate-300 font-medium">Buku Paspor Asli</span>
+              <span class="text-emerald-400 font-mono font-bold" x-text="countByJenis('Paspor') + ' berkas'"></span>
+            </div>
+            <div class="w-full bg-slate-950 h-2 rounded-full overflow-hidden">
+              <div class="bg-emerald-500 h-full rounded-full transition-all duration-500" :style="'width: ' + (documents.length ? Math.min(100, Math.round((countByJenis('Paspor') / documents.length) * 100)) : 0) + '%'"></div>
+            </div>
+          </div>
+
+          <!-- Kartu Keluarga -->
+          <div>
+            <div class="flex justify-between text-[11px] mb-1">
+              <span class="text-slate-300 font-medium">Kartu Keluarga (KK)</span>
+              <span class="text-amber-400 font-mono font-bold" x-text="countByJenis('Kartu Keluarga') + ' berkas'"></span>
+            </div>
+            <div class="w-full bg-slate-950 h-2 rounded-full overflow-hidden">
+              <div class="bg-amber-500 h-full rounded-full transition-all duration-500" :style="'width: ' + (documents.length ? Math.min(100, Math.round((countByJenis('Kartu Keluarga') / documents.length) * 100)) : 0) + '%'"></div>
+            </div>
+          </div>
+
+          <!-- Foto Jamaah -->
+          <div>
+            <div class="flex justify-between text-[11px] mb-1">
+              <span class="text-slate-300 font-medium">Foto Jamaah (4x6 Putih)</span>
+              <span class="text-pink-400 font-mono font-bold" x-text="countByJenis('Foto') + ' berkas'"></span>
+            </div>
+            <div class="w-full bg-slate-950 h-2 rounded-full overflow-hidden">
+              <div class="bg-pink-500 h-full rounded-full transition-all duration-500" :style="'width: ' + (documents.length ? Math.min(100, Math.round((countByJenis('Foto') / documents.length) * 100)) : 0) + '%'"></div>
+            </div>
+          </div>
+
+          <!-- Bukti Transfer -->
+          <div>
+            <div class="flex justify-between text-[11px] mb-1">
+              <span class="text-slate-300 font-medium">Bukti Pembayaran / Transfer</span>
+              <span class="text-purple-400 font-mono font-bold" x-text="(countByJenis('Bukti') + countByJenis('Transfer')) + ' berkas'"></span>
+            </div>
+            <div class="w-full bg-slate-950 h-2 rounded-full overflow-hidden">
+              <div class="bg-purple-500 h-full rounded-full transition-all duration-500" :style="'width: ' + (documents.length ? Math.min(100, Math.round(((countByJenis('Bukti') + countByJenis('Transfer')) / documents.length) * 100)) : 0) + '%'"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Integrasi Google Drive & Supabase Status -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3.5 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2.5">
+            <div class="flex items-center gap-2">
+              <i class="fa-solid fa-server text-cyan-400 text-sm"></i>
+              <h4 class="text-xs font-bold text-slate-100 uppercase tracking-wide">Status Integrasi Google Drive & Database</h4>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">Active</span>
+          </div>
+
+          <div class="mt-3 space-y-2.5 text-xs text-slate-300">
+            <div class="bg-slate-950/70 border border-slate-800 p-2.5 rounded-xl flex items-center justify-between">
+              <span class="text-slate-400">Sheet Sinkronisasi:</span>
+              <span class="font-mono text-emerald-400 font-bold">UploadDokJamaah</span>
+            </div>
+            <div class="bg-slate-950/70 border border-slate-800 p-2.5 rounded-xl flex items-center justify-between">
+              <span class="text-slate-400">Database Storage:</span>
+              <span class="font-mono text-cyan-400 font-bold">Supabase PostgreSQL</span>
+            </div>
+            <div class="bg-slate-950/70 border border-slate-800 p-2.5 rounded-xl flex items-center justify-between">
+              <span class="text-slate-400">Auto-Sync Kolom:</span>
+              <span class="text-slate-200">upload_ktp, upload_pasport, kartu_keluarga</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3 bg-emerald-950/30 border border-emerald-500/30 rounded-xl flex items-center gap-2.5 text-xs text-emerald-300">
+          <i class="fa-solid fa-circle-check text-emerald-400 text-base shrink-0"></i>
+          <span>Pengarsipan berkas langsung terhubung ke Google Drive dan tersimpan aman di basis data Supabase travel.</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Tabel Matriks Checklist Dokumen Jamaah Umrah -->
+    <div class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl shadow-xl space-y-4">
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-3 border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+            <i class="fa-solid fa-list-check"></i>
+            <span>Matriks Checklist Dokumen Jamaah Umrah</span>
+          </h3>
+          <p class="text-[11px] text-slate-400">Status kelengkapan berkas fisik resmi untuk seluruh jamaah terdaftar</p>
+        </div>
+
+        <div class="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+          <div class="relative w-full sm:w-64">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+            <input type="text" x-model="matrixSearch" placeholder="Cari nama jamaah / ID..."
+              class="w-full pl-8 pr-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-400">
+          </div>
+
+          <select x-model="matrixFilterStatus"
+            class="px-3 py-1.5 bg-slate-950 border border-slate-700/80 rounded-xl text-xs text-emerald-300 font-semibold focus:outline-none focus:border-emerald-400">
+            <option value="Semua">Semua Status</option>
+            <option value="Lengkap">Lengkap</option>
+            <option value="Belum Lengkap">Belum Lengkap</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Matrix Table -->
+      <div class="bg-slate-950 rounded-xl border border-slate-800 overflow-hidden shadow-inner">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs whitespace-nowrap">
+            <thead class="bg-slate-900/90 text-slate-200 uppercase tracking-wider font-bold border-b border-slate-800">
+              <tr>
+                <th class="py-2.5 px-3 text-center w-10">No</th>
+                <th class="py-2.5 px-3 w-28">ID Jamaah</th>
+                <th class="py-2.5 px-3">Nama Jamaah</th>
+                <th class="py-2.5 px-3">Paket Umrah</th>
+                <th class="py-2.5 px-3 text-center border-l border-slate-800">KTP</th>
+                <th class="py-2.5 px-3 text-center">Paspor</th>
+                <th class="py-2.5 px-3 text-center">KK</th>
+                <th class="py-2.5 px-3 text-center">Surat Nikah</th>
+                <th class="py-2.5 px-3 text-center">Foto</th>
+                <th class="py-2.5 px-3 text-center">Bukti TF</th>
+                <th class="py-2.5 px-3 text-center border-l border-slate-800">Status</th>
+                <th class="py-2.5 px-3 text-center w-28 border-l border-slate-800">Aksi</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/80 text-slate-300 font-medium">
+              <template x-for="(row, idx) in getFilteredMatrix()" :key="row.id || idx">
+                <tr class="hover:bg-slate-900/50 transition-colors">
+                  <td class="py-2.5 px-3 text-center text-slate-500 font-mono text-[11px]" x-text="idx + 1"></td>
+                  <td class="py-2.5 px-3 font-mono text-cyan-400 font-bold" x-text="row.id"></td>
+                  <td class="py-2.5 px-3 font-bold text-slate-100" x-text="row.nama"></td>
+                  <td class="py-2.5 px-3 text-amber-300 text-[11px]" x-text="row.paket"></td>
+
+                  <!-- KTP -->
+                  <td class="py-2.5 px-3 text-center border-l border-slate-800">
+                    <span x-show="row.hasKtp" class="text-emerald-400 font-bold" title="KTP Terunggah"><i class="fa-solid fa-circle-check text-sm"></i></span>
+                    <span x-show="!row.hasKtp" class="text-slate-600" title="Belum Ada KTP"><i class="fa-solid fa-circle-xmark text-sm"></i></span>
+                  </td>
+
+                  <!-- Paspor -->
+                  <td class="py-2.5 px-3 text-center">
+                    <span x-show="row.hasPaspor" class="text-emerald-400 font-bold" title="Paspor Terunggah"><i class="fa-solid fa-circle-check text-sm"></i></span>
+                    <span x-show="!row.hasPaspor" class="text-slate-600" title="Belum Ada Paspor"><i class="fa-solid fa-circle-xmark text-sm"></i></span>
+                  </td>
+
+                  <!-- KK -->
+                  <td class="py-2.5 px-3 text-center">
+                    <span x-show="row.hasKk" class="text-emerald-400 font-bold" title="Kartu Keluarga Terunggah"><i class="fa-solid fa-circle-check text-sm"></i></span>
+                    <span x-show="!row.hasKk" class="text-slate-600" title="Belum Ada KK"><i class="fa-solid fa-circle-xmark text-sm"></i></span>
+                  </td>
+
+                  <!-- Surat Nikah -->
+                  <td class="py-2.5 px-3 text-center">
+                    <span x-show="row.hasNikah" class="text-emerald-400 font-bold" title="Surat Nikah Terunggah"><i class="fa-solid fa-circle-check text-sm"></i></span>
+                    <span x-show="!row.hasNikah" class="text-slate-600" title="Tidak Wajib / Belum Ada"><i class="fa-solid fa-minus text-xs"></i></span>
+                  </td>
+
+                  <!-- Foto -->
+                  <td class="py-2.5 px-3 text-center">
+                    <span x-show="row.hasFoto" class="text-emerald-400 font-bold" title="Foto Terunggah"><i class="fa-solid fa-circle-check text-sm"></i></span>
+                    <span x-show="!row.hasFoto" class="text-slate-600" title="Belum Ada Foto"><i class="fa-solid fa-circle-xmark text-sm"></i></span>
+                  </td>
+
+                  <!-- Bukti TF -->
+                  <td class="py-2.5 px-3 text-center">
+                    <span x-show="row.hasTf" class="text-emerald-400 font-bold" title="Bukti Bayar Terunggah"><i class="fa-solid fa-circle-check text-sm"></i></span>
+                    <span x-show="!row.hasTf" class="text-slate-600" title="Belum Ada Bukti TF"><i class="fa-solid fa-circle-xmark text-sm"></i></span>
+                  </td>
+
+                  <!-- Status -->
+                  <td class="py-2.5 px-3 text-center border-l border-slate-800">
+                    <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold inline-block"
+                      :class="row.isLengkap ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'"
+                      x-text="row.isLengkap ? 'Lengkap' : 'Belum Lengkap'"></span>
+                  </td>
+
+                  <!-- Aksi: Quick Upload to Tab 1 -->
+                  <td class="py-2.5 px-3 text-center border-l border-slate-800">
+                    <button type="button" @click="quickUploadForJamaah(row.id)"
+                      class="px-2.5 py-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1 mx-auto"
+                      title="Upload Berkas Jamaah Ini">
+                      <i class="fa-solid fa-cloud-arrow-up text-[10px]"></i>
+                      <span>Upload</span>
+                    </button>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- ============================================================================ -->
+<!-- ALPINE JS CONTROLLER COMPONENT FOR UPLOAD DOKUMEN JAMAAH                     -->
+<!-- ============================================================================ -->
+<script>
+function uploadDokJamaahApp() {
+  return {
+    activeTab: 'form', // 'form' | 'daftar' | 'dashboard'
+    isLoading: false,
+    isSaving: false,
+
+    jamaahList: [],
+    documents: [],
+    paketList: [],
+
+    selectedJamaahId: '',
+    selectedJamaah: null,
+    selectedJenisDok: '6. Paspor',
+    keterangan: '',
+    linkInput: '',
+    selectedFile: null,
+    fileBase64: '',
+    isDragging: false,
+
+    searchQuery: '',
+    filterJenis: 'Semua',
+    filterPaket: 'Semua',
+
+    matrixSearch: '',
+    matrixFilterStatus: 'Semua',
+
+    init() {
+      window.appUploadDokJamaahInstance = this;
+      this.loadAllData();
+    },
+
+    async loadAllData(force = false) {
+      this.isLoading = true;
+      try {
+        const [jRes, dRes] = await Promise.all([
+          fetch('/api/jamaah/all').then(r => r.json()).catch(() => ({ data: [] })),
+          fetch('/api/upload-dok-jamaah').then(r => r.json()).catch(() => ({ data: [] }))
+        ]);
+
+        let rawJamaah = (jRes && jRes.data) ? jRes.data : [];
+        if (!rawJamaah.length) {
+          try {
+            const fallback = await fetch('/data/data_jamaah.json').then(r => r.json());
+            if (Array.isArray(fallback)) rawJamaah = fallback;
+          } catch(e) {}
+        }
+        this.jamaahList = rawJamaah;
+
+        let rawDocs = (dRes && dRes.data) ? dRes.data : [];
+        if (!rawDocs.length) {
+          try {
+            const fallbackD = await fetch('/data/upload_dok_jamaah.json').then(r => r.json());
+            if (Array.isArray(fallbackD)) rawDocs = fallbackD;
+          } catch(e) {}
+        }
+        this.documents = rawDocs;
+
+        const pkts = new Set();
+        this.jamaahList.forEach(j => {
+          const p = j.jenisPaket || j.jenis_paket_umrah || j.nama_paket || '';
+          if (p && p.trim()) pkts.add(p.trim());
+        });
+        this.paketList = Array.from(pkts).sort();
+
+        if (force && window.Swal) {
+          Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Data dokumen berhasil disegarkan!', timer: 2000, showConfirmButton: false });
+        }
+      } catch (err) {
+        console.error('Error loading data for upload dok jamaah:', err);
+      } finally {
+        this.isLoading = false;
+      }
+    },
+
+    getSortedJamaahList() {
+      return [...(this.jamaahList || [])].sort((a, b) => {
+        const idA = String(a.id_jamaah || a.id || '');
+        const idB = String(b.id_jamaah || b.id || '');
+        return idB.localeCompare(idA);
+      });
+    },
+
+    get computedFileName() {
+      const idJ = this.selectedJamaahId || 'ID_JAMAAH';
+      const nama = this.selectedJamaah ? (this.selectedJamaah.nama_lengkap || this.selectedJamaah.namaLengkap || this.selectedJamaah.nama || 'NAMA_JAMAAH') : 'NAMA_JAMAAH';
+      
+      let jDok = this.selectedJenisDok || 'Paspor';
+      jDok = jDok.replace(/^\d+\.\s*/, '').trim();
+
+      let ext = 'pdf';
+      if (this.selectedFile && this.selectedFile.name) {
+        const parts = this.selectedFile.name.split('.');
+        if (parts.length > 1) ext = parts.pop().toLowerCase();
+      }
+
+      return `${idJ} - ${nama} - ${jDok}.${ext}`;
+    },
+
+    onJamaahChange() {
+      if (!this.selectedJamaahId) {
+        this.selectedJamaah = null;
+        return;
+      }
+      this.selectedJamaah = (this.jamaahList || []).find(j => (j.id_jamaah || j.id || j['ID Jamaah']) === this.selectedJamaahId) || null;
+    },
+
+    handleFileSelect(event) {
+      const file = event.target.files && event.target.files[0];
+      this.processFile(file);
+    },
+
+    handleDrop(event) {
+      this.isDragging = false;
+      const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+      this.processFile(file);
+    },
+
+    processFile(file) {
+      if (!file) return;
+      if (file.size > 10 * 1024 * 1024) {
+        alert('Ukuran berkas melebihi batas maksimum 10 MB!');
+        return;
+      }
+      this.selectedFile = file;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        this.fileBase64 = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    },
+
+    removeFile() {
+      this.selectedFile = null;
+      this.fileBase64 = '';
+      if (this.$refs && this.$refs.fileInput) this.$refs.fileInput.value = '';
+    },
+
+    resetForm() {
+      this.selectedJamaahId = '';
+      this.selectedJamaah = null;
+      this.selectedJenisDok = '6. Paspor';
+      this.keterangan = '';
+      this.linkInput = '';
+      this.removeFile();
+    },
+
+    async submitUpload() {
+      if (!this.selectedJamaahId) {
+        alert('Silakan pilih Jamaah terlebih dahulu!');
+        return;
+      }
+      if (!this.selectedFile && !this.linkInput) {
+        alert('Silakan pilih berkas fisik (Drag & Drop) atau masukkan link berkas!');
+        return;
+      }
+
+      const idJ = this.selectedJamaahId;
+      const nama = this.selectedJamaah ? (this.selectedJamaah.nama_lengkap || this.selectedJamaah.namaLengkap || this.selectedJamaah.nama || idJ) : idJ;
+      let jDok = this.selectedJenisDok.replace(/^\d+\.\s*/, '').trim();
+      const targetFileName = this.computedFileName;
+      const fileUrl = this.linkInput || this.fileBase64;
+      const uploader = (window.currentUser && window.currentUser.username) ? window.currentUser.username : 'Admin';
+
+      this.isSaving = true;
+
+      try {
+        const payload = {
+          'ID Jamaah': idJ,
+          id_jamaah: idJ,
+          'Nama Lengkap': nama,
+          nama_lengkap: nama,
+          'Jenis Dokumen': jDok,
+          jenis_dokumen: jDok,
+          'Nama File': targetFileName,
+          nama_file: targetFileName,
+          'Link File': fileUrl,
+          link_file: fileUrl,
+          Uploader: uploader,
+          uploader: uploader,
+          Keterangan: this.keterangan || `Diunggah via Portal Jamaah Umrah [${jDok}]`
+        };
+
+        const res = await fetch('/api/upload-dok-jamaah', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const json = await res.json();
+        if (json.success) {
+          if (window.Swal) {
+            Swal.fire({
+              icon: 'success',
+              title: 'Berkas Berhasil Diarsipkan!',
+              text: `Dokumen ${jDok} untuk jamaah ${nama} (${idJ}) berhasil disimpan ke database.`,
+              timer: 2500,
+              showConfirmButton: false
+            });
+          } else {
+            alert('Dokumen berhasil diunggah!');
+          }
+          this.resetForm();
+          await this.loadAllData();
+          this.activeTab = 'daftar';
+        } else {
+          alert('Gagal menyimpan: ' + (json.error || 'Terjadi kesalahan'));
+        }
+      } catch (err) {
+        alert('Gagal: ' + err.message);
+      } finally {
+        this.isSaving = false;
+      }
+    },
+
+    async deleteDoc(docId) {
+      if (!confirm('Yakin ingin menghapus dokumen berkas ini?')) return;
+      try {
+        const res = await fetch('/api/upload-dok-jamaah/' + encodeURIComponent(docId), { method: 'DELETE' });
+        const json = await res.json();
+        if (json.success) {
+          if (window.Swal) Swal.fire('Berhasil', 'Dokumen berhasil dihapus!', 'success');
+          await this.loadAllData();
+        } else {
+          alert('Gagal: ' + (json.error || 'Terjadi kesalahan'));
+        }
+      } catch (e) {
+        alert('Gagal: ' + e.message);
+      }
+    },
+
+    quickUploadForJamaah(jamaahId, defaultJenis = '6. Paspor') {
+      this.selectedJamaahId = jamaahId;
+      this.onJamaahChange();
+      this.selectedJenisDok = defaultJenis;
+      this.activeTab = 'form';
+    },
+
+    countByJenis(jenis) {
+      return (this.documents || []).filter(d => {
+        const jd = (d['Jenis Dokumen'] || d.jenis_dokumen || d.jenisDokumen || '').toLowerCase();
+        return jd.includes(jenis.toLowerCase());
+      }).length;
+    },
+
+    getFilteredDocs() {
+      let list = this.documents || [];
+      const q = (this.searchQuery || '').toLowerCase().trim();
+      if (q) {
+        list = list.filter(d => {
+          const id = String(d['ID Jamaah'] || d.id_jamaah || '').toLowerCase();
+          const nama = String(d['Nama Lengkap'] || d.nama_lengkap || '').toLowerCase();
+          const docId = String(d.DocID || d.docid || '').toLowerCase();
+          const jd = String(d['Jenis Dokumen'] || d.jenis_dokumen || '').toLowerCase();
+          const fn = String(d['Nama File'] || d.nama_file || '').toLowerCase();
+          return id.includes(q) || nama.includes(q) || docId.includes(q) || jd.includes(q) || fn.includes(q);
+        });
+      }
+
+      if (this.filterJenis && this.filterJenis !== 'Semua') {
+        const fj = this.filterJenis.toLowerCase();
+        list = list.filter(d => {
+          const jd = String(d['Jenis Dokumen'] || d.jenis_dokumen || '').toLowerCase();
+          return jd.includes(fj);
+        });
+      }
+
+      if (this.filterPaket && this.filterPaket !== 'Semua') {
+        list = list.filter(d => {
+          const jId = d['ID Jamaah'] || d.id_jamaah;
+          const found = (this.jamaahList || []).find(j => (j.id_jamaah || j.id) === jId);
+          const p = found ? (found.jenisPaket || found.jenis_paket_umrah || '') : '';
+          return p.trim().toLowerCase() === this.filterPaket.trim().toLowerCase();
+        });
+      }
+
+      return list;
+    },
+
+    getMatrixRows() {
+      const docMap = {};
+      (this.documents || []).forEach(d => {
+        const id = (d['ID Jamaah'] || d.id_jamaah || '').toUpperCase().trim();
+        if (!docMap[id]) docMap[id] = [];
+        docMap[id].push(d);
+      });
+
+      return (this.jamaahList || []).map(j => {
+        const idJ = (j.id_jamaah || j.id || '').toUpperCase().trim();
+        const docs = docMap[idJ] || [];
+
+        const hasDocType = (typeKeywords) => {
+          return docs.some(d => {
+            const t = (d['Jenis Dokumen'] || d.jenis_dokumen || '').toLowerCase();
+            return typeKeywords.some(kw => t.includes(kw));
+          });
+        };
+
+        const hasKtp = Boolean(j.upload_ktp) || hasDocType(['ktp']);
+        const hasPaspor = Boolean(j.upload_pasport) || hasDocType(['paspor']);
+        const hasKk = Boolean(j.kartu_keluarga) || hasDocType(['kartu keluarga', 'kk']);
+        const hasNikah = Boolean(j.surat_nikah || j.buku_nikah) || hasDocType(['nikah']);
+        const hasFoto = Boolean(j.foto_jamaah) || hasDocType(['foto']);
+        const hasTf = Boolean(j.upload_bukti_transfer) || hasDocType(['transfer', 'bukti']);
+
+        const isLengkap = hasKtp && hasPaspor && hasKk && hasFoto && hasTf;
+        let totalUploaded = (hasKtp?1:0) + (hasPaspor?1:0) + (hasKk?1:0) + (hasNikah?1:0) + (hasFoto?1:0) + (hasTf?1:0);
+
+        return {
+          id: idJ,
+          nama: j.nama_lengkap || j.namaLengkap || j.nama || 'Tanpa Nama',
+          paket: j.jenis_paket_umrah || j.jenisPaket || j.nama_paket || '-',
+          hasKtp,
+          hasPaspor,
+          hasKk,
+          hasNikah,
+          hasFoto,
+          hasTf,
+          isLengkap,
+          totalUploaded,
+          scorePct: Math.round((totalUploaded / 6) * 100)
+        };
+      });
+    },
+
+    getFilteredMatrix() {
+      let rows = this.getMatrixRows();
+      const q = (this.matrixSearch || '').toLowerCase().trim();
+      if (q) {
+        rows = rows.filter(r => r.id.toLowerCase().includes(q) || r.nama.toLowerCase().includes(q) || r.paket.toLowerCase().includes(q));
+      }
+      if (this.matrixFilterStatus === 'Lengkap') {
+        rows = rows.filter(r => r.isLengkap);
+      } else if (this.matrixFilterStatus === 'Belum Lengkap') {
+        rows = rows.filter(r => !r.isLengkap);
+      }
+      return rows;
+    },
+
+    getLengkapCount() {
+      return this.getMatrixRows().filter(r => r.isLengkap).length;
+    },
+
+    getBelumLengkapCount() {
+      return this.getMatrixRows().filter(r => !r.isLengkap).length;
+    }
+  };
+}
+</script>
         </div>
 
         <!-- ================================================================
