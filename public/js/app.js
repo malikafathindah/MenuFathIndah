@@ -9473,13 +9473,66 @@ window.initDashboardHT = initDashboardHT;
     // --- 3. Kelengkapan Umrah API ---
     async getKelengkapanUmrahData() {
       try {
-        const [resJamaah, resKel] = await Promise.all([
-          fetch('/api/jamaah/all').then(r => r.json()),
-          fetch('/api/kelengkapan-umrah').then(r => r.json())
-        ]);
+        let rawJamaahList = [];
+        let kelRows = [];
 
-        const rawJamaahList = resJamaah.data || [];
-        const kelRows = resKel.data || [];
+        const isStatic = (window.state && window.state.isStaticMode) || 
+                         window.location.hostname.includes('github.io') || 
+                         window.location.protocol === 'file:';
+
+        if (!isStatic) {
+          try {
+            const [resJamaah, resKel] = await Promise.all([
+              fetch('/api/jamaah/all').then(r => r.ok ? r.json() : null).catch(() => null),
+              fetch('/api/kelengkapan-umrah').then(r => r.ok ? r.json() : null).catch(() => null)
+            ]);
+            if (resJamaah && resJamaah.data) rawJamaahList = resJamaah.data;
+            if (resKel && resKel.data) kelRows = resKel.data;
+          } catch(e) {}
+        }
+
+        // Direct Supabase REST fetch fallback (for GitHub Pages!)
+        if (!rawJamaahList.length || !kelRows.length) {
+          try {
+            const [sbJamaah, sbKel] = await Promise.all([
+              !rawJamaahList.length ? fetchSupabaseDirect('jamaah', 'select=*&limit=500').catch(() => []) : Promise.resolve([]),
+              !kelRows.length ? fetchSupabaseDirect('kelengkapan_umrah', 'select=*&limit=500').catch(() => []) : Promise.resolve([])
+            ]);
+            if (!rawJamaahList.length && Array.isArray(sbJamaah) && sbJamaah.length) rawJamaahList = sbJamaah;
+            if (!kelRows.length && Array.isArray(sbKel) && sbKel.length) kelRows = sbKel;
+          } catch(errSb) {
+            console.warn('[KelengkapanUmrah] Direct Supabase error:', errSb);
+          }
+        }
+
+        // Local JSON fallback if still empty
+        const basePath = window.location.pathname.endsWith('/') 
+          ? window.location.pathname 
+          : window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+
+        if (!rawJamaahList.length) {
+          try {
+            const fallbackJ = await fetch(basePath + 'data/data_jamaah.json').then(r => r.json());
+            if (Array.isArray(fallbackJ)) rawJamaahList = fallbackJ;
+          } catch(e) {
+            try {
+              const fallbackJ2 = await fetch('data/data_jamaah.json').then(r => r.json());
+              if (Array.isArray(fallbackJ2)) rawJamaahList = fallbackJ2;
+            } catch(e2) {}
+          }
+        }
+
+        if (!kelRows.length) {
+          try {
+            const fallbackK = await fetch(basePath + 'data/kelengkapan_umrah.json').then(r => r.json());
+            if (Array.isArray(fallbackK)) kelRows = fallbackK;
+          } catch(e) {
+            try {
+              const fallbackK2 = await fetch('data/kelengkapan_umrah.json').then(r => r.json());
+              if (Array.isArray(fallbackK2)) kelRows = fallbackK2;
+            } catch(e2) {}
+          }
+        }
 
         const kelengkapanMap = {};
         const kelengkapanRecords = kelRows.map((r, idx) => {
@@ -9598,11 +9651,31 @@ window.initDashboardHT = initDashboardHT;
           user_input: userInput
         };
 
-        await fetch('/api/kelengkapan-umrah', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(record)
-        });
+        let saved = false;
+        if (!((window.state && window.state.isStaticMode) || window.location.hostname.includes('github.io'))) {
+          try {
+            const res = await fetch('/api/kelengkapan-umrah', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(record)
+            });
+            if (res.ok) saved = true;
+          } catch(e) {}
+        }
+        if (!saved) {
+          const key = SUPABASE_CONFIG.anonKey;
+          const sbRes = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/kelengkapan_umrah`, {
+            method: 'POST',
+            headers: {
+              'apikey': key,
+              'Authorization': 'Bearer ' + key,
+              'Content-Type': 'application/json',
+              'Prefer': 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify(record)
+          });
+          if (sbRes.ok) saved = true;
+        }
 
         if (this._successHandler) this._successHandler({
           success: true,
@@ -9617,9 +9690,25 @@ window.initDashboardHT = initDashboardHT;
 
     async deleteKelengkapanUmrah(idJamaah) {
       try {
-        const res = await fetch('/api/kelengkapan-umrah/' + encodeURIComponent(idJamaah), { method: 'DELETE' });
-        const json = await res.json();
-        if (this._successHandler) this._successHandler({ success: true, message: json.message || 'Data kelengkapan berhasil dihapus' });
+        let deleted = false;
+        if (!((window.state && window.state.isStaticMode) || window.location.hostname.includes('github.io'))) {
+          try {
+            const res = await fetch('/api/kelengkapan-umrah/' + encodeURIComponent(idJamaah), { method: 'DELETE' });
+            if (res.ok) deleted = true;
+          } catch(e) {}
+        }
+        if (!deleted) {
+          const key = SUPABASE_CONFIG.anonKey;
+          await fetch(`${SUPABASE_CONFIG.url}/rest/v1/kelengkapan_umrah?id_jamaah=eq.${encodeURIComponent(idJamaah)}`, {
+            method: 'DELETE',
+            headers: {
+              'apikey': key,
+              'Authorization': 'Bearer ' + key
+            }
+          });
+          deleted = true;
+        }
+        if (this._successHandler) this._successHandler({ success: true, message: 'Data kelengkapan berhasil dihapus' });
       } catch (err) {
         if (this._failureHandler) this._failureHandler(err);
       }
@@ -9651,10 +9740,32 @@ async function initUploadDokJamaahView() {
 
 async function loadUploadDokJamaahDropdowns() {
   try {
-    const res = await fetch('/api/jamaah/all');
-    const json = await res.json();
-    const list = json.data || [];
-    stateUploadDokJamaah.jamaahList = list;
+    let list = [];
+    if (!((window.state && window.state.isStaticMode) || window.location.hostname.includes('github.io'))) {
+      try {
+        const res = await fetch('/api/jamaah/all');
+        if (res.ok) {
+          const json = await res.json();
+          list = json.data || [];
+        }
+      } catch(e) {}
+    }
+    if (!list.length) {
+      try {
+        list = await fetchSupabaseDirect('jamaah', 'select=*&limit=500');
+      } catch(e) {}
+    }
+    if (!list.length) {
+      const basePath = window.location.pathname.endsWith('/') 
+        ? window.location.pathname 
+        : window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+      try {
+        list = await fetch(basePath + 'data/data_jamaah.json').then(r => r.json());
+      } catch(e) {
+        try { list = await fetch('data/data_jamaah.json').then(r => r.json()); } catch(e2) {}
+      }
+    }
+    stateUploadDokJamaah.jamaahList = list || [];
 
     // Populate Paket Filter dropdown
     const paketSelect = document.getElementById('udjFilterPaket');

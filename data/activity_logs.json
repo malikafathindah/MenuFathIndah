@@ -1,5 +1,27 @@
 [
   {
+    "LogID": "LOG-CGQAIQMS",
+    "Timestamp": "2026-10-23 09:51:26",
+    "Username": "admin",
+    "IP_Address": "127.0.0.1 (Localhost)",
+    "Maps_URL": "https://www.google.com/maps?q=-6.247900165541602,106.98033904297374",
+    "Location": "Lagoon, Jakasampurna, Bekasi",
+    "Action": "LOGIN_SUCCESS (User ADMINISTRATOR UTAMA berhasil login pada 2026-10-23 09:51:26)",
+    "Module": "Auth",
+    "isNewSessionLog": true
+  },
+  {
+    "LogID": "LOG-6TVONQMU",
+    "Timestamp": "2026-10-23 09:28:06",
+    "Username": "admin",
+    "IP_Address": "127.0.0.1 (Localhost)",
+    "Maps_URL": "https://www.google.com/maps?q=-6.247961978965765,106.98029247312375",
+    "Location": "Lagoon, Jakasampurna, Bekasi",
+    "Action": "LOGIN_SUCCESS (User ADMINISTRATOR UTAMA berhasil login pada 2026-10-23 09:28:06)",
+    "Module": "Auth",
+    "isNewSessionLog": true
+  },
+  {
     "LogID": "LOG-W93X8CEG",
     "Timestamp": "2026-10-22 21:13:21",
     "Username": "admin",

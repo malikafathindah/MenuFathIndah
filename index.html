@@ -7140,28 +7140,84 @@ function kelengkapanUmrahApp() {
       this.loadKelengkapanUmrahData();
     },
 
+    async _fetchDirectSupabase(table, query = '') {
+      if (typeof window.fetchSupabaseDirect === 'function') {
+        try {
+          return await window.fetchSupabaseDirect(table, query);
+        } catch(e) {}
+      }
+      const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0cWV4cGt3dGF0d3prbmpmdHB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxODQ5MTYsImV4cCI6MjEwNzc2MDkxNn0.s17as0ZuXm11AMJyYp01omnHkiqTRTGrKtYZfAI7kwE';
+      const url = 'https://utqexpkwtatwzknjftpx.supabase.co/rest/v1/' + table + (query ? '?' + query : '');
+      const res = await fetch(url, {
+        headers: { 'apikey': key, 'Authorization': 'Bearer ' + key }
+      });
+      if (!res.ok) throw new Error('Supabase direct HTTP ' + res.status);
+      return await res.json();
+    },
+
     async loadKelengkapanUmrahData(force = false) {
       this.isKelengkapanLoading = true;
       try {
-        const [kRes, jRes] = await Promise.all([
-          fetch('/api/kelengkapan-umrah').then(r => r.json()).catch(() => ({ data: [] })),
-          fetch('/api/jamaah/all').then(r => r.json()).catch(() => ({ data: [] }))
-        ]);
+        let rawJamaah = [];
+        let rawKelengkapan = [];
 
-        let rawJamaah = (jRes && jRes.data) ? jRes.data : [];
-        if (!rawJamaah || rawJamaah.length === 0) {
+        const isStatic = (window.state && window.state.isStaticMode) || 
+                         window.location.hostname.includes('github.io') || 
+                         window.location.protocol === 'file:';
+
+        // 1. Coba backend express API jika bukan static host
+        if (!isStatic) {
           try {
-            const fallbackJ = await fetch('/data/data_jamaah.json').then(r => r.json());
-            if (Array.isArray(fallbackJ)) rawJamaah = fallbackJ;
+            const [kRes, jRes] = await Promise.all([
+              fetch('/api/kelengkapan-umrah').then(r => r.ok ? r.json() : null).catch(() => null),
+              fetch('/api/jamaah/all').then(r => r.ok ? r.json() : null).catch(() => null)
+            ]);
+            if (kRes && kRes.data && Array.isArray(kRes.data)) rawKelengkapan = kRes.data;
+            if (jRes && jRes.data && Array.isArray(jRes.data)) rawJamaah = jRes.data;
           } catch(e) {}
         }
 
-        let rawKelengkapan = (kRes && kRes.data) ? kRes.data : [];
-        if (!rawKelengkapan || rawKelengkapan.length === 0) {
+        // 2. Direct Supabase REST API (Solusi untuk GitHub Pages!)
+        if (!rawJamaah.length || !rawKelengkapan.length) {
           try {
-            const fallbackK = await fetch('/data/kelengkapan_umrah.json').then(r => r.json());
+            const [sbJamaah, sbKel] = await Promise.all([
+              !rawJamaah.length ? this._fetchDirectSupabase('jamaah', 'select=*&limit=500').catch(() => []) : Promise.resolve([]),
+              !rawKelengkapan.length ? this._fetchDirectSupabase('kelengkapan_umrah', 'select=*&limit=500').catch(() => []) : Promise.resolve([])
+            ]);
+            if (!rawJamaah.length && Array.isArray(sbJamaah) && sbJamaah.length) rawJamaah = sbJamaah;
+            if (!rawKelengkapan.length && Array.isArray(sbKel) && sbKel.length) rawKelengkapan = sbKel;
+          } catch(errSb) {
+            console.warn('[Kelengkapan] Direct Supabase fetch error:', errSb);
+          }
+        }
+
+        // 3. Fallback ke file JSON statis lokal (menggunakan path relatif agar aman di GitHub Pages)
+        const basePath = window.location.pathname.endsWith('/') 
+          ? window.location.pathname 
+          : window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+
+        if (!rawJamaah.length) {
+          try {
+            const fallbackJ = await fetch(basePath + 'data/data_jamaah.json').then(r => r.json());
+            if (Array.isArray(fallbackJ)) rawJamaah = fallbackJ;
+          } catch(e) {
+            try {
+              const fallbackJ2 = await fetch('data/data_jamaah.json').then(r => r.json());
+              if (Array.isArray(fallbackJ2)) rawJamaah = fallbackJ2;
+            } catch(e2) {}
+          }
+        }
+
+        if (!rawKelengkapan.length) {
+          try {
+            const fallbackK = await fetch(basePath + 'data/kelengkapan_umrah.json').then(r => r.json());
             if (Array.isArray(fallbackK)) rawKelengkapan = fallbackK;
-          } catch(e) {}
+          } catch(e) {
+            try {
+              const fallbackK2 = await fetch('data/kelengkapan_umrah.json').then(r => r.json());
+              if (Array.isArray(fallbackK2)) rawKelengkapan = fallbackK2;
+            } catch(e2) {}
+          }
         }
 
         // Build lookup map for Jamaah
@@ -7417,14 +7473,28 @@ function kelengkapanUmrahApp() {
     async deleteKelengkapanConfirm(idJamaah) {
       if (!confirm('Yakin ingin menghapus data kelengkapan jamaah ini?')) return;
       try {
-        const res = await fetch('/api/kelengkapan-umrah/' + encodeURIComponent(idJamaah), { method: 'DELETE' });
-        const data = await res.json();
-        if (data.success) {
-          if (window.Swal) Swal.fire('Berhasil', 'Data kelengkapan berhasil dihapus', 'success');
-          this.loadKelengkapanUmrahData();
-        } else {
-          alert('Gagal: ' + (data.error || 'Terjadi kesalahan'));
+        let deleted = false;
+        if (!((window.state && window.state.isStaticMode) || window.location.hostname.includes('github.io'))) {
+          try {
+            const res = await fetch('/api/kelengkapan-umrah/' + encodeURIComponent(idJamaah), { method: 'DELETE' });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.success) deleted = true;
+            }
+          } catch(e) {}
         }
+        if (!deleted) {
+          const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0cWV4cGt3dGF0d3prbmpmdHB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxODQ5MTYsImV4cCI6MjEwNzc2MDkxNn0.s17as0ZuXm11AMJyYp01omnHkiqTRTGrKtYZfAI7kwE';
+          await fetch('https://utqexpkwtatwzknjftpx.supabase.co/rest/v1/kelengkapan_umrah?id_jamaah=eq.' + encodeURIComponent(idJamaah), {
+            method: 'DELETE',
+            headers: {
+              'apikey': key,
+              'Authorization': 'Bearer ' + key
+            }
+          });
+        }
+        if (window.Swal) Swal.fire('Berhasil', 'Data kelengkapan berhasil dihapus', 'success');
+        this.loadKelengkapanUmrahData();
       } catch (e) {
         alert('Gagal: ' + e.message);
       }
@@ -7507,20 +7577,63 @@ function kelengkapanUmrahApp() {
           statusKelengkapan: status
         };
 
-        const res = await fetch('/api/kelengkapan-umrah', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        const data = await res.json();
-        if (data.success) {
-          if (window.Swal) Swal.fire('Berhasil', 'Data kelengkapan berhasil disimpan ke database!', 'success');
-          await this.loadKelengkapanUmrahData();
-          this.kelengkapanViewTab = 'rekap';
-        } else {
-          alert('Gagal menyimpan: ' + (data.error || 'Terjadi kesalahan'));
+        let saved = false;
+        if (!((window.state && window.state.isStaticMode) || window.location.hostname.includes('github.io'))) {
+          try {
+            const res = await fetch('/api/kelengkapan-umrah', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.success) saved = true;
+            }
+          } catch(e) {}
         }
+        if (!saved) {
+          // Direct upsert ke Supabase REST API
+          const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0cWV4cGt3dGF0d3prbmpmdHB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxODQ5MTYsImV4cCI6MjEwNzc2MDkxNn0.s17as0ZuXm11AMJyYp01omnHkiqTRTGrKtYZfAI7kwE';
+          const sbRecord = {
+            id_kelengkapan: payload.id_kelengkapan,
+            id_jamaah: payload.id_jamaah,
+            nama_jamaah: payload.nama_jamaah || '',
+            nama_paket: payload.nama_paket || '',
+            agent: payload.agent || '',
+            no_visa: payload.no_visa || '',
+            tanggal_berlaku_visa: payload.tanggal_berlaku_visa || null,
+            tanggal_akhir_visa: payload.tanggal_akhir_visa || null,
+            upload_visa: payload.upload_visa || '',
+            no_polis: payload.no_polis || '',
+            tanggal_input_polis: payload.tanggal_input_polis || new Date().toISOString().slice(0, 10),
+            tanggal_awal_polis: payload.tanggal_awal_polis || null,
+            tanggal_akhir_polis: payload.tanggal_akhir_polis || null,
+            upload_asuransi: payload.upload_asuransi || '',
+            nomor_bpjs: payload.no_bpjs || payload.nomor_bpjs || '',
+            upload_bpjs: payload.upload_bpjs || '',
+            status_kelengkapan: status,
+            updatedat: new Date().toISOString().replace('T', ' ').slice(0, 19),
+            user_input: (window.currentUser && window.currentUser.username) ? window.currentUser.username : 'Admin'
+          };
+          const sbRes = await fetch('https://utqexpkwtatwzknjftpx.supabase.co/rest/v1/kelengkapan_umrah', {
+            method: 'POST',
+            headers: {
+              'apikey': key,
+              'Authorization': 'Bearer ' + key,
+              'Content-Type': 'application/json',
+              'Prefer': 'resolution=merge-duplicates'
+            },
+            body: JSON.stringify(sbRecord)
+          });
+          if (sbRes.ok) saved = true;
+          else {
+            const errT = await sbRes.text();
+            throw new Error(errT || 'Gagal menyimpan ke Supabase');
+          }
+        }
+        if (window.Swal) Swal.fire('Berhasil', 'Data kelengkapan berhasil disimpan ke database!', 'success');
+        await this.loadKelengkapanUmrahData();
+        this.kelengkapanViewTab = 'rekap';
       } catch (err) {
         alert('Gagal: ' + err.message);
       } finally {
@@ -8273,30 +8386,119 @@ function uploadDokJamaahApp() {
       this.loadAllData();
     },
 
+    async _fetchDirectSupabase(table, query = '') {
+      if (typeof window.fetchSupabaseDirect === 'function') {
+        try {
+          return await window.fetchSupabaseDirect(table, query);
+        } catch(e) {}
+      }
+      const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0cWV4cGt3dGF0d3prbmpmdHB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxODQ5MTYsImV4cCI6MjEwNzc2MDkxNn0.s17as0ZuXm11AMJyYp01omnHkiqTRTGrKtYZfAI7kwE';
+      const url = 'https://utqexpkwtatwzknjftpx.supabase.co/rest/v1/' + table + (query ? '?' + query : '');
+      const res = await fetch(url, {
+        headers: { 'apikey': key, 'Authorization': 'Bearer ' + key }
+      });
+      if (!res.ok) throw new Error('Supabase direct HTTP ' + res.status);
+      return await res.json();
+    },
+
     async loadAllData(force = false) {
       this.isLoading = true;
       try {
-        const [jRes, dRes] = await Promise.all([
-          fetch('/api/jamaah/all').then(r => r.json()).catch(() => ({ data: [] })),
-          fetch('/api/upload-dok-jamaah').then(r => r.json()).catch(() => ({ data: [] }))
-        ]);
+        let rawJamaah = [];
+        let rawDocs = [];
 
-        let rawJamaah = (jRes && jRes.data) ? jRes.data : [];
+        const isStatic = (window.state && window.state.isStaticMode) || 
+                         window.location.hostname.includes('github.io') || 
+                         window.location.protocol === 'file:';
+
+        // 1. Coba Express API jika bukan static
+        if (!isStatic) {
+          try {
+            const [jRes, dRes] = await Promise.all([
+              fetch('/api/jamaah/all').then(r => r.ok ? r.json() : null).catch(() => null),
+              fetch('/api/upload-dok-jamaah').then(r => r.ok ? r.json() : null).catch(() => null)
+            ]);
+            if (jRes && jRes.data && Array.isArray(jRes.data)) rawJamaah = jRes.data;
+            if (dRes && dRes.data && Array.isArray(dRes.data)) rawDocs = dRes.data;
+          } catch(e) {}
+        }
+
+        // 2. Direct Supabase REST API (Solusi data tampil di GitHub Pages!)
+        if (!rawJamaah.length || !rawDocs.length) {
+          try {
+            const [sbJamaah, sbDocs] = await Promise.all([
+              !rawJamaah.length ? this._fetchDirectSupabase('jamaah', 'select=*&limit=500').catch(() => []) : Promise.resolve([]),
+              !rawDocs.length ? this._fetchDirectSupabase('upload_dok', 'select=*&order=created_at.desc&limit=500').catch(() => []) : Promise.resolve([])
+            ]);
+
+            if (!rawJamaah.length && Array.isArray(sbJamaah) && sbJamaah.length) {
+              rawJamaah = sbJamaah;
+            }
+            if (!rawDocs.length && Array.isArray(sbDocs) && sbDocs.length) {
+              rawDocs = sbDocs.map(d => {
+                let idJ = d.id_jamaah || d['ID Jamaah'] || '';
+                let nama = d.nama_lengkap || d['Nama Lengkap'] || '';
+                if (!idJ && d.nama_karyawan) {
+                  const parts = String(d.nama_karyawan).split(' - ');
+                  idJ = parts[0] ? parts[0].trim() : '';
+                  nama = parts.slice(1).join(' - ').trim();
+                }
+                return {
+                  ...d,
+                  DocID: d.docid || d.DocID || d.id || '',
+                  'ID Jamaah': idJ,
+                  id_jamaah: idJ,
+                  'Nama Lengkap': nama,
+                  nama_lengkap: nama,
+                  'Jenis Dokumen': d.jenis_dokumen || d['Jenis Dokumen'] || '',
+                  jenis_dokumen: d.jenis_dokumen || d['Jenis Dokumen'] || '',
+                  'Nama File': d.nama_file || d['Nama File'] || '',
+                  nama_file: d.nama_file || d['Nama File'] || '',
+                  'Link File': d.link_file || d['Link File'] || '',
+                  link_file: d.link_file || d['Link File'] || '',
+                  Uploader: d.uploader || d.Uploader || 'Admin',
+                  uploader: d.uploader || d.Uploader || 'Admin',
+                  Keterangan: d.keterangan || d.Keterangan || '',
+                  keterangan: d.keterangan || d.Keterangan || '',
+                  Timestamp: d.timestamp || d.created_at || ''
+                };
+              });
+            }
+          } catch(errSb) {
+            console.warn('[UploadDokJamaah] Direct Supabase fetch error:', errSb);
+          }
+        }
+
+        // 3. Fallback file JSON relatif jika masih kosong
+        const basePath = window.location.pathname.endsWith('/') 
+          ? window.location.pathname 
+          : window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
+
         if (!rawJamaah.length) {
           try {
-            const fallback = await fetch('/data/data_jamaah.json').then(r => r.json());
+            const fallback = await fetch(basePath + 'data/data_jamaah.json').then(r => r.json());
             if (Array.isArray(fallback)) rawJamaah = fallback;
-          } catch(e) {}
+          } catch(e) {
+            try {
+              const fallback2 = await fetch('data/data_jamaah.json').then(r => r.json());
+              if (Array.isArray(fallback2)) rawJamaah = fallback2;
+            } catch(e2) {}
+          }
         }
-        this.jamaahList = rawJamaah;
 
-        let rawDocs = (dRes && dRes.data) ? dRes.data : [];
         if (!rawDocs.length) {
           try {
-            const fallbackD = await fetch('/data/upload_dok_jamaah.json').then(r => r.json());
+            const fallbackD = await fetch(basePath + 'data/upload_dok_jamaah.json').then(r => r.json());
             if (Array.isArray(fallbackD)) rawDocs = fallbackD;
-          } catch(e) {}
+          } catch(e) {
+            try {
+              const fallbackD2 = await fetch('data/upload_dok_jamaah.json').then(r => r.json());
+              if (Array.isArray(fallbackD2)) rawDocs = fallbackD2;
+            } catch(e2) {}
+          }
         }
+
+        this.jamaahList = rawJamaah;
         this.documents = rawDocs;
 
         const pkts = new Set();
@@ -8424,31 +8626,62 @@ function uploadDokJamaahApp() {
           Keterangan: this.keterangan || `Diunggah via Portal Jamaah Umrah [${jDok}]`
         };
 
-        const res = await fetch('/api/upload-dok-jamaah', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        const json = await res.json();
-        if (json.success) {
-          if (window.Swal) {
-            Swal.fire({
-              icon: 'success',
-              title: 'Berkas Berhasil Diarsipkan!',
-              text: `Dokumen ${jDok} untuk jamaah ${nama} (${idJ}) berhasil disimpan ke database.`,
-              timer: 2500,
-              showConfirmButton: false
+        let saved = false;
+        if (!((window.state && window.state.isStaticMode) || window.location.hostname.includes('github.io'))) {
+          try {
+            const res = await fetch('/api/upload-dok-jamaah', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
             });
-          } else {
-            alert('Dokumen berhasil diunggah!');
-          }
-          this.resetForm();
-          await this.loadAllData();
-          this.activeTab = 'daftar';
-        } else {
-          alert('Gagal menyimpan: ' + (json.error || 'Terjadi kesalahan'));
+            if (res.ok) {
+              const json = await res.json();
+              if (json.success) saved = true;
+            }
+          } catch(e) {}
         }
+        if (!saved) {
+          const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0cWV4cGt3dGF0d3prbmpmdHB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxODQ5MTYsImV4cCI6MjEwNzc2MDkxNn0.s17as0ZuXm11AMJyYp01omnHkiqTRTGrKtYZfAI7kwE';
+          const docId = 'DOCJ-' + Math.floor(1000 + Math.random() * 9000);
+          const sbRes = await fetch('https://utqexpkwtatwzknjftpx.supabase.co/rest/v1/upload_dok', {
+            method: 'POST',
+            headers: {
+              'apikey': key,
+              'Authorization': 'Bearer ' + key,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify({
+              docid: docId,
+              timestamp: new Date().toISOString(),
+              nama_karyawan: `${idJ} - ${nama}`,
+              jenis_dokumen: jDok,
+              nama_file: targetFileName,
+              link_file: fileUrl,
+              uploader: uploader,
+              keterangan: this.keterangan || `Diunggah via Portal Jamaah Umrah [${jDok}]`
+            })
+          });
+          if (sbRes.ok) saved = true;
+          else {
+            const errT = await sbRes.text();
+            throw new Error(errT || 'Gagal menyimpan ke Supabase');
+          }
+        }
+        if (window.Swal) {
+          Swal.fire({
+            icon: 'success',
+            title: 'Berkas Berhasil Diarsipkan!',
+            text: `Dokumen ${jDok} untuk jamaah ${nama} (${idJ}) berhasil disimpan ke database.`,
+            timer: 2500,
+            showConfirmButton: false
+          });
+        } else {
+          alert('Dokumen berhasil diunggah!');
+        }
+        this.resetForm();
+        await this.loadAllData();
+        this.activeTab = 'daftar';
       } catch (err) {
         alert('Gagal: ' + err.message);
       } finally {
@@ -8459,14 +8692,28 @@ function uploadDokJamaahApp() {
     async deleteDoc(docId) {
       if (!confirm('Yakin ingin menghapus dokumen berkas ini?')) return;
       try {
-        const res = await fetch('/api/upload-dok-jamaah/' + encodeURIComponent(docId), { method: 'DELETE' });
-        const json = await res.json();
-        if (json.success) {
-          if (window.Swal) Swal.fire('Berhasil', 'Dokumen berhasil dihapus!', 'success');
-          await this.loadAllData();
-        } else {
-          alert('Gagal: ' + (json.error || 'Terjadi kesalahan'));
+        let deleted = false;
+        if (!((window.state && window.state.isStaticMode) || window.location.hostname.includes('github.io'))) {
+          try {
+            const res = await fetch('/api/upload-dok-jamaah/' + encodeURIComponent(docId), { method: 'DELETE' });
+            if (res.ok) {
+              const json = await res.json();
+              if (json.success) deleted = true;
+            }
+          } catch(e) {}
         }
+        if (!deleted) {
+          const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV0cWV4cGt3dGF0d3prbmpmdHB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxODQ5MTYsImV4cCI6MjEwNzc2MDkxNn0.s17as0ZuXm11AMJyYp01omnHkiqTRTGrKtYZfAI7kwE';
+          await fetch('https://utqexpkwtatwzknjftpx.supabase.co/rest/v1/upload_dok?or=(docid.eq.' + encodeURIComponent(docId) + ',id.eq.' + encodeURIComponent(docId) + ')', {
+            method: 'DELETE',
+            headers: {
+              'apikey': key,
+              'Authorization': 'Bearer ' + key
+            }
+          });
+        }
+        if (window.Swal) Swal.fire('Berhasil', 'Dokumen berhasil dihapus!', 'success');
+        await this.loadAllData();
       } catch (e) {
         alert('Gagal: ' + e.message);
       }
